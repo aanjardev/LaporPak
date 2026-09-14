@@ -5,6 +5,12 @@ class Settings(BaseSettings):
     app_env: str = "development"
     frontend_url: str = "http://localhost:3000"
 
+    database_url: str = ""
+
+    supabase_url: str = ""
+    supabase_publishable_key: str = ""
+    supabase_secret_key: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
