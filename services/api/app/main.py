@@ -4,7 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.health import router as health_router
 from app.core.config import settings
 
-
 app = FastAPI(
     title="LaporPak API",
     description="Backend API for LaporPak",
