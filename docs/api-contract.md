@@ -468,6 +468,22 @@ Canonical P0 analysis:
 | `clarification_reason` | string/null | yes | reason |
 | `summary` | string/null | yes | generated summary |
 
+`location`, bila tidak `null`, selalu memiliki ketiga key berikut. Nilainya
+boleh `null` agar hasil ekstraksi yang belum lengkap tetap dapat divalidasi dan
+diteruskan ke alur klarifikasi.
+
+| Field | Type | Required | Meaning |
+|---|---|---:|---|
+| `text` | string/null | yes | lokasi tekstual dari input warga |
+| `latitude` | number/null | yes | latitude pada rentang `-90..90` |
+| `longitude` | number/null | yes | longitude pada rentang `-180..180` |
+
+Semua object pada Internal AI Output menolak field yang tidak tercantum dalam
+contract. String non-null harus berisi teks, bukan string kosong/whitespace.
+Output boleh valid secara schema tetapi belum lengkap secara bisnis; OpenClaw
+melakukan pemeriksaan provisional dan FastAPI menghitung ulang kelengkapan saat
+create report.
+
 ### Important
 
 Backend tetap menghitung ulang:

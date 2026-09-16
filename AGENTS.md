@@ -125,6 +125,9 @@ LaporPak/
 ├── data/
 │   └── knowledge-base/
 │
+├── integrations/
+│   └── openclaw/                # Secret-free prompts and schema artifacts
+│
 ├── docs/
 │   ├── project-context.md
 │   ├── architecture.md

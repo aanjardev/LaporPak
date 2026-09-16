@@ -348,6 +348,15 @@ AI module:
 services/api/app/services/ai/
 ```
 
+Version-controlled OpenClaw prompts and schema artifacts live in:
+
+```text
+integrations/openclaw/
+```
+
+Runtime configuration, auth profiles, channel/session state, and secrets remain
+local to the OpenClaw host and are not committed.
+
 Rules:
 
 - output structured;
