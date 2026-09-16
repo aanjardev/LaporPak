@@ -1,0 +1,632 @@
+# LaporPak — API & Data Contract
+
+> **Contract version:** `0.2.0`  
+> **Status:** Day 1 baseline  
+> **Base API:** `/api/v1`
+
+Dokumen ini adalah canonical contract untuk Frontend, Backend, AI integration, dan mock data.
+
+---
+
+## 1. General Conventions
+
+### JSON
+
+- Request/response menggunakan JSON kecuali upload file.
+- Field API menggunakan `snake_case`.
+- UUID menggunakan string.
+- Timestamp menggunakan ISO 8601 UTC bila dikirim lewat API.
+
+### Canonical casing
+
+Status/category/urgency API memakai lowercase.
+
+Intent AI memakai uppercase.
+
+---
+
+## 2. Canonical Enums
+
+### Intent
+
+```text
+ASK
+REPORT
+REQUEST
+TRACK
+UNKNOWN
+```
+
+P0:
+
+```text
+REPORT
+UNKNOWN
+```
+
+### Report status
+
+```text
+pending_verification
+verified
+in_progress
+forwarded
+resolved
+rejected
+```
+
+### Urgency
+
+```text
+low
+medium
+high
+critical
+```
+
+### Source
+
+```text
+whatsapp
+dashboard
+api
+seed
+```
+
+### Category code
+
+```text
+infrastructure
+public_facility
+cleanliness
+security
+social
+administration
+other
+```
+
+---
+
+## 3. Standard Error Envelope
+
+Semua controlled API error sebaiknya mengikuti:
+
+```json
+{
+  "error": {
+    "code": "REPORT_NOT_FOUND",
+    "message": "Report not found",
+    "details": null
+  }
+}
+```
+
+`details` boleh object/list/null.
+
+### Minimum error codes
+
+```text
+INVALID_REQUEST
+UNAUTHORIZED
+FORBIDDEN
+REPORT_NOT_FOUND
+INVALID_STATUS_TRANSITION
+DUPLICATE_OPERATION
+VALIDATION_ERROR
+DATABASE_UNAVAILABLE
+AI_UNAVAILABLE
+INTERNAL_ERROR
+```
+
+Suggested HTTP mapping:
+
+| HTTP | Code |
+|---:|---|
+| 400 | `INVALID_REQUEST` |
+| 401 | `UNAUTHORIZED` |
+| 403 | `FORBIDDEN` |
+| 404 | `REPORT_NOT_FOUND` |
+| 409 | `INVALID_STATUS_TRANSITION` |
+| 409 | `DUPLICATE_OPERATION` |
+| 422 | `VALIDATION_ERROR` |
+| 503 | `DATABASE_UNAVAILABLE` |
+| 503 | `AI_UNAVAILABLE` |
+| 500 | `INTERNAL_ERROR` |
+
+---
+
+## 4. Health
+
+```http
+GET /health
+```
+
+Response `200`:
+
+```json
+{
+  "status": "ok",
+  "service": "laporpak-api"
+}
+```
+
+Health bukan `/api/v1/health` pada baseline saat ini.
+
+---
+
+## 5. Create Report
+
+```http
+POST /api/v1/reports
+```
+
+### Responsibility
+
+Endpoint membuat entity `reports`.
+
+Ticket number dihasilkan server-side dan **tidak** dikirim client.
+
+### Request
+
+```json
+{
+  "sender_phone_number": "+6281234567890",
+  "conversation_id": "fa5d95ae-514f-4ce0-a3c2-735d8558948b",
+  "category": "infrastructure",
+  "description": "Jalan di RT 03 rusak parah.",
+  "location": {
+    "text": "RT 03 dekat masjid",
+    "latitude": -7.123,
+    "longitude": 112.123
+  },
+  "urgency": "high",
+  "original_text": "Pak jalan di RT 03 dekat masjid rusak parah.",
+  "source": "whatsapp",
+  "ai_analysis": {
+    "confidence": 0.94,
+    "summary": "Kerusakan jalan di RT 03 dekat masjid."
+  }
+}
+```
+
+### Required before persistence
+
+Authoritative backend requirements:
+
+```text
+identitas warga yang dapat dipetakan backend ke citizen_id
+category
+description
+location
+```
+
+`location` valid jika:
+
+- `text` non-empty; atau
+- latitude + longitude valid.
+
+Untuk `source: "whatsapp"`, `sender_phone_number` berasal dari metadata kanal OpenClaw, bukan dari teks warga atau output Gemini. Endpoint ini harus mengautentikasi pemanggil OpenClaw; FastAPI menormalisasi nomor lalu mencari/membuat `citizens` dan menentukan `citizen_id`. Nomor tidak boleh dipercaya jika dikirim oleh client publik. Untuk source lain, identitas warga dan izin pemanggil harus didefinisikan sebelum endpoint tersebut dipakai.
+
+`conversation_id`, `urgency`, `original_text`, dan `ai_analysis` dapat optional sesuai source. `Idempotency-Key` wajib untuk create dari WhatsApp.
+
+### Backend behavior
+
+Backend:
+
+1. validates schema;
+2. resolves citizen dari metadata sender dan category code;
+3. validates required fields;
+4. verifies idempotency dalam transaksi;
+5. generates unique ticket number;
+6. inserts report;
+7. inserts initial status history;
+8. returns success only after persistence succeeds.
+
+### Response `201`
+
+```json
+{
+  "id": "72af1a52-7016-48c7-aacc-6c35417be819",
+  "ticket_number": "LP-2026-0001",
+  "status": "pending_verification",
+  "created_at": "2026-09-16T14:00:00Z"
+}
+```
+
+---
+
+## 6. Idempotency for Create Report
+
+Satu draf laporan memperoleh satu ID stabil saat OpenClaw mulai mengumpulkan fakta. ID ini dipertahankan saat klarifikasi, konfirmasi, retry, atau warga mengirim jawaban konfirmasi dua kali. Dua laporan berbeda memperoleh ID berbeda.
+
+```http
+Idempotency-Key: <report-draft-uuid>
+```
+
+Backend menyimpan key dengan constraint unik dan mengikatnya ke laporan. Insert laporan, initial status history, dan key harus berhasil dalam satu transaksi. Untuk key dan payload yang sama:
+
+- permintaan pertama menghasilkan `201` dan tiket baru;
+- permintaan ulang menghasilkan `200` dengan body tiket yang sudah ada, tanpa laporan/history baru;
+- key sama dengan payload berbeda menghasilkan `409 DUPLICATE_OPERATION`.
+
+Lakukan perubahan schema melalui migration sebelum integrasi WhatsApp nyata. `external_message_id` dapat disimpan terpisah untuk deduplikasi event masuk; ID pesan saja tidak cukup karena warga dapat mengirim dua pesan konfirmasi untuk satu draf.
+
+---
+
+## 7. List Reports
+
+```http
+GET /api/v1/reports
+```
+
+Wajib authenticated admin sistem atau admin desa. Backend membatasi data admin desa ke desa yang diizinkan; admin sistem mengikuti cakupan akses yang ditetapkan tim. Saat multi-desa diimplementasikan, filter desa wajib ditegakkan server-side.
+
+### Query
+
+```text
+page
+page_size
+status
+urgency
+category
+search
+```
+
+Defaults:
+
+```text
+page = 1
+page_size = 20
+```
+
+Recommended maximum:
+
+```text
+page_size <= 100
+```
+
+Example:
+
+```http
+GET /api/v1/reports?page=1&page_size=20&status=pending_verification&category=infrastructure
+```
+
+### Response `200`
+
+```json
+{
+  "items": [
+    {
+      "id": "72af1a52-7016-48c7-aacc-6c35417be819",
+      "ticket_number": "LP-2026-0001",
+      "category": "infrastructure",
+      "description": "Jalan di RT 03 rusak parah.",
+      "location": {
+        "text": "RT 03 dekat masjid",
+        "latitude": -7.123,
+        "longitude": 112.123
+      },
+      "urgency": "high",
+      "status": "pending_verification",
+      "created_at": "2026-09-16T14:00:00Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total": 1
+}
+```
+
+Frontend mock harus mengikuti shape ini.
+
+---
+
+## 8. Report Detail
+
+```http
+GET /api/v1/reports/{report_id}
+```
+
+Wajib authenticated admin sistem atau admin desa dengan akses ke desa pemilik laporan. Laporan di luar cakupan tidak boleh dibocorkan melalui respons.
+
+Response `200`:
+
+```json
+{
+  "id": "72af1a52-7016-48c7-aacc-6c35417be819",
+  "ticket_number": "LP-2026-0001",
+  "citizen": {
+    "id": "5c242fc6-77a8-4fa7-a12f-a67bbc75839b",
+    "display_name": "Warga"
+  },
+  "category": "infrastructure",
+  "description": "Jalan di RT 03 rusak parah.",
+  "summary": "Kerusakan jalan di RT 03 dekat masjid.",
+  "location": {
+    "text": "RT 03 dekat masjid",
+    "latitude": -7.123,
+    "longitude": 112.123
+  },
+  "urgency": "high",
+  "status": "pending_verification",
+  "responsible_unit": null,
+  "ai_recommendation": {},
+  "attachments": [],
+  "status_history": [
+    {
+      "old_status": null,
+      "new_status": "pending_verification",
+      "actor_type": "system",
+      "actor_identifier": null,
+      "notes": "Report created",
+      "created_at": "2026-09-16T14:00:00Z"
+    }
+  ],
+  "verified_at": null,
+  "resolved_at": null,
+  "created_at": "2026-09-16T14:00:00Z",
+  "updated_at": "2026-09-16T14:00:00Z"
+}
+```
+
+Jika tidak ada:
+
+```http
+404 REPORT_NOT_FOUND
+```
+
+---
+
+## 9. Update Report Status
+
+```http
+PATCH /api/v1/reports/{report_id}/status
+```
+
+### Request
+
+```json
+{
+  "status": "verified",
+  "reason": "Laporan telah diverifikasi oleh operator."
+}
+```
+
+Backend tidak menerima arbitrary status.
+
+### Allowed baseline transitions
+
+```text
+pending_verification → verified
+pending_verification → rejected
+verified             → in_progress
+in_progress          → forwarded
+in_progress          → resolved
+forwarded            → resolved
+```
+
+Invalid transition:
+
+```http
+409 INVALID_STATUS_TRANSITION
+```
+
+### Response `200`
+
+```json
+{
+  "id": "72af1a52-7016-48c7-aacc-6c35417be819",
+  "ticket_number": "LP-2026-0001",
+  "status": "verified",
+  "updated_at": "2026-09-16T15:00:00Z"
+}
+```
+
+Status mutation harus menulis `report_status_history`.
+
+Sebelum endpoint dibuka ke deployment publik, mutation ini wajib membutuhkan authenticated admin sistem atau admin desa yang berwenang atas laporan tersebut. FastAPI memeriksa role dan cakupan desa, bukan hanya status login.
+
+---
+
+## 10. Internal AI Output Contract
+
+AI analysis bukan operational truth.
+
+Canonical P0 analysis:
+
+```json
+{
+  "intent": "REPORT",
+  "confidence": 0.94,
+  "category": "infrastructure",
+  "description": "Jalan di RT 03 rusak parah.",
+  "location": {
+    "text": "RT 03 dekat masjid",
+    "latitude": null,
+    "longitude": null
+  },
+  "urgency": "high",
+  "missing_fields": [],
+  "needs_clarification": false,
+  "clarification_reason": null,
+  "summary": "Kerusakan jalan di RT 03 dekat masjid."
+}
+```
+
+### Schema
+
+| Field | Type | Required | Meaning |
+|---|---|---:|---|
+| `intent` | enum | yes | `REPORT` atau `UNKNOWN` pada P0 |
+| `confidence` | float 0..1 | yes | advisory model confidence |
+| `category` | enum/null | yes | canonical category code atau null |
+| `description` | string/null | yes | extracted description |
+| `location` | object/null | yes | extracted location |
+| `urgency` | enum/null | yes | advisory urgency |
+| `missing_fields` | array[string] | yes | AI suggestion |
+| `needs_clarification` | bool | yes | AI suggestion |
+| `clarification_reason` | string/null | yes | reason |
+| `summary` | string/null | yes | generated summary |
+
+### Important
+
+Backend tetap menghitung ulang:
+
+```text
+required fields
+category validity
+location validity
+status permission
+```
+
+`confidence >= 0.80` boleh dipakai sebagai heuristic eksperimen, tetapi bukan satu-satunya gate.
+
+---
+
+## 11. UNKNOWN Handling
+
+Jika input bukan REPORT yang cukup jelas:
+
+```json
+{
+  "intent": "UNKNOWN",
+  "confidence": 0.55,
+  "category": null,
+  "description": null,
+  "location": null,
+  "urgency": null,
+  "missing_fields": [],
+  "needs_clarification": true,
+  "clarification_reason": "Intent belum dapat dipastikan.",
+  "summary": null
+}
+```
+
+Jangan create report dari `UNKNOWN`.
+
+---
+
+## 12. Category Resolution
+
+AI/API menggunakan `category` sebagai canonical code:
+
+```text
+infrastructure
+public_facility
+cleanliness
+security
+social
+administration
+other
+```
+
+Backend resolve:
+
+```text
+category code
+      ↓
+report_categories.id
+      ↓
+reports.category_id
+```
+
+Frontend tidak perlu mengetahui UUID category untuk P0.
+
+---
+
+## 13. Location Mapping
+
+API location:
+
+```json
+{
+  "text": "RT 03 dekat masjid",
+  "latitude": -7.123,
+  "longitude": 112.123
+}
+```
+
+Database mapping:
+
+```text
+text      → reports.location_text
+latitude  → reports.latitude
+longitude → reports.longitude
+```
+
+Validation:
+
+```text
+-90 <= latitude <= 90
+-180 <= longitude <= 180
+```
+
+---
+
+## 14. AI Metadata Mapping
+
+AI operational recommendation dapat disimpan sebagai metadata:
+
+```text
+reports.ai_extraction
+reports.ai_recommendation
+```
+
+Metadata ini bukan pengganti:
+
+```text
+reports.status
+reports.category_id
+reports.responsible_unit_id
+```
+
+untuk state yang sudah divalidasi backend/human.
+
+---
+
+## 15. Attachment Contract
+
+Binary upload flow boleh ditambahkan sebagai endpoint terpisah saat diperlukan.
+
+Storage:
+
+```text
+Supabase Storage / report-attachments
+```
+
+Database:
+
+```text
+report_attachments
+```
+
+Do not embed binary/base64 ke `reports` JSON.
+
+---
+
+## 16. Reserved Future APIs
+
+Belum P0:
+
+```text
+/api/v1/ask
+/api/v1/track
+/api/v1/requests
+```
+
+Jangan mengimplementasikan endpoint tersebut jika menghambat REPORT.
+
+---
+
+## 17. Breaking Change Rule
+
+Perubahan berikut menaikkan contract minor/breaking baseline dan wajib dikomunikasikan:
+
+- rename field;
+- status/category baru;
+- response envelope berubah;
+- endpoint berubah;
+- required field berubah;
+- state transition berubah.
+
+Update dokumen ini sebelum atau bersamaan dengan code change.
