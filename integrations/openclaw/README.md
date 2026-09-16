@@ -13,12 +13,30 @@ FastAPI does not call Gemini.
    openclaw models list --provider google
    ```
 
-2. Enable `llm-task` and restrict the extraction agent to that tool while the
-   create-report tool is not yet integrated:
+   `GEMINI_API_KEY` belongs in the OpenClaw host environment (for example,
+   `%USERPROFILE%\.openclaw\.env` on Windows). Use `.env.example` in this
+   directory only as a key-name template; never add a real value to Git.
+
+2. Enable `llm-task`, pin the evaluated model, and restrict the extraction
+   agent to that tool while the create-report tool is not yet integrated.
+   Merge these entries with any existing plugin or tool allowlist:
 
    ```json5
    {
-     plugins: { entries: { "llm-task": { enabled: true } } },
+     plugins: {
+       entries: {
+         "llm-task": {
+           enabled: true,
+           config: {
+             defaultProvider: "google",
+             defaultModel: "gemini-3.1-flash-lite",
+             allowedModels: ["google/gemini-3.1-flash-lite"],
+             maxTokens: 1600,
+             timeoutMs: 60000
+           }
+         }
+       }
+     },
      tools: { allow: ["llm-task"] }
    }
    ```
@@ -34,9 +52,10 @@ Use `details.json` as the untrusted result and validate it again with
 Do not put `GEMINI_API_KEY`, channel credentials, or backend credentials in
 this directory, prompts, logs, or model input.
 
-No model ID is pinned yet. Select a model returned by
-`openclaw models list --provider google`, record it with eval results, and pin
-it only after the P0 dataset passes.
+The current baseline is `google/gemini-3.1-flash-lite`. On 2026-09-17 it
+passed all 7 cases in `evals/report-p0.json` through OpenClaw 2026.7.1 and was
+then validated again with `AIAnalysis`. Re-run the dataset before changing the
+model or prompt.
 
 ## Evaluation
 
