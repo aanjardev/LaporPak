@@ -14,9 +14,11 @@ import {
   getReports,
   reportCategories,
   reportStatuses,
+  reportUrgencies,
   type ReportCategory,
   type ReportQuery,
   type ReportStatus,
+  type ReportUrgency,
 } from "@/lib/reports";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -29,6 +31,7 @@ function pageHref(query: ReportQuery, page: number) {
   const params = new URLSearchParams({ page: String(page) });
   if (query.search) params.set("search", query.search);
   if (query.status) params.set("status", query.status);
+  if (query.urgency) params.set("urgency", query.urgency);
   if (query.category) params.set("category", query.category);
   return `/reports?${params.toString()}`;
 }
@@ -37,12 +40,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
   const params = await searchParams;
   const requestedPage = Number(first(params.page));
   const status = first(params.status);
+  const urgency = first(params.urgency);
   const category = first(params.category);
   const query: ReportQuery = {
     page: Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
     page_size: 20,
     search: first(params.search).trim() || undefined,
     status: reportStatuses.includes(status as ReportStatus) ? (status as ReportStatus) : undefined,
+    urgency: reportUrgencies.includes(urgency as ReportUrgency) ? (urgency as ReportUrgency) : undefined,
     category: reportCategories.includes(category as ReportCategory) ? (category as ReportCategory) : undefined,
   };
   let result;
@@ -67,7 +72,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
       </header>
 
       <section aria-label="Pencarian dan filter laporan" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <form action="/reports" method="get" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_180px_190px_auto] lg:items-end">
+        <form action="/reports" method="get" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_155px_155px_170px_auto] xl:items-end">
           <div className="space-y-1.5">
             <label htmlFor="search" className="text-sm font-medium text-slate-700">Cari laporan</label>
             <div className="relative">
@@ -83,6 +88,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
             </select>
           </div>
           <div className="space-y-1.5">
+            <label htmlFor="urgency" className="text-sm font-medium text-slate-700">Urgensi</label>
+            <select id="urgency" name="urgency" defaultValue={query.urgency ?? ""} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:border-sky-700 focus-visible:ring-2 focus-visible:ring-sky-200">
+              <option value="">Semua urgensi</option>
+              {reportUrgencies.map((value) => <option key={value} value={value}>{urgencyLabels[value]}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
             <label htmlFor="category" className="text-sm font-medium text-slate-700">Kategori</label>
             <select id="category" name="category" defaultValue={query.category ?? ""} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:border-sky-700 focus-visible:ring-2 focus-visible:ring-sky-200">
               <option value="">Semua kategori</option>
@@ -93,7 +105,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
             Terapkan
           </button>
         </form>
-        {(query.search || query.status || query.category) && (
+        {(query.search || query.status || query.urgency || query.category) && (
           <Link href="/reports" className="mt-4 inline-block text-sm font-medium text-sky-800 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">Hapus filter</Link>
         )}
       </section>
