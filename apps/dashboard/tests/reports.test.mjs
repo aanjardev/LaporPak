@@ -33,6 +33,10 @@ test("mock daftar dan detail mengikuti alur laporan", async () => {
   const detail = await getReportById(firstPage.items[0].id);
   assert.equal(detail?.ticket_number, firstPage.items[0].ticket_number);
   assert.equal(detail?.status_history[0].new_status, "pending_verification");
+  assert.deepEqual(detail?.responsible_unit, {
+    id: "b5e83fd3-71e2-4ec3-b432-b7e970b57c6a",
+    name: "Unit Infrastruktur Desa",
+  });
   assert.equal(await getReportById("unknown"), null);
 });
 
@@ -45,15 +49,27 @@ test("mode API meneruskan filter dan access token ke FastAPI", async () => {
     process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
     globalThis.fetch = async (url, init) => {
       calls.push({ url: String(url), init });
-      return new Response(JSON.stringify({ items: [], page: 2, page_size: 20, total: 0 }), {
+      return new Response(JSON.stringify({ items: [{
+        id: "72af1a52-7016-48c7-aacc-000000000021",
+        ticket_number: "LP-2026-0021",
+        category: "infrastructure",
+        description: "Jalan desa rusak.",
+        location: { text: "RT 03", latitude: null, longitude: null },
+        urgency: "high",
+        status: "pending_verification",
+        created_at: "2026-09-17T00:00:00Z",
+      }], page: 2, page_size: 20, total: 21 }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
     };
-    await getReports({ page: 2, page_size: 20, urgency: "high" }, "supabase-token");
+    const result = await getReports({ page: 2, page_size: 20, urgency: "high" }, "supabase-token");
     assert.match(calls[0].url, /page=2/);
     assert.match(calls[0].url, /urgency=high/);
     assert.equal(calls[0].init.headers.Authorization, "Bearer supabase-token");
+    assert.equal(result.page, 2);
+    assert.equal(result.total, 21);
+    assert.equal(result.items[0].ticket_number, "LP-2026-0021");
   } finally {
     if (oldSource === undefined) delete process.env.REPORTS_DATA_SOURCE;
     else process.env.REPORTS_DATA_SOURCE = oldSource;
