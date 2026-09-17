@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     supabase_url: str = ""
     supabase_anon_key: str = ""
-    supabase_service_role_key: str = ""
+    supabase_secret_key: str = ""
 
     whatsapp_access_token: str = ""
     whatsapp_phone_number_id: str = ""

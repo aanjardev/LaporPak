@@ -315,6 +315,8 @@ latitude
 longitude
 ai_extraction
 ai_recommendation
+idempotency_key
+idempotency_payload_hash
 verified_at
 resolved_at
 created_at
@@ -370,11 +372,15 @@ direction
 sender_role
 message_type
 content
+external_message_id
 metadata
 created_at
 ```
 
-Untuk deduplikasi event masuk, tambahkan `external_message_id` melalui migration bila dibutuhkan. Idempotensi pembuatan tiket menggunakan ID draf laporan yang stabil dan unik, bukan hanya ID satu pesan WhatsApp.
+`external_message_id` mendeduplikasi event kanal masuk. Idempotensi pembuatan
+tiket menggunakan `reports.idempotency_key`, yaitu ID draf laporan yang stabil
+dan unik, bukan hanya ID satu pesan WhatsApp. Payload hash membedakan retry
+valid dari penggunaan key yang sama untuk payload berbeda.
 
 ### `routing_rules`
 

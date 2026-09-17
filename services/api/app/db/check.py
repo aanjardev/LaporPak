@@ -1,10 +1,10 @@
 from sqlalchemy import text
 
-from app.db.session import engine
+from app.db.session import get_engine
 
 
 def main():
-    with engine.connect() as connection:
+    with get_engine().connect() as connection:
         result = connection.execute(
             text(
                 """

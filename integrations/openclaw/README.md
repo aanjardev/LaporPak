@@ -52,6 +52,11 @@ Use `details.json` as the untrusted result and validate it again with
 Do not put `GEMINI_API_KEY`, channel credentials, or backend credentials in
 this directory, prompts, logs, or model input.
 
+The OpenClaw host also needs `LAPORPAK_API_URL` and `LAPORPAK_API_KEY` from
+its local environment when invoking the backend. Send the latter as
+`X-OpenClaw-API-Key` and send the stable report draft UUID as
+`Idempotency-Key` to `POST /api/v1/reports`.
+
 The current baseline is `google/gemini-3.1-flash-lite`. On 2026-09-17 it
 passed all 7 cases in `evals/report-p0.json` through OpenClaw 2026.7.1 and was
 then validated again with `AIAnalysis`. Re-run the dataset before changing the
