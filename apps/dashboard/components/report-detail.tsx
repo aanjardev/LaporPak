@@ -2,6 +2,7 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Clock3, MapPin, UserRound } from "lucide-react";
 import { saveReportDecision } from "@/app/reports/[id]/actions";
 import { categoryLabels, formatLocation, formatReportDate, StatusBadge, statusLabels, urgencyLabels } from "@/components/report-display";
@@ -10,15 +11,16 @@ import type { ReportDetail } from "@/lib/reports";
 type Decision = "verified" | "rejected";
 
 export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { initialReport: ReportDetail; actionsEnabled: boolean; isMock: boolean }) {
+  const router = useRouter();
   const [report, setReport] = useState(initialReport);
   const [decision, setDecision] = useState<Decision | "">("");
   const [reason, setReason] = useState("");
-  const [state, setState] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [state, setState] = useState<"idle" | "saving" | "success" | "saved_unavailable" | "conflict" | "error">("idle");
   const saving = useRef(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving.current || !actionsEnabled || report.status !== "pending_verification") return;
+    if (saving.current || !actionsEnabled || state === "saved_unavailable" || state === "conflict" || report.status !== "pending_verification") return;
     if (!decision || !reason.trim()) {
       setState("error");
       return;
@@ -29,26 +31,41 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
     try {
       const result = await saveReportDecision(report.id, { status: decision, reason: reason.trim() });
       if (!result.ok) {
-        setState("error");
+        if (result.status === 401) {
+          router.replace(`/login?reauth=1&next=${encodeURIComponent(`/reports/${encodeURIComponent(report.id)}`)}`);
+        } else if (result.status === 403) {
+          router.replace("/access-denied");
+        } else if (result.status === 404) {
+          window.location.reload();
+        } else {
+          setState(result.status === 409 ? "conflict" : "error");
+        }
         return;
       }
-      setReport((current) => ({
-        ...current,
-        status: result.data.status,
-        updated_at: result.data.updated_at,
-        verified_at: result.data.status === "verified" ? result.data.updated_at : current.verified_at,
-        status_history: [
-          ...current.status_history,
-          {
-            old_status: current.status,
-            new_status: result.data.status,
-            actor_type: "admin",
-            actor_identifier: null,
-            notes: reason.trim(),
-            created_at: result.data.updated_at,
-          },
-        ],
-      }));
+      if (isMock) {
+        setReport((current) => ({
+          ...current,
+          status: result.data.status,
+          updated_at: result.data.updated_at,
+          verified_at: result.data.status === "verified" ? result.data.updated_at : current.verified_at,
+          status_history: [
+            ...current.status_history,
+            {
+              old_status: current.status,
+              new_status: result.data.status,
+              actor_type: "admin",
+              actor_identifier: null,
+              notes: reason.trim(),
+              created_at: result.data.updated_at,
+            },
+          ],
+        }));
+      } else if (result.report) {
+        setReport(result.report);
+      } else {
+        setState("saved_unavailable");
+        return;
+      }
       setState("success");
     } catch {
       setState("error");
@@ -107,7 +124,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
               <div><dt className="flex items-center gap-1.5 text-slate-600"><Clock3 aria-hidden="true" size={15} /> Terakhir diperbarui</dt><dd className="mt-1 font-medium">{formatReportDate(report.updated_at)}</dd></div>
             </dl>
           </section>
-          {actionsEnabled && report.status === "pending_verification" && (
+          {actionsEnabled && report.status === "pending_verification" && state !== "saved_unavailable" && state !== "conflict" && (
             <section aria-labelledby="keputusan-petugas" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 id="keputusan-petugas" className="text-base font-semibold">Keputusan petugas</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">Periksa laporan sebelum menentukan keputusan.</p>
@@ -131,6 +148,8 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
             </section>
           )}
           {state === "success" && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">{isMock ? "Keputusan berhasil disimulasikan. Status kembali semula setelah halaman dimuat ulang." : "Keputusan berhasil disimpan."}</p>}
+          {state === "conflict" && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-950"><p>Status laporan telah berubah. Muat ulang halaman sebelum membuat keputusan lagi.</p><button type="button" onClick={() => window.location.reload()} className="mt-3 min-h-11 rounded-lg border border-rose-300 px-4 text-sm font-semibold">Muat ulang halaman</button></div>}
+          {state === "saved_unavailable" && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><p>Keputusan berhasil disimpan, tetapi detail terbaru belum dapat dimuat. Muat ulang halaman untuk melihat status resmi.</p><button type="button" onClick={() => window.location.reload()} className="mt-3 min-h-11 rounded-lg border border-amber-400 px-4 text-sm font-semibold">Muat ulang halaman</button></div>}
           <p className="rounded-xl border border-sky-100 bg-sky-50 p-4 text-sm leading-6 text-sky-950">Informasi dan rekomendasi AI membantu petugas meninjau laporan. Keputusan penanganan tetap dilakukan oleh petugas berwenang.</p>
         </aside>
       </div>

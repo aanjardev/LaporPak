@@ -12,7 +12,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
     report = await getReportById(id);
   } catch (error) {
     if (error instanceof ReportApiError && error.status === 401) {
-      redirect(`/login?next=${encodeURIComponent(`/reports/${id}`)}`);
+      redirect(`/login?reauth=1&next=${encodeURIComponent(`/reports/${encodeURIComponent(id)}`)}`);
     }
     if (error instanceof ReportApiError && error.status === 403) {
       redirect("/access-denied");
