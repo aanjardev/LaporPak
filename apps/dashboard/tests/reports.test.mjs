@@ -17,16 +17,47 @@ test("mock daftar dan detail mengikuti alur laporan", async () => {
     page: 1,
     page_size: 20,
     status: "rejected",
+    urgency: "low",
     category: "administration",
     search: "LP-2026-0006",
   });
   assert.equal(filtered.total, 1);
   assert.equal(filtered.items[0].ticket_number, "LP-2026-0006");
 
+  const urgent = await getReports({ page: 1, page_size: 20, urgency: "critical" });
+  assert.equal(urgent.total, 4);
+  assert.ok(urgent.items.every((item) => item.urgency === "critical"));
+  assert.equal((await getReports({ page: 2, page_size: 20, urgency: "critical" })).items.length, 0);
+
   const detail = await getReportById(firstPage.items[0].id);
   assert.equal(detail?.ticket_number, firstPage.items[0].ticket_number);
   assert.equal(detail?.status_history[0].new_status, "pending_verification");
   assert.equal(await getReportById("unknown"), null);
+});
+
+test("mode API meneruskan filter urgensi pada query GET", async () => {
+  const oldSource = process.env.REPORTS_DATA_SOURCE;
+  const oldApiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const oldFetch = globalThis.fetch;
+  let requestedUrl;
+  try {
+    process.env.REPORTS_DATA_SOURCE = "api";
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
+    globalThis.fetch = async (url) => {
+      requestedUrl = new URL(url);
+      return new Response(JSON.stringify({ items: [], page: 2, page_size: 20, total: 0 }), { status: 200 });
+    };
+    await getReports({ page: 2, page_size: 20, urgency: "high" });
+    assert.equal(requestedUrl.pathname, "/api/v1/reports");
+    assert.equal(requestedUrl.searchParams.get("urgency"), "high");
+    assert.equal(requestedUrl.searchParams.get("page"), "2");
+  } finally {
+    if (oldSource === undefined) delete process.env.REPORTS_DATA_SOURCE;
+    else process.env.REPORTS_DATA_SOURCE = oldSource;
+    if (oldApiUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = oldApiUrl;
+    globalThis.fetch = oldFetch;
+  }
 });
 
 test("fixture detail mencakup kondisi data panjang dan kosong", async () => {

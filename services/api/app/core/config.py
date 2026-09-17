@@ -11,9 +11,15 @@ class Settings(BaseSettings):
     database_url: str = ""
 
     supabase_url: str = ""
+    supabase_anon_key: str = ""
     supabase_publishable_key: str = ""
     supabase_secret_key: str = ""
 
+    whatsapp_access_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_verify_token: str = ""
+
+    openclaw_api_url: str = ""
     openclaw_api_key: SecretStr | None = None
     dashboard_api_key: SecretStr | None = None
     dashboard_admin_identifier: str = "admin-desa-demo"

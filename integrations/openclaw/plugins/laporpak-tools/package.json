@@ -1,0 +1,21 @@
+{
+  "name": "@laporpak/openclaw-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.9.4",
+      "minGatewayVersion": ">=2026.9.4"
+    }
+  },
+  "engines": {
+    "node": ">=24.15.0"
+  }
+}

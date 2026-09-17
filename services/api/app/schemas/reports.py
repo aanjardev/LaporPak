@@ -159,3 +159,8 @@ class ReportStatusUpdateResponse(StrictSchema):
     ticket_number: str
     status: ReportStatus
     updated_at: datetime
+
+
+# Compatibility names used by the OpenClaw integration contract.
+CreateReportRequest = ReportCreate
+CreateReportResponse = ReportCreateResponse

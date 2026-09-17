@@ -140,6 +140,8 @@ class FakeRepository:
     def list_status_history(self, report_id):
         return [
             {
+                "id": UUID("8e400a10-5712-46f9-ad6c-d16999a18fc2"),
+                "report_id": report_id,
                 "old_status": None,
                 "new_status": "pending_verification",
                 "actor_type": "system",

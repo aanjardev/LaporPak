@@ -25,7 +25,7 @@ Intent AI memakai uppercase.
 
 ### Autentikasi P0
 
-Endpoint P0 yang dilindungi menggunakan bearer token backend-only:
+Endpoint admin P0 menggunakan bearer token backend-only:
 
 ```http
 Authorization: Bearer <token>
@@ -35,14 +35,14 @@ Izin caller:
 
 | Caller | Operasi P0 yang diizinkan |
 |---|---|
-| OpenClaw | Membuat laporan WhatsApp melalui `POST /api/v1/reports` |
+| OpenClaw | Membuat laporan WhatsApp melalui `POST /api/v1/reports` dengan `X-OpenClaw-API-Key` |
 | Admin dashboard | Membaca laporan dan mengubah status laporan |
 
-OpenClaw dan dashboard menggunakan token berbeda. FastAPI memetakan token
-dashboard ke identitas admin dan, untuk demo satu desa, administrative unit
-yang diizinkan. Token valid untuk operasi yang salah menghasilkan
-`403 FORBIDDEN`; token yang hilang atau tidak valid menghasilkan
-`401 UNAUTHORIZED`.
+OpenClaw dan dashboard menggunakan secret serta header berbeda. FastAPI
+memetakan bearer token dashboard ke identitas admin dan, untuk demo satu desa,
+administrative unit yang diizinkan. Token dashboard valid untuk operasi admin
+yang tidak diizinkan menghasilkan `403 FORBIDDEN`; credential yang hilang atau
+tidak valid menghasilkan `401 UNAUTHORIZED`.
 
 Token dashboard hanya digunakan server Next.js. Token tidak boleh diekspos
 melalui `NEXT_PUBLIC_*`, JavaScript browser, source code, atau log. Mekanisme
@@ -159,6 +159,29 @@ Suggested HTTP mapping:
 | 503 | `AI_UNAVAILABLE` |
 | 500 | `INTERNAL_ERROR` |
 
+### Autentikasi dan izin REPORT
+
+Akses petugas untuk demo P0 menggunakan `DASHBOARD_API_KEY` backend-only. Untuk
+endpoint GET/PATCH pada bagian 7–9, server Next.js meneruskan token tersebut:
+
+```http
+Authorization: Bearer <dashboard_api_key>
+```
+
+FastAPI memverifikasi token lalu memakai `DASHBOARD_ADMIN_IDENTIFIER` sebagai
+identitas audit dan `DASHBOARD_ADMIN_UNIT_ID` sebagai cakupan demo satu desa.
+Credential tidak boleh masuk browser. Supabase Auth berbasis undangan dan tabel
+role/cakupan admin adalah target hardening setelah demo, bukan kontrak runtime
+yang sudah tersedia saat ini.
+
+| Kondisi | HTTP / code | Perilaku dashboard |
+|---|---|---|
+| Token tidak ada, tidak valid, atau kedaluwarsa | `401 UNAUTHORIZED` | Arahkan ke login; simpan tujuan lokal agar dapat kembali setelah login. |
+| Token valid, tetapi akun admin tidak aktif atau tidak memiliki izin memakai dashboard | `403 FORBIDDEN` | Tampilkan akses ditolak; sesi tetap ada agar petugas dapat logout. |
+| ID laporan tidak ada atau berada di luar cakupan desa petugas | `404 REPORT_NOT_FOUND` | Tampilkan laporan tidak ditemukan, tanpa mengungkap keberadaan laporan lintas desa. |
+
+Pemeriksaan detail dan PATCH dilakukan terhadap laporan terkait, bukan berdasarkan filter di frontend. Gunakan error envelope standar di atas. Tabel admin, migrasi, dan pemeriksaan izin FastAPI harus siap sebelum mode API dipakai dengan data nyata.
+
 ---
 
 ## 4. Health
@@ -235,6 +258,15 @@ Untuk `source: "whatsapp"`, `sender_phone_number` berasal dari metadata kanal Op
 
 `conversation_id`, `urgency`, `original_text`, dan `ai_analysis` dapat optional sesuai source. `Idempotency-Key` wajib untuk create dari WhatsApp.
 
+Pemanggil OpenClaw wajib mengirim secret internal pada header:
+
+```http
+X-OpenClaw-API-Key: <server-only-secret>
+```
+
+`Idempotency-Key` harus berupa UUID draf laporan yang stabil. Kedua header
+bersifat server-to-server dan tidak boleh dikirim oleh frontend publik.
+
 ### Backend behavior
 
 Backend:
@@ -275,7 +307,10 @@ Backend menyimpan key dengan constraint unik dan mengikatnya ke laporan. Insert 
 - permintaan ulang menghasilkan `200` dengan body tiket yang sudah ada, tanpa laporan/history baru;
 - key sama dengan payload berbeda menghasilkan `409 DUPLICATE_OPERATION`.
 
-Lakukan perubahan schema melalui migration sebelum integrasi WhatsApp nyata. `external_message_id` dapat disimpan terpisah untuk deduplikasi event masuk; ID pesan saja tidak cukup karena warga dapat mengirim dua pesan konfirmasi untuk satu draf.
+Database menyimpan UUID draf pada `reports.idempotency_key` dan hash payload
+pada `reports.idempotency_payload_hash`. `conversation_messages.external_message_id`
+menangani deduplikasi event masuk secara terpisah; ID pesan saja tidak cukup
+karena warga dapat mengirim dua pesan konfirmasi untuk satu draf.
 
 ---
 
@@ -493,6 +528,22 @@ Canonical P0 analysis:
 | `needs_clarification` | bool | yes | AI suggestion |
 | `clarification_reason` | string/null | yes | reason |
 | `summary` | string/null | yes | generated summary |
+
+`location`, bila tidak `null`, selalu memiliki ketiga key berikut. Nilainya
+boleh `null` agar hasil ekstraksi yang belum lengkap tetap dapat divalidasi dan
+diteruskan ke alur klarifikasi.
+
+| Field | Type | Required | Meaning |
+|---|---|---:|---|
+| `text` | string/null | yes | lokasi tekstual dari input warga |
+| `latitude` | number/null | yes | latitude pada rentang `-90..90` |
+| `longitude` | number/null | yes | longitude pada rentang `-180..180` |
+
+Semua object pada Internal AI Output menolak field yang tidak tercantum dalam
+contract. String non-null harus berisi teks, bukan string kosong/whitespace.
+Output boleh valid secara schema tetapi belum lengkap secara bisnis; OpenClaw
+melakukan pemeriksaan provisional dan FastAPI menghitung ulang kelengkapan saat
+create report.
 
 ### Important
 

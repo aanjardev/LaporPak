@@ -43,6 +43,10 @@ SessionLocal = sessionmaker(
 )
 
 
+def get_engine():
+    return engine
+
+
 def get_db_session() -> Generator[Session]:
     session = SessionLocal()
     try:

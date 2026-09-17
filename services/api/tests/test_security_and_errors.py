@@ -74,14 +74,14 @@ def test_missing_or_invalid_token_uses_standard_error(monkeypatch):
     missing = client.get("/openclaw")
     invalid = client.get(
         "/openclaw",
-        headers={"Authorization": "Bearer wrong-token"},
+        headers={"X-OpenClaw-API-Key": "wrong-token"},
     )
 
     assert missing.status_code == 401
     assert missing.json() == {
         "error": {
             "code": "UNAUTHORIZED",
-            "message": "Valid bearer token required",
+            "message": "Valid OpenClaw API key required",
             "details": None,
         }
     }
@@ -94,7 +94,7 @@ def test_openclaw_and_admin_tokens_have_separate_permissions(monkeypatch):
 
     openclaw = client.get(
         "/openclaw",
-        headers={"Authorization": "Bearer openclaw-token"},
+        headers={"X-OpenClaw-API-Key": "openclaw-token"},
     )
     openclaw_as_admin = client.get(
         "/admin",
@@ -106,7 +106,7 @@ def test_openclaw_and_admin_tokens_have_separate_permissions(monkeypatch):
     )
     admin_as_openclaw = client.get(
         "/openclaw",
-        headers={"Authorization": "Bearer admin-token"},
+        headers={"X-OpenClaw-API-Key": "admin-token"},
     )
 
     assert openclaw.status_code == 200
@@ -118,7 +118,7 @@ def test_openclaw_and_admin_tokens_have_separate_permissions(monkeypatch):
     assert admin.json()["administrative_unit_id"] == (
         "00000000-0000-4000-8000-000000000002"
     )
-    assert admin_as_openclaw.status_code == 403
+    assert admin_as_openclaw.status_code == 401
 
 
 def test_same_token_for_both_callers_is_rejected(monkeypatch):

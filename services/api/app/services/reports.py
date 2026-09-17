@@ -206,7 +206,12 @@ class ReportPersistenceService:
                 dict(row) for row in self.repository.list_attachments(report_id)
             ]
             history = [
-                ReportStatusHistory.model_validate(dict(row))
+                ReportStatusHistory.model_validate(
+                    {
+                        field: row[field]
+                        for field in ReportStatusHistory.model_fields
+                    }
+                )
                 for row in self.repository.list_status_history(report_id)
             ]
         except ReportNotFoundError:

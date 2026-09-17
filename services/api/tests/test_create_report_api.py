@@ -70,7 +70,7 @@ def auth_tokens(monkeypatch):
 
 
 def request_headers(token="openclaw-token", include_idempotency=True):
-    headers = {"Authorization": f"Bearer {token}"}
+    headers = {"X-OpenClaw-API-Key": token}
     if include_idempotency:
         headers["Idempotency-Key"] = "ef51f99f-a47d-4a31-a3db-e520838997f5"
     return headers
@@ -161,7 +161,7 @@ def test_create_report_requires_openclaw_token_and_idempotency_key(auth_tokens):
         },
         json=valid_payload(),
     )
-    admin_token = client.post(
+    invalid_token = client.post(
         "/api/v1/reports",
         headers=request_headers(token="admin-token"),
         json=valid_payload(),
@@ -173,7 +173,7 @@ def test_create_report_requires_openclaw_token_and_idempotency_key(auth_tokens):
     )
 
     assert no_token.status_code == 401
-    assert admin_token.status_code == 403
+    assert invalid_token.status_code == 401
     assert no_idempotency_key.status_code == 422
     assert no_idempotency_key.json()["error"]["code"] == "VALIDATION_ERROR"
     assert service.calls == []
@@ -186,7 +186,7 @@ def test_create_report_rejects_invalid_key_and_non_whatsapp_source(auth_tokens):
     invalid_key = client.post(
         "/api/v1/reports",
         headers={
-            "Authorization": "Bearer openclaw-token",
+            "X-OpenClaw-API-Key": "openclaw-token",
             "Idempotency-Key": "not-a-uuid",
         },
         json=valid_payload(),
