@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ClipboardList } from "lucide-react";
+import { logoutAction } from "@/app/auth-actions";
 
 export default function ReportsLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -22,6 +23,9 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
               <ClipboardList aria-hidden="true" size={18} /> Laporan warga
             </Link>
           </nav>
+          <form action={logoutAction} className="mt-5 lg:mt-8">
+            <button type="submit" className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">Keluar</button>
+          </form>
         </aside>
         <main id="konten-utama" className="min-w-0 flex-1 px-4 py-7 sm:px-8 lg:px-10 lg:py-10">
           {children}

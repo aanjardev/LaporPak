@@ -224,24 +224,9 @@ async function mockScenario() {
   return scenario;
 }
 
-function apiUrl(path: string): URL {
-  const base = process.env.NEXT_PUBLIC_API_URL;
-  if (!base) throw new Error("NEXT_PUBLIC_API_URL belum dikonfigurasi");
-  return new URL(path, base);
-}
-
 export async function getReports(query: ReportQuery): Promise<ReportListResponse> {
   if (process.env.REPORTS_DATA_SOURCE === "api") {
-    const url = apiUrl("/api/v1/reports");
-    url.searchParams.set("page", String(query.page));
-    url.searchParams.set("page_size", String(query.page_size));
-    if (query.status) url.searchParams.set("status", query.status);
-    if (query.urgency) url.searchParams.set("urgency", query.urgency);
-    if (query.category) url.searchParams.set("category", query.category);
-    if (query.search) url.searchParams.set("search", query.search);
-    const response = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
-    if (!response.ok) throw new Error("Gagal mengambil daftar laporan");
-    return (await response.json()) as ReportListResponse;
+    throw new Error("Akses API REPORT menunggu otorisasi FastAPI");
   }
 
   const scenario = await mockScenario();
@@ -273,13 +258,7 @@ export async function getReports(query: ReportQuery): Promise<ReportListResponse
 
 export async function getReportById(id: string): Promise<ReportDetail | null> {
   if (process.env.REPORTS_DATA_SOURCE === "api") {
-    const response = await fetch(apiUrl(`/api/v1/reports/${encodeURIComponent(id)}`), {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-    if (response.status === 404) return null;
-    if (!response.ok) throw new Error("Gagal mengambil detail laporan");
-    return (await response.json()) as ReportDetail;
+    throw new Error("Akses API REPORT menunggu otorisasi FastAPI");
   }
 
   const scenario = await mockScenario();

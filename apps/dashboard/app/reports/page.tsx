@@ -10,6 +10,7 @@ import {
   urgencyLabels,
 } from "@/components/report-display";
 import { ReportUnavailable } from "@/components/report-unavailable";
+import { requireSignedIn } from "@/lib/auth";
 import {
   getReports,
   reportCategories,
@@ -37,6 +38,7 @@ function pageHref(query: ReportQuery, page: number) {
 }
 
 export default async function ReportsPage({ searchParams }: { searchParams: SearchParams }) {
+  await requireSignedIn("/reports");
   const params = await searchParams;
   const requestedPage = Number(first(params.page));
   const status = first(params.status);
