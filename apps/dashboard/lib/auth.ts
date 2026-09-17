@@ -10,3 +10,15 @@ export async function requireSignedIn(returnPath: string) {
   }
   return claims;
 }
+
+export async function getAdminAccessToken() {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) throw new Error("Supabase Auth is not configured");
+
+  const claims = (await supabase.auth.getClaims()).data?.claims;
+  const session = (await supabase.auth.getSession()).data.session;
+  if (!claims || !session?.access_token) {
+    throw new Error("Admin session is unavailable");
+  }
+  return session.access_token;
+}

@@ -35,19 +35,24 @@ test("mock daftar dan detail mengikuti alur laporan", async () => {
   assert.equal(await getReportById("unknown"), null);
 });
 
-test("mode API tidak mengambil data nyata sebelum otorisasi FastAPI tersedia", async () => {
+test("mode API meneruskan filter dan access token ke FastAPI", async () => {
   const oldSource = process.env.REPORTS_DATA_SOURCE;
   const oldFetch = globalThis.fetch;
-  let fetched = false;
+  const calls = [];
   try {
     process.env.REPORTS_DATA_SOURCE = "api";
-    globalThis.fetch = async () => {
-      fetched = true;
-      throw new Error("API should not be called");
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url: String(url), init });
+      return new Response(JSON.stringify({ items: [], page: 2, page_size: 20, total: 0 }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     };
-    await assert.rejects(getReports({ page: 2, page_size: 20, urgency: "high" }));
-    await assert.rejects(getReportById("72af1a52-7016-48c7-aacc-000000000001"));
-    assert.equal(fetched, false);
+    await getReports({ page: 2, page_size: 20, urgency: "high" }, "supabase-token");
+    assert.match(calls[0].url, /page=2/);
+    assert.match(calls[0].url, /urgency=high/);
+    assert.equal(calls[0].init.headers.Authorization, "Bearer supabase-token");
   } finally {
     if (oldSource === undefined) delete process.env.REPORTS_DATA_SOURCE;
     else process.env.REPORTS_DATA_SOURCE = oldSource;
@@ -79,7 +84,7 @@ test("simulasi keputusan mengikuti response PATCH tanpa mengubah fixture", async
   await assert.rejects(updateReportStatus("72af1a52-7016-48c7-aacc-000000000002", { status: "rejected", reason: "Alasan" }));
 });
 
-test("skenario gagal dan mode API menolak mutasi mock", async () => {
+test("skenario gagal mock dan mode API mengirim PATCH", async () => {
   const id = "72af1a52-7016-48c7-aacc-000000000001";
   const oldNodeEnv = process.env.NODE_ENV;
   const oldScenario = process.env.REPORTS_MOCK_MUTATION_SCENARIO;
@@ -89,7 +94,16 @@ test("skenario gagal dan mode API menolak mutasi mock", async () => {
     process.env.REPORTS_MOCK_MUTATION_SCENARIO = "error";
     await assert.rejects(updateReportStatus(id, { status: "verified", reason: "Alasan" }));
     process.env.REPORTS_DATA_SOURCE = "api";
-    await assert.rejects(updateReportStatus(id, { status: "verified", reason: "Alasan" }));
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
+    const oldFetch = globalThis.fetch;
+    globalThis.fetch = async (_url, init) => {
+      assert.equal(init.method, "PATCH");
+      assert.equal(init.headers.Authorization, "Bearer supabase-token");
+      assert.deepEqual(JSON.parse(init.body), { status: "verified", reason: "Alasan" });
+      return new Response(JSON.stringify({ id, ticket_number: "LP-2026-0001", status: "verified", updated_at: "2026-09-17T00:00:00Z" }), { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+    assert.equal((await updateReportStatus(id, { status: "verified", reason: "Alasan" }, "supabase-token")).status, "verified");
+    globalThis.fetch = oldFetch;
   } finally {
     if (oldNodeEnv === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = oldNodeEnv;

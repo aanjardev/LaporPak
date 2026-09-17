@@ -1,6 +1,6 @@
 # LaporPak
 
-LaporPak adalah platform layanan publik desa berbasis WhatsApp. Target MVP mencakup ASK (tanya layanan), REPORT (laporan warga), REQUEST (pengajuan layanan), TRACK (pantau status), dan dukungan multi-desa. Fokus pengembangan pertama adalah REPORT. Dashboard daftar/detail laporan dan simulasi keputusan petugas sudah tersedia dengan data sintetis; integrasi API, autentikasi admin, dan alur WhatsApp end-to-end belum selesai.
+LaporPak adalah platform layanan publik desa berbasis WhatsApp. Target MVP mencakup ASK (tanya layanan), REPORT (laporan warga), REQUEST (pengajuan layanan), TRACK (pantau status), dan dukungan multi-desa. Fokus pengembangan pertama adalah REPORT. Dashboard daftar/detail laporan mendukung data mock maupun FastAPI dan autentikasi admin menggunakan Supabase Auth invite-only.
 
 ## Dokumen acuan
 
@@ -56,7 +56,8 @@ API tersedia di `http://localhost:8000`; endpoint awalnya adalah `/health` dan d
 
 ## Status pengembangan
 
-- Dashboard menampilkan daftar/detail REPORT dengan pencarian, filter, pagination, dan simulasi verifikasi/penolakan menggunakan data mock. Filter urgensi mengikuti enum API.
-- API baru menyediakan endpoint dasar dan health check.
-- Migrasi SQL dan seed kategori sudah ditulis, tetapi penerapannya ke Supabase harus dilakukan dan diverifikasi terpisah.
-- Plugin OpenClaw dan kontrak tool REPORT sudah tersedia; koneksi WhatsApp/OpenClaw nyata masih menunggu credential dan konfigurasi host. API admin demo memakai secret server-side sementara Supabase Auth tetap menjadi target hardening setelah demo.
+- Dashboard menampilkan daftar/detail REPORT dengan pencarian, filter, pagination, dan verifikasi/penolakan melalui data mock atau FastAPI.
+- FastAPI menyediakan POST, list, detail, dan perubahan status REPORT dengan transaksi serta riwayat.
+- Migration dan seed REPORT sudah diterapkan serta diverifikasi pada Supabase development.
+- Login admin memakai Supabase Auth invite-only; FastAPI memvalidasi access token untuk GET/PATCH.
+- Plugin OpenClaw dan kontrak tool REPORT tersedia; integrasi WhatsApp dasar sudah dapat menyimpan laporan dan masih dikembangkan lebih lanjut.

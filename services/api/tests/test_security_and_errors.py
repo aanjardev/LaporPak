@@ -1,6 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
+import httpx
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, SecretStr
@@ -58,13 +59,25 @@ def build_test_app() -> FastAPI:
 
 def configure_tokens(monkeypatch):
     monkeypatch.setattr(settings, "openclaw_api_key", SecretStr("openclaw-token"))
-    monkeypatch.setattr(settings, "dashboard_api_key", SecretStr("admin-token"))
-    monkeypatch.setattr(settings, "dashboard_admin_identifier", "admin-desa-demo")
+    monkeypatch.setattr(settings, "supabase_url", "https://project.supabase.co")
+    monkeypatch.setattr(settings, "supabase_anon_key", "anon-key")
     monkeypatch.setattr(
         settings,
         "dashboard_admin_unit_id",
         UUID("00000000-0000-4000-8000-000000000002"),
     )
+
+    def fake_get(_url, *, headers, timeout):
+        assert headers["apikey"] == "anon-key"
+        assert timeout == 5
+        if headers["Authorization"] == "Bearer admin-token":
+            return httpx.Response(
+                200,
+                json={"id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"},
+            )
+        return httpx.Response(401, json={"message": "invalid token"})
+
+    monkeypatch.setattr("app.core.security.httpx.get", fake_get)
 
 
 def test_missing_or_invalid_token_uses_standard_error(monkeypatch):
@@ -111,33 +124,34 @@ def test_openclaw_and_admin_tokens_have_separate_permissions(monkeypatch):
 
     assert openclaw.status_code == 200
     assert openclaw.json()["caller_type"] == "openclaw"
-    assert openclaw_as_admin.status_code == 403
-    assert openclaw_as_admin.json()["error"]["code"] == "FORBIDDEN"
+    assert openclaw_as_admin.status_code == 401
+    assert openclaw_as_admin.json()["error"]["code"] == "UNAUTHORIZED"
     assert admin.status_code == 200
-    assert admin.json()["identifier"] == "admin-desa-demo"
+    assert admin.json()["identifier"] == (
+        "supabase:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    )
     assert admin.json()["administrative_unit_id"] == (
         "00000000-0000-4000-8000-000000000002"
     )
     assert admin_as_openclaw.status_code == 401
 
 
-def test_same_token_for_both_callers_is_rejected(monkeypatch):
-    monkeypatch.setattr(settings, "openclaw_api_key", SecretStr("same-token"))
-    monkeypatch.setattr(settings, "dashboard_api_key", SecretStr("same-token"))
+def test_invalid_supabase_token_is_rejected(monkeypatch):
+    configure_tokens(monkeypatch)
     client = TestClient(build_test_app())
 
     response = client.get(
         "/admin",
-        headers={"Authorization": "Bearer same-token"},
+        headers={"Authorization": "Bearer invalid-token"},
     )
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "UNAUTHORIZED"
 
 
-def test_empty_or_unconfigured_tokens_never_authenticate(monkeypatch):
-    monkeypatch.setattr(settings, "openclaw_api_key", SecretStr(""))
-    monkeypatch.setattr(settings, "dashboard_api_key", None)
+def test_unconfigured_supabase_auth_fails_closed(monkeypatch):
+    monkeypatch.setattr(settings, "supabase_url", "")
+    monkeypatch.setattr(settings, "supabase_anon_key", "")
     client = TestClient(build_test_app())
 
     response = client.get(
@@ -145,8 +159,8 @@ def test_empty_or_unconfigured_tokens_never_authenticate(monkeypatch):
         headers={"Authorization": "Bearer any-value"},
     )
 
-    assert response.status_code == 401
-    assert response.json()["error"]["code"] == "UNAUTHORIZED"
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
 
 
 def test_request_validation_uses_standard_error(monkeypatch):

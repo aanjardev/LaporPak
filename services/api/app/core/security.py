@@ -3,6 +3,7 @@ from hmac import compare_digest
 from typing import Annotated
 from uuid import UUID
 
+import httpx
 from fastapi import Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, SecretStr
@@ -52,29 +53,59 @@ def authenticate_caller(
             message="Valid bearer token required",
         )
 
-    token = credentials.credentials
-    is_openclaw = token_matches(token, settings.openclaw_api_key)
-    is_admin = token_matches(token, settings.dashboard_api_key)
+    user_id = verify_supabase_access_token(credentials.credentials)
+    return AuthenticatedCaller(
+        caller_type=CallerType.ADMIN,
+        identifier=f"supabase:{user_id}",
+        administrative_unit_id=settings.dashboard_admin_unit_id,
+    )
 
-    # Reject ambiguous configuration as well as invalid credentials.
-    if is_openclaw == is_admin:
+
+def verify_supabase_access_token(access_token: str) -> UUID:
+    if not settings.supabase_url or not settings.supabase_anon_key:
+        raise APIError(
+            status_code=503,
+            code="INTERNAL_ERROR",
+            message="Admin authentication is not configured",
+        )
+
+    try:
+        response = httpx.get(
+            f"{settings.supabase_url.rstrip('/')}/auth/v1/user",
+            headers={
+                "apikey": settings.supabase_anon_key,
+                "Authorization": f"Bearer {access_token}",
+            },
+            timeout=5,
+        )
+    except httpx.HTTPError as exc:
+        raise APIError(
+            status_code=503,
+            code="INTERNAL_ERROR",
+            message="Admin authentication is temporarily unavailable",
+        ) from exc
+
+    if response.status_code in {401, 403}:
         raise APIError(
             status_code=401,
             code="UNAUTHORIZED",
-            message="Valid bearer token required",
+            message="Valid Supabase access token required",
+        )
+    if response.is_error:
+        raise APIError(
+            status_code=503,
+            code="INTERNAL_ERROR",
+            message="Admin authentication is temporarily unavailable",
         )
 
-    if is_openclaw:
-        return AuthenticatedCaller(
-            caller_type=CallerType.OPENCLAW,
-            identifier="openclaw",
-        )
-
-    return AuthenticatedCaller(
-        caller_type=CallerType.ADMIN,
-        identifier=settings.dashboard_admin_identifier,
-        administrative_unit_id=settings.dashboard_admin_unit_id,
-    )
+    try:
+        return UUID(response.json()["id"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise APIError(
+            status_code=401,
+            code="UNAUTHORIZED",
+            message="Valid Supabase access token required",
+        ) from exc
 
 
 AuthenticatedCallerDependency = Annotated[

@@ -1,6 +1,6 @@
 # Dashboard LaporPak
 
-Dashboard menggunakan Next.js, TypeScript, Tailwind CSS, dan shadcn/ui. Login petugas memakai Supabase Auth. Daftar, detail, dan simulasi keputusan petugas memakai data sintetis sesuai [kontrak API](../../docs/api-contract.md).
+Dashboard menggunakan Next.js, TypeScript, Tailwind CSS, dan shadcn/ui. Login petugas memakai Supabase Auth. Daftar, detail, dan keputusan petugas dapat memakai data sintetis atau FastAPI sesuai [kontrak API](../../docs/api-contract.md).
 
 ## Menjalankan lokal
 
@@ -20,7 +20,11 @@ Untuk memeriksa state kosong, error, atau loading pada mode development, set `RE
 
 Pada detail laporan berstatus menunggu verifikasi, pilih **Verifikasi laporan** atau **Tolak laporan**, isi alasan, lalu simpan. Badge dan riwayat akan berubah di layar setelah simulasi berhasil; muat ulang halaman untuk kembali ke fixture awal. Untuk menguji proses lambat atau gagal, set `REPORTS_MOCK_MUTATION_SCENARIO=slow` atau `error` di `.env.local` dan mulai ulang server. Laporan pertama memiliki deskripsi panjang dan ringkasan kosong; laporan kelima memiliki riwayat status panjang. Lokasi mock hanya berupa teks tanpa koordinat.
 
-Lapisan data berada di `lib/reports.ts`. Mode `api` sengaja tertutup sampai FastAPI memverifikasi access token dan izin admin pada GET/PATCH. Login Supabase pada tahap ini hanya memeriksa identitas untuk dashboard mock; peran dan cakupan desa tetap menjadi tanggung jawab FastAPI. Halaman `/access-denied` menyiapkan tampilan untuk respons `403` pada tahap integrasi.
+Lapisan data berada di `lib/reports.ts`. Set `REPORTS_DATA_SOURCE=api` untuk
+menggunakan GET/detail/PATCH FastAPI. Pemanggilan dilakukan server-side dan
+meneruskan access token Supabase milik sesi petugas; dashboard tidak menyimpan
+secret backend dan tidak membaca tabel laporan langsung dari Supabase.
+`/access-denied` menyiapkan tampilan untuk respons `403`.
 
 ## Pemeriksaan
 

@@ -5,6 +5,10 @@ API menggunakan FastAPI, Pydantic, SQLAlchemy, dan PostgreSQL Supabase. Endpoint
 menegakkan idempotency, lalu menyimpan laporan dan status history dalam satu
 transaksi.
 
+Endpoint GET/detail/PATCH admin menerima access token Supabase Auth pada bearer
+header. FastAPI memvalidasi token melalui proyek Supabase yang dikonfigurasi
+oleh `SUPABASE_URL` dan `SUPABASE_ANON_KEY`.
+
 ## Menjalankan lokal
 
 Gunakan Python 3.14 sesuai `.python-version` dan `pyproject.toml`.

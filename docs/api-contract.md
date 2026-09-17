@@ -161,18 +161,19 @@ Suggested HTTP mapping:
 
 ### Autentikasi dan izin REPORT
 
-Akses petugas untuk demo P0 menggunakan `DASHBOARD_API_KEY` backend-only. Untuk
-endpoint GET/PATCH pada bagian 7–9, server Next.js meneruskan token tersebut:
+Akses petugas untuk demo P0 menggunakan akun Supabase Auth yang dibuat melalui
+undangan admin. Untuk endpoint GET/PATCH pada bagian 7–9, server Next.js
+meneruskan access token sesi petugas:
 
 ```http
-Authorization: Bearer <dashboard_api_key>
+Authorization: Bearer <supabase_access_token>
 ```
 
-FastAPI memverifikasi token lalu memakai `DASHBOARD_ADMIN_IDENTIFIER` sebagai
-identitas audit dan `DASHBOARD_ADMIN_UNIT_ID` sebagai cakupan demo satu desa.
-Credential tidak boleh masuk browser. Supabase Auth berbasis undangan dan tabel
-role/cakupan admin adalah target hardening setelah demo, bukan kontrak runtime
-yang sudah tersedia saat ini.
+FastAPI memverifikasi token melalui Supabase Auth dan memakai UUID pengguna
+sebagai identitas audit. P0 bersifat invite-only dan satu desa; akun publik
+tidak dapat mendaftar sendiri. `DASHBOARD_ADMIN_UNIT_ID` menjadi cakupan demo.
+Tabel role/cakupan admin per pengguna adalah target hardening sebelum
+deployment multi-desa atau pendaftaran pengguna yang lebih luas.
 
 | Kondisi | HTTP / code | Perilaku dashboard |
 |---|---|---|
@@ -180,7 +181,7 @@ yang sudah tersedia saat ini.
 | Token valid, tetapi akun admin tidak aktif atau tidak memiliki izin memakai dashboard | `403 FORBIDDEN` | Tampilkan akses ditolak; sesi tetap ada agar petugas dapat logout. |
 | ID laporan tidak ada atau berada di luar cakupan desa petugas | `404 REPORT_NOT_FOUND` | Tampilkan laporan tidak ditemukan, tanpa mengungkap keberadaan laporan lintas desa. |
 
-Pemeriksaan detail dan PATCH dilakukan terhadap laporan terkait, bukan berdasarkan filter di frontend. Gunakan error envelope standar di atas. Tabel admin, migrasi, dan pemeriksaan izin FastAPI harus siap sebelum mode API dipakai dengan data nyata.
+Pemeriksaan detail dan PATCH dilakukan terhadap laporan terkait, bukan berdasarkan filter di frontend. Gunakan error envelope standar di atas. Pada demo satu desa, hanya akun yang dibuat melalui invitation yang diberi akses dashboard.
 
 ---
 
