@@ -17,9 +17,11 @@ export const reportCategories = [
   "other",
 ] as const;
 
+export const reportUrgencies = ["low", "medium", "high", "critical"] as const;
+
 export type ReportStatus = (typeof reportStatuses)[number];
 export type ReportCategory = (typeof reportCategories)[number];
-export type ReportUrgency = "low" | "medium" | "high" | "critical";
+export type ReportUrgency = (typeof reportUrgencies)[number];
 
 export type ReportLocation = {
   text: string | null;
@@ -70,6 +72,7 @@ export type ReportQuery = {
   page: number;
   page_size: 20;
   status?: ReportStatus;
+  urgency?: ReportUrgency;
   category?: ReportCategory;
   search?: string;
 };
@@ -233,6 +236,7 @@ export async function getReports(query: ReportQuery): Promise<ReportListResponse
     url.searchParams.set("page", String(query.page));
     url.searchParams.set("page_size", String(query.page_size));
     if (query.status) url.searchParams.set("status", query.status);
+    if (query.urgency) url.searchParams.set("urgency", query.urgency);
     if (query.category) url.searchParams.set("category", query.category);
     if (query.search) url.searchParams.set("search", query.search);
     const response = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
@@ -247,6 +251,7 @@ export async function getReports(query: ReportQuery): Promise<ReportListResponse
   const search = query.search?.trim().toLocaleLowerCase("id-ID");
   const filtered = mockReports.filter((report) => {
     if (query.status && report.status !== query.status) return false;
+    if (query.urgency && report.urgency !== query.urgency) return false;
     if (query.category && report.category !== query.category) return false;
     if (!search) return true;
     return [report.ticket_number, report.description, report.location.text ?? ""]

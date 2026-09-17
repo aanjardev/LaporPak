@@ -133,6 +133,24 @@ Suggested HTTP mapping:
 | 503 | `AI_UNAVAILABLE` |
 | 500 | `INTERNAL_ERROR` |
 
+### Autentikasi dan izin REPORT
+
+Akun petugas menggunakan Supabase Auth melalui undangan, tanpa pendaftaran publik. Untuk ketiga endpoint REPORT yang dilindungi pada bagian 7–9, Next.js meneruskan access token petugas:
+
+```http
+Authorization: Bearer <supabase_access_token>
+```
+
+FastAPI memverifikasi token, lalu membaca akun admin aktif, peran (`admin_sistem` atau `admin_desa`), dan cakupan desa dari database pada **setiap** GET/PATCH. Peran dan cakupan tidak dipercayakan pada state frontend atau metadata yang dapat diubah pengguna. Admin desa hanya dapat mengakses laporan dari desa yang ditugaskan; admin sistem mengikuti cakupan yang ditetapkan tim. GET daftar hanya mengembalikan laporan dalam cakupan petugas.
+
+| Kondisi | HTTP / code | Perilaku dashboard |
+|---|---|---|
+| Token tidak ada, tidak valid, atau kedaluwarsa | `401 UNAUTHORIZED` | Arahkan ke login; simpan tujuan lokal agar dapat kembali setelah login. |
+| Token valid, tetapi akun admin tidak aktif atau tidak memiliki izin memakai dashboard | `403 FORBIDDEN` | Tampilkan akses ditolak; sesi tetap ada agar petugas dapat logout. |
+| ID laporan tidak ada atau berada di luar cakupan desa petugas | `404 REPORT_NOT_FOUND` | Tampilkan laporan tidak ditemukan, tanpa mengungkap keberadaan laporan lintas desa. |
+
+Pemeriksaan detail dan PATCH dilakukan terhadap laporan terkait, bukan berdasarkan filter di frontend. Gunakan error envelope standar di atas. Tabel admin, migrasi, dan pemeriksaan izin FastAPI harus siap sebelum mode API dipakai dengan data nyata.
+
 ---
 
 ## 4. Health

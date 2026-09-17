@@ -10,7 +10,7 @@ npm ci
 npm run dev
 ```
 
-Buka `http://localhost:3000/reports`. Secara default, `REPORTS_DATA_SOURCE=mock` memakai laporan sintetis. Pencarian, filter status/kategori, dan pagination disimpan pada URL.
+Buka `http://localhost:3000/reports`. Secara default, `REPORTS_DATA_SOURCE=mock` memakai laporan sintetis. Pencarian, filter status/urgensi/kategori, dan pagination disimpan pada URL.
 
 Untuk memeriksa state kosong, error, atau loading pada mode development, set `REPORTS_MOCK_SCENARIO` menjadi `empty`, `error`, atau `slow` di `.env.local`, lalu mulai ulang server. Nilai default adalah `normal`. Skenario tersebut diabaikan pada build production.
 

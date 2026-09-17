@@ -657,7 +657,9 @@ Bucket bersifat private.
 
 ## 16. Authentication Boundary
 
-Day 1 dapat melakukan local development sebelum auth dashboard selesai.
+Day 1 dapat melakukan local development dengan dashboard mock sebelum auth selesai. Akun petugas dibuat melalui undangan Supabase Auth tanpa pendaftaran publik. Next.js mengelola sesi berbasis cookie dan meneruskan access token petugas ke FastAPI melalui `Authorization: Bearer` saat memanggil API REPORT. Frontend tidak membaca tabel laporan langsung dari Supabase.
+
+FastAPI memverifikasi token, lalu pada setiap GET/PATCH memeriksa akun admin aktif, peran `admin_sistem` atau `admin_desa`, dan cakupan desa dari database. Penyimpanan peran/cakupan dalam tabel admin memungkinkan pencabutan akses tanpa menunggu JWT kedaluwarsa. Skema tabel dan migrasi baru menjadi pekerjaan backend sebelum integrasi data nyata. Perilaku `401`, `403`, dan `404` untuk laporan di luar cakupan mengikuti `api-contract.md`.
 
 Namun sebelum dashboard/API dibuka ke deployment publik:
 
