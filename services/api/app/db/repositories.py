@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import func, insert, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
@@ -88,21 +88,48 @@ class ReportRepository:
         *,
         offset: int,
         limit: int,
+        status: str | None = None,
+        urgency: str | None = None,
+        category: str | None = None,
+        search: str | None = None,
     ) -> tuple[list[RowMapping], int]:
+        report_join = reports.join(
+            report_categories,
+            report_categories.c.id == reports.c.category_id,
+        )
+        conditions = []
+        if status is not None:
+            conditions.append(reports.c.status == status)
+        if urgency is not None:
+            conditions.append(reports.c.urgency == urgency)
+        if category is not None:
+            conditions.append(report_categories.c.code == category)
+        if search:
+            escaped_search = (
+                search.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
+            )
+            search_pattern = f"%{escaped_search}%"
+            conditions.append(
+                or_(
+                    reports.c.ticket_number.ilike(search_pattern, escape="\\"),
+                    reports.c.description.ilike(search_pattern, escape="\\"),
+                    reports.c.location_text.ilike(search_pattern, escape="\\"),
+                )
+            )
+
         statement = (
-            select(
-                *reports.c,
-                report_categories.c.code.label("category"),
-            )
-            .join(
-                report_categories,
-                report_categories.c.id == reports.c.category_id,
-            )
+            select(*reports.c, report_categories.c.code.label("category"))
+            .select_from(report_join)
+            .where(*conditions)
             .order_by(reports.c.created_at.desc(), reports.c.id.desc())
             .offset(offset)
             .limit(limit)
         )
-        count_statement = select(func.count()).select_from(reports)
+        count_statement = (
+            select(func.count()).select_from(report_join).where(*conditions)
+        )
         rows = list(self.session.execute(statement).mappings().all())
         total = self.session.execute(count_statement).scalar_one()
         return rows, total

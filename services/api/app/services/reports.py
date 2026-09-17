@@ -10,7 +10,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db.repositories import ReportRepository
-from app.schemas.reports import ReportCreate
+from app.schemas.enums import ReportCategory, ReportStatus, ReportUrgency
+from app.schemas.reports import (
+    ReportCitizen,
+    ReportCreate,
+    ReportDetail,
+    ReportListItem,
+    ReportListResponse,
+    ReportLocation,
+    ReportStatusHistory,
+)
 from app.services.exceptions import (
     CategoryNotFoundError,
     DuplicateOperationError,
@@ -142,27 +151,91 @@ class ReportPersistenceService:
     def list_reports(
         self,
         *,
-        offset: int,
-        limit: int,
-    ) -> tuple[list[Mapping[str, Any]], int]:
-        rows, total = self.repository.list_reports(offset=offset, limit=limit)
-        return list(rows), total
+        page: int,
+        page_size: int,
+        status: ReportStatus | None = None,
+        urgency: ReportUrgency | None = None,
+        category: ReportCategory | None = None,
+        search: str | None = None,
+    ) -> ReportListResponse:
+        normalized_search = search.strip() if search else None
+        try:
+            rows, total = self.repository.list_reports(
+                offset=(page - 1) * page_size,
+                limit=page_size,
+                status=status.value if status else None,
+                urgency=urgency.value if urgency else None,
+                category=category.value if category else None,
+                search=normalized_search or None,
+            )
+        except SQLAlchemyError as exc:
+            raise ReportPersistenceError("report list") from exc
 
-    def get_report_detail(self, report_id: UUID) -> dict[str, Any]:
-        report = self.repository.get_report_detail(report_id)
-        if report is None:
-            raise ReportNotFoundError(report_id)
+        return ReportListResponse(
+            items=[self._to_list_item(row) for row in rows],
+            page=page,
+            page_size=page_size,
+            total=total,
+        )
 
-        return {
-            **dict(report),
-            "attachments": [
+    def get_report_detail(self, report_id: UUID) -> ReportDetail:
+        try:
+            report = self.repository.get_report_detail(report_id)
+            if report is None:
+                raise ReportNotFoundError(report_id)
+
+            attachments = [
                 dict(row) for row in self.repository.list_attachments(report_id)
-            ],
-            "status_history": [
-                dict(row)
+            ]
+            history = [
+                ReportStatusHistory.model_validate(dict(row))
                 for row in self.repository.list_status_history(report_id)
-            ],
-        }
+            ]
+        except ReportNotFoundError:
+            raise
+        except SQLAlchemyError as exc:
+            raise ReportPersistenceError("report detail") from exc
+
+        responsible_unit = None
+        if report["responsible_unit_id"] is not None:
+            responsible_unit = {
+                "id": report["responsible_unit_id"],
+                "name": report["responsible_unit_name"],
+            }
+
+        list_item = self._to_list_item(report)
+        return ReportDetail(
+            **list_item.model_dump(),
+            citizen=ReportCitizen(
+                id=report["citizen_id"],
+                display_name=report["citizen_display_name"] or "Warga",
+            ),
+            summary=report["summary"],
+            responsible_unit=responsible_unit,
+            ai_recommendation=report["ai_recommendation"] or {},
+            attachments=attachments,
+            status_history=history,
+            verified_at=report["verified_at"],
+            resolved_at=report["resolved_at"],
+            updated_at=report["updated_at"],
+        )
+
+    @staticmethod
+    def _to_list_item(report: Mapping[str, Any]) -> ReportListItem:
+        return ReportListItem(
+            id=report["id"],
+            ticket_number=report["ticket_number"],
+            category=report["category"],
+            description=report["description"],
+            location=ReportLocation(
+                text=report["location_text"],
+                latitude=report["latitude"],
+                longitude=report["longitude"],
+            ),
+            urgency=report["urgency"],
+            status=report["status"],
+            created_at=report["created_at"],
+        )
 
     def update_report_with_history(
         self,

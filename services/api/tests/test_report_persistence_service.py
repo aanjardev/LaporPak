@@ -1,9 +1,11 @@
 from contextlib import AbstractContextManager
+from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.schemas.enums import ReportCategory, ReportStatus, ReportUrgency
 from app.schemas.reports import ReportCreate
 from app.services.exceptions import (
     CategoryNotFoundError,
@@ -45,12 +47,33 @@ class TransactionSession:
 
 class FakeRepository:
     def __init__(self):
-        self.category = {"id": "category-id"}
-        self.citizen = {"id": "citizen-id"}
+        self.category = {
+            "id": UUID("600dc7e0-1cd8-4249-aa22-80a1ad65ee42")
+        }
+        self.citizen = {
+            "id": UUID("5c242fc6-77a8-4fa7-a12f-a67bbc75839b")
+        }
         self.report = {
-            "id": "report-id",
+            "id": UUID("72af1a52-7016-48c7-aacc-6c35417be819"),
             "status": "pending_verification",
             "ticket_number": "LP-2026-0001",
+            "category": "infrastructure",
+            "category_id": self.category["id"],
+            "citizen_id": self.citizen["id"],
+            "citizen_display_name": None,
+            "description": "Jalan rusak.",
+            "location_text": "RT 03",
+            "latitude": None,
+            "longitude": None,
+            "urgency": "high",
+            "summary": "Kerusakan jalan di RT 03.",
+            "responsible_unit_id": None,
+            "responsible_unit_name": None,
+            "ai_recommendation": {},
+            "verified_at": None,
+            "resolved_at": None,
+            "created_at": datetime(2026, 9, 16, 14, tzinfo=UTC),
+            "updated_at": datetime(2026, 9, 16, 14, tzinfo=UTC),
         }
         self.inserted_report = None
         self.inserted_history = None
@@ -94,7 +117,8 @@ class FakeRepository:
         self.updated_values = values
         return self.updated_report
 
-    def list_reports(self, *, offset, limit):
+    def list_reports(self, **parameters):
+        self.list_parameters = parameters
         return [self.report], 1
 
     def get_report_detail(self, report_id):
@@ -104,7 +128,16 @@ class FakeRepository:
         return [{"id": "attachment-id"}]
 
     def list_status_history(self, report_id):
-        return [{"id": "history-id"}]
+        return [
+            {
+                "old_status": None,
+                "new_status": "pending_verification",
+                "actor_type": "system",
+                "actor_identifier": None,
+                "notes": "Report created",
+                "created_at": datetime(2026, 9, 16, 14, tzinfo=UTC),
+            }
+        ]
 
 
 def valid_payload(**overrides):
@@ -136,10 +169,10 @@ def test_create_report_and_initial_history_share_one_transaction():
 
     assert result.report["ticket_number"] == "LP-2026-0001"
     assert result.replayed is False
-    assert repository.inserted_report["citizen_id"] == "citizen-id"
-    assert repository.inserted_report["category_id"] == "category-id"
+    assert repository.inserted_report["citizen_id"] == repository.citizen["id"]
+    assert repository.inserted_report["category_id"] == repository.category["id"]
     assert "ticket_number" not in repository.inserted_report
-    assert repository.inserted_history["report_id"] == "report-id"
+    assert repository.inserted_history["report_id"] == repository.report["id"]
     assert repository.inserted_history["new_status"] == "pending_verification"
     assert repository.inserted_history["notes"] == "Report created"
     assert repository.lock_key is not None
@@ -307,5 +340,34 @@ def test_detail_aggregates_attachments_and_ordered_history():
 
     detail = service.get_report_detail(report_id)
 
-    assert detail["attachments"] == [{"id": "attachment-id"}]
-    assert detail["status_history"] == [{"id": "history-id"}]
+    assert detail.attachments == [{"id": "attachment-id"}]
+    assert detail.status_history[0].new_status.value == "pending_verification"
+    assert detail.citizen.display_name == "Warga"
+
+
+def test_list_maps_filters_pagination_and_response_shape():
+    session = TransactionSession()
+    repository = FakeRepository()
+    service = ReportPersistenceService(session, repository)
+
+    response = service.list_reports(
+        page=2,
+        page_size=20,
+        status=ReportStatus.PENDING_VERIFICATION,
+        urgency=ReportUrgency.HIGH,
+        category=ReportCategory.INFRASTRUCTURE,
+        search="  LP-2026  ",
+    )
+
+    assert response.page == 2
+    assert response.page_size == 20
+    assert response.total == 1
+    assert response.items[0].location.text == "RT 03"
+    assert repository.list_parameters == {
+        "offset": 20,
+        "limit": 20,
+        "status": "pending_verification",
+        "urgency": "high",
+        "category": "infrastructure",
+        "search": "LP-2026",
+    }

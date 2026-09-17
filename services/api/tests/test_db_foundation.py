@@ -157,6 +157,31 @@ def test_repository_uses_transaction_scoped_idempotency_lock():
     assert session.commit_called is False
 
 
+def test_list_query_applies_the_same_filters_to_items_and_total():
+    session = RecordingSession()
+    repository = ReportRepository(session)
+
+    repository.list_reports(
+        offset=20,
+        limit=10,
+        status="pending_verification",
+        urgency="high",
+        category="infrastructure",
+        search="jalan_100%",
+    )
+
+    item_query = compile_statement(session.statements[0])
+    count_query = compile_statement(session.statements[1])
+    for query in (item_query, count_query):
+        assert "public.reports.status" in query
+        assert "public.reports.urgency" in query
+        assert "public.report_categories.code" in query
+        assert "public.reports.ticket_number ILIKE" in query
+        assert "ESCAPE" in query
+    assert "ORDER BY public.reports.created_at DESC" in item_query
+    assert "count(*)" in count_query
+
+
 def test_insert_report_leaves_ticket_generation_to_database():
     session = RecordingSession()
     repository = ReportRepository(session)
