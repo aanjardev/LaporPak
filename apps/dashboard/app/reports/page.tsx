@@ -13,6 +13,7 @@ import { ReportUnavailable } from "@/components/report-unavailable";
 import { requireSignedIn } from "@/lib/auth";
 import {
   getReports,
+  ReportApiError,
   reportCategories,
   reportStatuses,
   reportUrgencies,
@@ -55,7 +56,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
   let result;
   try {
     result = await getReports(query);
-  } catch {
+  } catch (error) {
+    if (error instanceof ReportApiError && error.status === 401) {
+      redirect(`/login?next=${encodeURIComponent("/reports")}`);
+    }
+    if (error instanceof ReportApiError && error.status === 403) {
+      redirect("/access-denied");
+    }
     return <ReportUnavailable />;
   }
   const totalPages = Math.max(1, Math.ceil(result.total / result.page_size));

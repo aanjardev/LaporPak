@@ -66,7 +66,6 @@ def valid_payload():
 @pytest.fixture
 def auth_tokens(monkeypatch):
     monkeypatch.setattr(settings, "openclaw_api_key", SecretStr("openclaw-token"))
-    monkeypatch.setattr(settings, "dashboard_api_key", SecretStr("admin-token"))
 
 
 def request_headers(token="openclaw-token", include_idempotency=True):

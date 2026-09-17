@@ -21,8 +21,6 @@ class Settings(BaseSettings):
 
     openclaw_api_url: str = ""
     openclaw_api_key: SecretStr | None = None
-    dashboard_api_key: SecretStr | None = None
-    dashboard_admin_identifier: str = "admin-desa-demo"
     dashboard_admin_unit_id: UUID | None = None
 
     model_config = SettingsConfigDict(

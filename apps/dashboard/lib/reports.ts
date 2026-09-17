@@ -224,9 +224,60 @@ async function mockScenario() {
   return scenario;
 }
 
-export async function getReports(query: ReportQuery): Promise<ReportListResponse> {
+export class ReportApiError extends Error {
+  status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function apiRequest<T>(
+  path: string,
+  init: RequestInit = {},
+  accessToken?: string,
+): Promise<T> {
+  const token = accessToken ?? await (await import("./auth")).getAdminAccessToken();
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!baseUrl) throw new Error("NEXT_PUBLIC_API_URL is not configured");
+
+  const response = await fetch(new URL(path, `${baseUrl.replace(/\/+$/, "")}/`), {
+    ...init,
+    cache: "no-store",
+    headers: {
+      ...init.headers,
+      Authorization: `Bearer ${token}`,
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+    },
+  });
+  if (!response.ok) {
+    let message = "Layanan laporan tidak tersedia";
+    try {
+      const body = await response.json();
+      message = body?.error?.message ?? message;
+    } catch {
+      // Keep the safe fallback when the upstream body is not JSON.
+    }
+    throw new ReportApiError(response.status, message);
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function getReports(
+  query: ReportQuery,
+  accessToken?: string,
+): Promise<ReportListResponse> {
   if (process.env.REPORTS_DATA_SOURCE === "api") {
-    throw new Error("Akses API REPORT menunggu otorisasi FastAPI");
+    const params = new URLSearchParams({
+      page: String(query.page),
+      page_size: String(query.page_size),
+    });
+    if (query.status) params.set("status", query.status);
+    if (query.urgency) params.set("urgency", query.urgency);
+    if (query.category) params.set("category", query.category);
+    if (query.search) params.set("search", query.search);
+    return apiRequest(`/api/v1/reports?${params}`, {}, accessToken);
   }
 
   const scenario = await mockScenario();
@@ -256,9 +307,21 @@ export async function getReports(query: ReportQuery): Promise<ReportListResponse
   return { items, page: query.page, page_size: query.page_size, total: filtered.length };
 }
 
-export async function getReportById(id: string): Promise<ReportDetail | null> {
+export async function getReportById(
+  id: string,
+  accessToken?: string,
+): Promise<ReportDetail | null> {
   if (process.env.REPORTS_DATA_SOURCE === "api") {
-    throw new Error("Akses API REPORT menunggu otorisasi FastAPI");
+    try {
+      return await apiRequest(
+        `/api/v1/reports/${encodeURIComponent(id)}`,
+        {},
+        accessToken,
+      );
+    } catch (error) {
+      if (error instanceof ReportApiError && error.status === 404) return null;
+      throw error;
+    }
   }
 
   const scenario = await mockScenario();
@@ -269,9 +332,14 @@ export async function getReportById(id: string): Promise<ReportDetail | null> {
 export async function updateReportStatus(
   id: string,
   request: UpdateReportStatusRequest,
+  accessToken?: string,
 ): Promise<UpdateReportStatusResponse> {
   if (process.env.REPORTS_DATA_SOURCE === "api") {
-    throw new Error("Perubahan status API menunggu autentikasi admin");
+    return apiRequest(
+      `/api/v1/reports/${encodeURIComponent(id)}/status`,
+      { method: "PATCH", body: JSON.stringify(request) },
+      accessToken,
+    );
   }
 
   const report = mockReports.find((item) => item.id === id);

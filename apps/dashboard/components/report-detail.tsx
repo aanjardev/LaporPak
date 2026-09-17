@@ -3,13 +3,13 @@
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { ArrowLeft, Clock3, MapPin, UserRound } from "lucide-react";
-import { saveMockReportDecision } from "@/app/reports/[id]/actions";
+import { saveReportDecision } from "@/app/reports/[id]/actions";
 import { categoryLabels, formatLocation, formatReportDate, StatusBadge, statusLabels, urgencyLabels } from "@/components/report-display";
 import type { ReportDetail } from "@/lib/reports";
 
 type Decision = "verified" | "rejected";
 
-export function ReportDetailView({ initialReport, mockActionsEnabled }: { initialReport: ReportDetail; mockActionsEnabled: boolean }) {
+export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { initialReport: ReportDetail; actionsEnabled: boolean; isMock: boolean }) {
   const [report, setReport] = useState(initialReport);
   const [decision, setDecision] = useState<Decision | "">("");
   const [reason, setReason] = useState("");
@@ -18,7 +18,7 @@ export function ReportDetailView({ initialReport, mockActionsEnabled }: { initia
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving.current || !mockActionsEnabled || report.status !== "pending_verification") return;
+    if (saving.current || !actionsEnabled || report.status !== "pending_verification") return;
     if (!decision || !reason.trim()) {
       setState("error");
       return;
@@ -27,7 +27,7 @@ export function ReportDetailView({ initialReport, mockActionsEnabled }: { initia
     saving.current = true;
     setState("saving");
     try {
-      const result = await saveMockReportDecision(report.id, { status: decision, reason: reason.trim() });
+      const result = await saveReportDecision(report.id, { status: decision, reason: reason.trim() });
       if (!result.ok) {
         setState("error");
         return;
@@ -61,7 +61,7 @@ export function ReportDetailView({ initialReport, mockActionsEnabled }: { initia
     <div className="mx-auto max-w-5xl space-y-6">
       <Link href="/reports" className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-semibold text-sky-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"><ArrowLeft aria-hidden="true" size={17} /> Kembali ke daftar laporan</Link>
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-2"><p className="text-sm font-semibold text-sky-800">Detail laporan</p><h1 className="break-words text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{report.ticket_number}</h1><p className="text-sm text-slate-600">Dibuat <time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time></p>{mockActionsEnabled && report.status === "pending_verification" && <a href="#keputusan-petugas" className="inline-flex min-h-11 items-center text-sm font-semibold text-sky-800 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 lg:hidden">Lompat ke keputusan petugas</a>}</div>
+        <div className="min-w-0 space-y-2"><p className="text-sm font-semibold text-sky-800">Detail laporan</p><h1 className="break-words text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{report.ticket_number}</h1><p className="text-sm text-slate-600">Dibuat <time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time></p>{actionsEnabled && report.status === "pending_verification" && <a href="#keputusan-petugas" className="inline-flex min-h-11 items-center text-sm font-semibold text-sky-800 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 lg:hidden">Lompat ke keputusan petugas</a>}</div>
         <StatusBadge status={report.status} />
       </header>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_290px]">
@@ -107,7 +107,7 @@ export function ReportDetailView({ initialReport, mockActionsEnabled }: { initia
               <div><dt className="flex items-center gap-1.5 text-slate-600"><Clock3 aria-hidden="true" size={15} /> Terakhir diperbarui</dt><dd className="mt-1 font-medium">{formatReportDate(report.updated_at)}</dd></div>
             </dl>
           </section>
-          {mockActionsEnabled && report.status === "pending_verification" && (
+          {actionsEnabled && report.status === "pending_verification" && (
             <section aria-labelledby="keputusan-petugas" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 id="keputusan-petugas" className="text-base font-semibold">Keputusan petugas</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">Periksa laporan sebelum menentukan keputusan.</p>
@@ -127,11 +127,10 @@ export function ReportDetailView({ initialReport, mockActionsEnabled }: { initia
               </form>
               {state === "saving" && <p role="status" className="mt-3 text-sm text-slate-600">Keputusan sedang disimpan…</p>}
               {state === "error" && <p role="alert" className="mt-3 text-sm text-rose-800">Keputusan belum tersimpan. Periksa pilihan dan alasan, lalu coba lagi.</p>}
-              <p className="mt-3 text-xs leading-5 text-amber-900">Simulasi: perubahan hanya terlihat sampai halaman dimuat ulang.</p>
+              {isMock && <p className="mt-3 text-xs leading-5 text-amber-900">Simulasi: perubahan hanya terlihat sampai halaman dimuat ulang.</p>}
             </section>
           )}
-          {state === "success" && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">Keputusan berhasil disimulasikan. Status dan riwayat kembali semula setelah halaman dimuat ulang.</p>}
-          {!mockActionsEnabled && report.status === "pending_verification" && <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">Perubahan status belum tersedia pada mode data ini.</p>}
+          {state === "success" && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">{isMock ? "Keputusan berhasil disimulasikan. Status kembali semula setelah halaman dimuat ulang." : "Keputusan berhasil disimpan."}</p>}
           <p className="rounded-xl border border-sky-100 bg-sky-50 p-4 text-sm leading-6 text-sky-950">Informasi dan rekomendasi AI membantu petugas meninjau laporan. Keputusan penanganan tetap dilakukan oleh petugas berwenang.</p>
         </aside>
       </div>

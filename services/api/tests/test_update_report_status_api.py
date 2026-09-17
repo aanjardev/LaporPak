@@ -5,7 +5,9 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
+from app.core import security
 from app.core.config import settings
+from app.core.errors import APIError
 from app.main import app
 from app.schemas.reports import ReportStatusUpdateResponse
 from app.services.dependencies import get_report_service
@@ -38,8 +40,11 @@ class FakeStatusService:
 @pytest.fixture
 def auth_tokens(monkeypatch):
     monkeypatch.setattr(settings, "openclaw_api_key", SecretStr("openclaw-token"))
-    monkeypatch.setattr(settings, "dashboard_api_key", SecretStr("admin-token"))
-    monkeypatch.setattr(settings, "dashboard_admin_identifier", "admin-desa-demo")
+    def verify(token):
+        if token != "admin-token":
+            raise APIError(status_code=401, code="UNAUTHORIZED", message="Invalid token")
+        return UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    monkeypatch.setattr(security, "verify_supabase_access_token", verify)
 
 
 @pytest.fixture(autouse=True)
@@ -77,7 +82,7 @@ def test_update_status_returns_contract_response_and_admin_actor(auth_tokens):
     call = service.calls[0]
     assert call["new_status"].value == "verified"
     assert call["reason"] == "Sudah diperiksa."
-    assert call["actor_identifier"] == "admin-desa-demo"
+    assert call["actor_identifier"] == "supabase:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 
 
 def test_update_status_requires_admin_and_valid_request(auth_tokens):
@@ -105,7 +110,7 @@ def test_update_status_requires_admin_and_valid_request(auth_tokens):
     )
 
     assert missing_token.status_code == 401
-    assert openclaw.status_code == 403
+    assert openclaw.status_code == 401
     assert blank_reason.status_code == 422
     assert unknown_status.status_code == 422
     assert service.calls == []
