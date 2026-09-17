@@ -17,9 +17,9 @@ FastAPI does not call Gemini.
    `%USERPROFILE%\.openclaw\.env` on Windows). Use `.env.example` in this
    directory only as a key-name template; never add a real value to Git.
 
-2. Enable `llm-task`, pin the evaluated model, and restrict the extraction
-   agent to that tool while the create-report tool is not yet integrated.
-   Merge these entries with any existing plugin or tool allowlist:
+2. Enable `llm-task` and `laporpak-tools`, pin the evaluated model, and limit
+   the agent to the extraction and report-creation tools. Merge these entries
+   with any existing plugin or tool allowlist:
 
    ```json5
    {
@@ -30,14 +30,22 @@ FastAPI does not call Gemini.
            config: {
              defaultProvider: "google",
              defaultModel: "gemini-3.1-flash-lite",
-             allowedModels: ["google/gemini-3.1-flash-lite"],
              maxTokens: 1600,
              timeoutMs: 60000
+           },
+           llm: {
+             allowModelOverride: true,
+             allowAuthProfileOverride: true,
+             allowedCompletionModels: ["google/gemini-3.1-flash-lite"]
            }
-         }
-       }
-     },
-     tools: { allow: ["llm-task"] }
+          },
+          "laporpak-tools": {
+            enabled: true
+          }
+        },
+        allow: ["google", "llm-task", "laporpak-tools"]
+      },
+      tools: { allow: ["llm-task", "laporpak_create_report"] }
    }
    ```
 
@@ -57,6 +65,16 @@ its local environment when invoking the backend. Send the latter as
 `X-OpenClaw-API-Key` and send the stable report draft UUID as
 `Idempotency-Key` to `POST /api/v1/reports`.
 
+The version-controlled plugin is in `plugins/laporpak-tools`. Install it on
+the OpenClaw host, enable it in `plugins.entries`, and add
+`laporpak_create_report` to `tools.allow`. The tool is available only for an
+authenticated WhatsApp context and takes the sender identity from OpenClaw's
+trusted runtime metadata. Call it only after the citizen confirms a complete
+REPORT draft.
+
+See `../../docs/whatsapp-setup.md` for Windows setup, QR pairing, access
+policy, verification, and troubleshooting.
+
 The current baseline is `google/gemini-3.1-flash-lite`. On 2026-09-17 it
 passed all 7 cases in `evals/report-p0.json` through OpenClaw 2026.7.1 and was
 then validated again with `AIAnalysis`. Re-run the dataset before changing the
@@ -72,6 +90,6 @@ scores exactly, and do not add real citizen data to this dataset.
 
 ## Current boundary
 
-This foundation supports isolated structured extraction only. Conversation
-state, citizen confirmation, `create_report`, retry/idempotency, and WhatsApp
-wiring are later phases and must follow the canonical repository workflow.
+Structured extraction and idempotent `create_report` are implemented.
+Conversation state, citizen confirmation behavior, and WhatsApp channel setup
+remain OpenClaw host responsibilities.

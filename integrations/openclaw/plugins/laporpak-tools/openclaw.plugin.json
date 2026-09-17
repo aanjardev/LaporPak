@@ -1,0 +1,25 @@
+{
+  "id": "laporpak-tools",
+  "name": "LaporPak Tools",
+  "description": "Create confirmed LaporPak reports through the FastAPI boundary.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  },
+  "activation": {
+    "onStartup": false
+  },
+  "contracts": {
+    "tools": [
+      "laporpak_create_report"
+    ]
+  },
+  "toolMetadata": {
+    "laporpak_create_report": {
+      "optional": true,
+      "replaySafe": true
+    }
+  }
+}
