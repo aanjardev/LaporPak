@@ -663,9 +663,28 @@ Bucket bersifat private.
 
 ## 16. Authentication Boundary
 
-Day 1 dapat melakukan local development dengan dashboard mock sebelum auth selesai. Akun petugas dibuat melalui undangan Supabase Auth tanpa pendaftaran publik. Next.js mengelola sesi berbasis cookie dan meneruskan access token petugas ke FastAPI melalui `Authorization: Bearer` saat memanggil API REPORT. Frontend tidak membaca tabel laporan langsung dari Supabase.
+Demo P0 memakai `DASHBOARD_API_KEY` yang hanya tersedia pada server Next.js.
+Server meneruskannya ke FastAPI melalui `Authorization: Bearer`; browser dan
+frontend publik tidak menerima secret tersebut. FastAPI menetapkan identitas
+audit dan cakupan desa dari konfigurasi backend. Frontend tidak membaca tabel
+laporan langsung dari Supabase.
 
-FastAPI memverifikasi token, lalu pada setiap GET/PATCH memeriksa akun admin aktif, peran `admin_sistem` atau `admin_desa`, dan cakupan desa dari database. Penyimpanan peran/cakupan dalam tabel admin memungkinkan pencabutan akses tanpa menunggu JWT kedaluwarsa. Skema tabel dan migrasi baru menjadi pekerjaan backend sebelum integrasi data nyata. Perilaku `401`, `403`, dan `404` untuk laporan di luar cakupan mengikuti `api-contract.md`.
+Supabase Auth berbasis undangan beserta tabel role/cakupan admin tetap menjadi
+target hardening setelah demo. Implementasi tersebut harus tetap diverifikasi
+FastAPI pada setiap GET/PATCH dan tidak memindahkan keputusan izin ke frontend.
+
+Baseline autentikasi demo P0 menggunakan dua bearer token backend-only yang
+berbeda:
+
+```text
+OpenClaw token  -> POST report dari kanal WhatsApp
+Dashboard token -> GET report dan PATCH status
+```
+
+FastAPI memetakan token ke caller/principal dan menegakkan izin endpoint.
+Untuk demo satu desa, dashboard principal juga membawa administrative unit
+yang diizinkan. Token dashboard hanya boleh digunakan dari server Next.js dan
+tidak boleh menjadi environment variable `NEXT_PUBLIC_*`.
 
 Namun sebelum dashboard/API dibuka ke deployment publik:
 

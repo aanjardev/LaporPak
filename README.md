@@ -59,4 +59,4 @@ API tersedia di `http://localhost:8000`; endpoint awalnya adalah `/health` dan d
 - Dashboard menampilkan daftar/detail REPORT dengan pencarian, filter, pagination, dan simulasi verifikasi/penolakan menggunakan data mock. Filter urgensi mengikuti enum API.
 - API baru menyediakan endpoint dasar dan health check.
 - Migrasi SQL dan seed kategori sudah ditulis, tetapi penerapannya ke Supabase harus dilakukan dan diverifikasi terpisah.
-- Integrasi WhatsApp/OpenClaw dan alur laporan nyata belum tersedia. Kontrak autentikasi admin sudah dicatat di dokumentasi; login Supabase Auth menunggu konfigurasi proyek dan akun undangan.
+- Plugin OpenClaw dan kontrak tool REPORT sudah tersedia; koneksi WhatsApp/OpenClaw nyata masih menunggu credential dan konfigurasi host. API admin demo memakai secret server-side sementara Supabase Auth tetap menjadi target hardening setelah demo.

@@ -1,174 +1,313 @@
 import hashlib
 import json
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
-from app.core.errors import APIError
-from app.db.session import get_engine
-from app.schemas.reports import CreateReportRequest, CreateReportResponse, ReportSource
+from app.db.repositories import ReportRepository
+from app.schemas.enums import ReportCategory, ReportStatus, ReportUrgency
+from app.schemas.reports import (
+    ReportCitizen,
+    ReportCreate,
+    ReportDetail,
+    ReportListItem,
+    ReportListResponse,
+    ReportLocation,
+    ReportStatusHistory,
+    ReportStatusUpdateResponse,
+)
+from app.services.exceptions import (
+    CategoryNotFoundError,
+    DuplicateOperationError,
+    InvalidSenderIdentityError,
+    InvalidStatusTransitionError,
+    ReportNotFoundError,
+    ReportPersistenceError,
+)
+
+PHONE_NUMBER_PATTERN = re.compile(r"^\+[1-9][0-9]{7,14}$")
+
+ALLOWED_STATUS_TRANSITIONS = {
+    ReportStatus.PENDING_VERIFICATION: {
+        ReportStatus.VERIFIED,
+        ReportStatus.REJECTED,
+    },
+    ReportStatus.VERIFIED: {ReportStatus.IN_PROGRESS},
+    ReportStatus.IN_PROGRESS: {
+        ReportStatus.FORWARDED,
+        ReportStatus.RESOLVED,
+    },
+    ReportStatus.FORWARDED: {ReportStatus.RESOLVED},
+    ReportStatus.RESOLVED: set(),
+    ReportStatus.REJECTED: set(),
+}
+
+
+@dataclass(frozen=True)
+class IdempotentReportResult:
+    report: Mapping[str, Any]
+    replayed: bool
 
 
 def normalize_phone_number(value: str) -> str:
-    digits = "".join(character for character in value if character.isdigit())
-    if digits.startswith("0"):
-        digits = "62" + digits[1:]
-    if not 8 <= len(digits) <= 15:
-        raise APIError(422, "VALIDATION_ERROR", "Invalid sender phone number")
-    return "+" + digits
+    compact = re.sub(r"[\s().-]", "", value)
+    if compact.startswith("0"):
+        compact = "+62" + compact[1:]
+    elif compact.startswith("62"):
+        compact = "+" + compact
+
+    if not PHONE_NUMBER_PATTERN.fullmatch(compact):
+        raise InvalidSenderIdentityError
+    return compact
 
 
-def payload_hash(payload: CreateReportRequest) -> str:
-    canonical = payload.model_dump_json(exclude_none=True)
-    return hashlib.sha256(canonical.encode()).hexdigest()
+def canonical_payload_hash(payload: ReportCreate, phone_number: str) -> str:
+    canonical_payload = payload.model_dump(mode="json")
+    canonical_payload["sender_phone_number"] = phone_number
+    serialized = json.dumps(
+        canonical_payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-def create_report(
-    payload: CreateReportRequest,
-    idempotency_key: UUID,
-) -> tuple[CreateReportResponse, bool]:
-    if payload.source is not ReportSource.WHATSAPP:
-        raise APIError(400, "INVALID_REQUEST", "Only WhatsApp report creation is enabled")
+def advisory_lock_key(idempotency_key: UUID) -> int:
+    unsigned = idempotency_key.int & ((1 << 64) - 1)
+    return unsigned - (1 << 64) if unsigned >= (1 << 63) else unsigned
 
-    phone_number = normalize_phone_number(payload.sender_phone_number)
-    request_hash = payload_hash(payload)
 
-    try:
-        with get_engine().begin() as connection:
-            connection.execute(
-                text("select pg_advisory_xact_lock(hashtextextended(:key, 0))"),
-                {"key": str(idempotency_key)},
-            )
-            existing = connection.execute(
-                text(
-                    """
-                    select id, ticket_number, status, created_at,
-                           idempotency_payload_hash
-                    from public.reports
-                    where idempotency_key = :idempotency_key
-                    """
-                ),
-                {"idempotency_key": idempotency_key},
-            ).mappings().one_or_none()
-            if existing:
-                if existing["idempotency_payload_hash"] != request_hash:
-                    raise APIError(
-                        409,
-                        "DUPLICATE_OPERATION",
-                        "Idempotency key was already used with a different payload",
-                    )
-                return CreateReportResponse.model_validate(
+class ReportPersistenceService:
+    def __init__(
+        self,
+        session: Session,
+        repository: ReportRepository | None = None,
+    ) -> None:
+        self.session = session
+        self.repository = repository or ReportRepository(session)
+
+    def create_idempotent_report(
+        self,
+        *,
+        payload: ReportCreate,
+        idempotency_key: UUID,
+    ) -> IdempotentReportResult:
+        phone_number = normalize_phone_number(payload.sender_phone_number)
+        payload_hash = canonical_payload_hash(payload, phone_number)
+
+        try:
+            with self.session.begin():
+                self.repository.acquire_idempotency_lock(
+                    advisory_lock_key(idempotency_key)
+                )
+                existing = self.repository.find_report_by_idempotency_key(
+                    idempotency_key
+                )
+                if existing is not None:
+                    if existing["idempotency_payload_hash"] != payload_hash:
+                        raise DuplicateOperationError
+                    return IdempotentReportResult(existing, replayed=True)
+
+                citizen = self.repository.get_or_create_citizen(phone_number)
+                category = self.repository.resolve_active_category(
+                    payload.category.value
+                )
+                if category is None:
+                    raise CategoryNotFoundError(payload.category.value)
+
+                ai_extraction = (
+                    payload.ai_analysis.model_dump(mode="json")
+                    if payload.ai_analysis is not None
+                    else {}
+                )
+                summary = (
+                    payload.ai_analysis.summary
+                    if payload.ai_analysis is not None
+                    else None
+                )
+                report = self.repository.insert_report(
                     {
-                        key: existing[key]
-                        for key in ("id", "ticket_number", "status", "created_at")
+                        "citizen_id": citizen["id"],
+                        "category_id": category["id"],
+                        "source": payload.source.value,
+                        "urgency": payload.urgency.value,
+                        "original_text": payload.original_text,
+                        "description": payload.description,
+                        "summary": summary,
+                        "location_text": payload.location.text,
+                        "latitude": payload.location.latitude,
+                        "longitude": payload.location.longitude,
+                        "ai_extraction": ai_extraction,
+                        "ai_recommendation": {},
+                        "idempotency_key": idempotency_key,
+                        "idempotency_payload_hash": payload_hash,
                     }
-                ), True
+                )
+                self.repository.insert_status_history(
+                    {
+                        "report_id": report["id"],
+                        "old_status": None,
+                        "new_status": "pending_verification",
+                        "actor_type": "system",
+                        "actor_identifier": None,
+                        "notes": "Report created",
+                    }
+                )
+                return IdempotentReportResult(report, replayed=False)
+        except (CategoryNotFoundError, DuplicateOperationError):
+            raise
+        except SQLAlchemyError as exc:
+            raise ReportPersistenceError("report creation") from exc
 
-            citizen_id = connection.execute(
-                text(
-                    """
-                    insert into public.citizens (phone_number)
-                    values (:phone_number)
-                    on conflict (phone_number) do update
-                    set phone_number = excluded.phone_number
-                    returning id
-                    """
-                ),
-                {"phone_number": phone_number},
-            ).scalar_one()
-
-            category_id = connection.execute(
-                text(
-                    """
-                    select id
-                    from public.report_categories
-                    where code = :category and is_active
-                    """
-                ),
-                {"category": payload.category.value},
-            ).scalar_one_or_none()
-            if category_id is None:
-                raise APIError(422, "VALIDATION_ERROR", "Report category is unavailable")
-
-            ai_analysis = (
-                payload.ai_analysis.model_dump(mode="json")
-                if payload.ai_analysis
-                else {}
+    def list_reports(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        status: ReportStatus | None = None,
+        urgency: ReportUrgency | None = None,
+        category: ReportCategory | None = None,
+        search: str | None = None,
+    ) -> ReportListResponse:
+        normalized_search = search.strip() if search else None
+        try:
+            rows, total = self.repository.list_reports(
+                offset=(page - 1) * page_size,
+                limit=page_size,
+                status=status.value if status else None,
+                urgency=urgency.value if urgency else None,
+                category=category.value if category else None,
+                search=normalized_search or None,
             )
-            report = connection.execute(
-                text(
-                    """
-                    insert into public.reports (
-                        citizen_id,
-                        category_id,
-                        source,
-                        urgency,
-                        original_text,
-                        description,
-                        summary,
-                        location_text,
-                        latitude,
-                        longitude,
-                        ai_extraction,
-                        idempotency_key,
-                        idempotency_payload_hash
-                    ) values (
-                        :citizen_id,
-                        :category_id,
-                        :source,
-                        :urgency,
-                        :original_text,
-                        :description,
-                        :summary,
-                        :location_text,
-                        :latitude,
-                        :longitude,
-                        cast(:ai_extraction as jsonb),
-                        :idempotency_key,
-                        :idempotency_payload_hash
+        except SQLAlchemyError as exc:
+            raise ReportPersistenceError("report list") from exc
+
+        return ReportListResponse(
+            items=[self._to_list_item(row) for row in rows],
+            page=page,
+            page_size=page_size,
+            total=total,
+        )
+
+    def get_report_detail(self, report_id: UUID) -> ReportDetail:
+        try:
+            report = self.repository.get_report_detail(report_id)
+            if report is None:
+                raise ReportNotFoundError(report_id)
+
+            attachments = [
+                dict(row) for row in self.repository.list_attachments(report_id)
+            ]
+            history = [
+                ReportStatusHistory.model_validate(
+                    {
+                        field: row[field]
+                        for field in ReportStatusHistory.model_fields
+                    }
+                )
+                for row in self.repository.list_status_history(report_id)
+            ]
+        except ReportNotFoundError:
+            raise
+        except SQLAlchemyError as exc:
+            raise ReportPersistenceError("report detail") from exc
+
+        responsible_unit = None
+        if report["responsible_unit_id"] is not None:
+            responsible_unit = {
+                "id": report["responsible_unit_id"],
+                "name": report["responsible_unit_name"],
+            }
+
+        list_item = self._to_list_item(report)
+        return ReportDetail(
+            **list_item.model_dump(),
+            citizen=ReportCitizen(
+                id=report["citizen_id"],
+                display_name=report["citizen_display_name"] or "Warga",
+            ),
+            summary=report["summary"],
+            responsible_unit=responsible_unit,
+            ai_recommendation=report["ai_recommendation"] or {},
+            attachments=attachments,
+            status_history=history,
+            verified_at=report["verified_at"],
+            resolved_at=report["resolved_at"],
+            updated_at=report["updated_at"],
+        )
+
+    @staticmethod
+    def _to_list_item(report: Mapping[str, Any]) -> ReportListItem:
+        return ReportListItem(
+            id=report["id"],
+            ticket_number=report["ticket_number"],
+            category=report["category"],
+            description=report["description"],
+            location=ReportLocation(
+                text=report["location_text"],
+                latitude=report["latitude"],
+                longitude=report["longitude"],
+            ),
+            urgency=report["urgency"],
+            status=report["status"],
+            created_at=report["created_at"],
+        )
+
+    def update_report_status(
+        self,
+        *,
+        report_id: UUID,
+        new_status: ReportStatus,
+        reason: str,
+        actor_identifier: str,
+    ) -> ReportStatusUpdateResponse:
+        try:
+            with self.session.begin():
+                current = self.repository.lock_report(report_id)
+                if current is None:
+                    raise ReportNotFoundError(report_id)
+
+                current_status = ReportStatus(current["status"])
+                if new_status not in ALLOWED_STATUS_TRANSITIONS[current_status]:
+                    raise InvalidStatusTransitionError(
+                        current_status.value,
+                        new_status.value,
                     )
-                    returning id, ticket_number, status, created_at
-                    """
-                ),
-                {
-                    "citizen_id": citizen_id,
-                    "category_id": category_id,
-                    "source": payload.source.value,
-                    "urgency": payload.urgency.value if payload.urgency else "medium",
-                    "original_text": payload.original_text,
-                    "description": payload.description,
-                    "summary": payload.ai_analysis.summary if payload.ai_analysis else None,
-                    "location_text": payload.location.text,
-                    "latitude": payload.location.latitude,
-                    "longitude": payload.location.longitude,
-                    "ai_extraction": json.dumps(ai_analysis),
-                    "idempotency_key": idempotency_key,
-                    "idempotency_payload_hash": request_hash,
-                },
-            ).mappings().one()
-            connection.execute(
-                text(
-                    """
-                    insert into public.report_status_history (
-                        report_id,
-                        old_status,
-                        new_status,
-                        actor_type,
-                        notes
-                    ) values (
-                        :report_id,
-                        null,
-                        'pending_verification',
-                        'system',
-                        'Report created'
-                    )
-                    """
-                ),
-                {"report_id": report["id"]},
-            )
-            return CreateReportResponse.model_validate(report), False
-    except APIError:
-        raise
-    except (SQLAlchemyError, RuntimeError) as error:
-        raise APIError(503, "DATABASE_UNAVAILABLE", "Database unavailable") from error
+
+                report_values: dict[str, Any] = {"status": new_status.value}
+                if new_status is ReportStatus.VERIFIED:
+                    report_values["verified_at"] = func.now()
+                if new_status is ReportStatus.RESOLVED:
+                    report_values["resolved_at"] = func.now()
+
+                updated = self.repository.update_report(report_id, report_values)
+                if updated is None:
+                    raise ReportNotFoundError(report_id)
+
+                self.repository.insert_status_history(
+                    {
+                        "report_id": report_id,
+                        "old_status": current_status.value,
+                        "new_status": new_status.value,
+                        "actor_type": "admin",
+                        "actor_identifier": actor_identifier,
+                        "notes": reason,
+                    }
+                )
+                return ReportStatusUpdateResponse(
+                    id=updated["id"],
+                    ticket_number=updated["ticket_number"],
+                    status=updated["status"],
+                    updated_at=updated["updated_at"],
+                )
+        except (InvalidStatusTransitionError, ReportNotFoundError):
+            raise
+        except SQLAlchemyError as exc:
+            raise ReportPersistenceError("status update") from exc

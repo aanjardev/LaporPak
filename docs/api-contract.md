@@ -23,6 +23,32 @@ Status/category/urgency API memakai lowercase.
 
 Intent AI memakai uppercase.
 
+### Autentikasi P0
+
+Endpoint admin P0 menggunakan bearer token backend-only:
+
+```http
+Authorization: Bearer <token>
+```
+
+Izin caller:
+
+| Caller | Operasi P0 yang diizinkan |
+|---|---|
+| OpenClaw | Membuat laporan WhatsApp melalui `POST /api/v1/reports` dengan `X-OpenClaw-API-Key` |
+| Admin dashboard | Membaca laporan dan mengubah status laporan |
+
+OpenClaw dan dashboard menggunakan secret serta header berbeda. FastAPI
+memetakan bearer token dashboard ke identitas admin dan, untuk demo satu desa,
+administrative unit yang diizinkan. Token dashboard valid untuk operasi admin
+yang tidak diizinkan menghasilkan `403 FORBIDDEN`; credential yang hilang atau
+tidak valid menghasilkan `401 UNAUTHORIZED`.
+
+Token dashboard hanya digunakan server Next.js. Token tidak boleh diekspos
+melalui `NEXT_PUBLIC_*`, JavaScript browser, source code, atau log. Mekanisme
+token sederhana ini adalah baseline demo P0 dan dapat diganti dengan identity
+provider lengkap tanpa memindahkan aturan otorisasi ke frontend.
+
 ---
 
 ## 2. Canonical Enums
@@ -135,13 +161,18 @@ Suggested HTTP mapping:
 
 ### Autentikasi dan izin REPORT
 
-Akun petugas menggunakan Supabase Auth melalui undangan, tanpa pendaftaran publik. Untuk ketiga endpoint REPORT yang dilindungi pada bagian 7–9, Next.js meneruskan access token petugas:
+Akses petugas untuk demo P0 menggunakan `DASHBOARD_API_KEY` backend-only. Untuk
+endpoint GET/PATCH pada bagian 7–9, server Next.js meneruskan token tersebut:
 
 ```http
-Authorization: Bearer <supabase_access_token>
+Authorization: Bearer <dashboard_api_key>
 ```
 
-FastAPI memverifikasi token, lalu membaca akun admin aktif, peran (`admin_sistem` atau `admin_desa`), dan cakupan desa dari database pada **setiap** GET/PATCH. Peran dan cakupan tidak dipercayakan pada state frontend atau metadata yang dapat diubah pengguna. Admin desa hanya dapat mengakses laporan dari desa yang ditugaskan; admin sistem mengikuti cakupan yang ditetapkan tim. GET daftar hanya mengembalikan laporan dalam cakupan petugas.
+FastAPI memverifikasi token lalu memakai `DASHBOARD_ADMIN_IDENTIFIER` sebagai
+identitas audit dan `DASHBOARD_ADMIN_UNIT_ID` sebagai cakupan demo satu desa.
+Credential tidak boleh masuk browser. Supabase Auth berbasis undangan dan tabel
+role/cakupan admin adalah target hardening setelah demo, bukan kontrak runtime
+yang sudah tersedia saat ini.
 
 | Kondisi | HTTP / code | Perilaku dashboard |
 |---|---|---|

@@ -1,7 +1,7 @@
-from functools import lru_cache
+from collections.abc import Generator
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
@@ -24,20 +24,35 @@ def normalize_database_url(url: str) -> str:
     return url
 
 
-@lru_cache
+if not settings.database_url:
+    raise RuntimeError(
+        "DATABASE_URL is not configured."
+    )
+
+
+engine = create_engine(
+    normalize_database_url(settings.database_url),
+    pool_pre_ping=True,
+)
+
+
+SessionLocal = sessionmaker(
+    bind=engine,
+    autoflush=False,
+    autocommit=False,
+)
+
+
 def get_engine():
-    if not settings.database_url:
-        raise RuntimeError("DATABASE_URL is not configured.")
-
-    return create_engine(
-        normalize_database_url(settings.database_url),
-        pool_pre_ping=True,
-    )
+    return engine
 
 
-def get_session_factory():
-    return sessionmaker(
-        bind=get_engine(),
-        autoflush=False,
-        autocommit=False,
-    )
+def get_db_session() -> Generator[Session]:
+    session = SessionLocal()
+    try:
+        yield session
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
