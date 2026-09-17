@@ -93,7 +93,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
                 <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Urgensi</dt><dd className="mt-2 text-sm font-medium">{urgencyLabels[report.urgency]}</dd></div>
                 <div><dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500"><MapPin aria-hidden="true" size={15} /> Lokasi</dt><dd className="mt-2 break-words text-sm font-medium">{formatLocation(report.location)}</dd></div>
                 <div><dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500"><UserRound aria-hidden="true" size={15} /> Pelapor</dt><dd className="mt-2 text-sm font-medium">{report.citizen.display_name}</dd></div>
-                <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unit penanggung jawab</dt><dd className="mt-2 text-sm font-medium">{report.responsible_unit ?? "Belum ditetapkan"}</dd></div>
+                <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unit penanggung jawab</dt><dd className="mt-2 break-words text-sm font-medium">{report.responsible_unit?.name ?? "Belum ditetapkan"}</dd></div>
                 <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lampiran</dt><dd className="mt-2 text-sm font-medium">{report.attachments.length === 0 ? "Belum ada lampiran" : `${report.attachments.length} lampiran`}</dd></div>
               </dl>
             </div>

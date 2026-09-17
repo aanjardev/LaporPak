@@ -95,3 +95,31 @@ Observed results:
 
 This completes the P0 REPORT happy path through the real citizen channel,
 database, authenticated dashboard, and human verification boundary.
+
+## Frontend integration recheck — 2026-09-18
+
+Code commit: `028784d` on `fix/frontend-report-integration` (based on
+`main` `2bf03ed`). Environment: Windows, Node.js `v22.16.0`, Next.js local
+development on port 3000, FastAPI local on port 8000, Supabase development,
+and an invited test admin. Test data is synthetic; no credentials or tokens
+are recorded here. `REPORTS_DATA_SOURCE=api` was set only in the ignored
+dashboard `.env.local`.
+
+| Check | Source | Observed result |
+|---|---|---|
+| `/health` | FastAPI nyata | `200` |
+| List and detail without a bearer token | FastAPI nyata | Both returned `401 UNAUTHORIZED`; unauthenticated PATCH also returned `401` without a write |
+| Sign in, reload, list, search/filter, and open detail | FastAPI nyata + manual dashboard check by Ferdi | Two database-backed reports appeared; mock label was absent; search/filter and detail worked after reload |
+| Page 1 and page 2 (`page_size=20`, 21 synthetic rows) | API simulasi, direct HTTP | `200`; 20 items on page 1, one on page 2, `total=21` |
+| List errors `401`, `403`, and service `503` | API simulasi, direct HTTP | Correct HTTP status and contract error code from the simulator; dashboard behavior still needs browser confirmation |
+| PATCH errors `401`, `403`, `409`, and service `503`; unknown detail `404` | API simulasi, direct HTTP | Correct HTTP status and contract error code from the simulator; dashboard behavior still needs browser confirmation |
+| Dashboard lint, TypeScript, report tests, auth tests, build | Local checks on code commit above | Passed; 7 report tests and 1 auth test |
+| Secret and data-access scan | Git and dashboard source | `.env.local` and backend `.env` ignored; no tracked `.env`, frontend table access, or backend secret reference found |
+
+The simulated API is an in-memory local server; it does not prove FastAPI
+authorization, database persistence, village scope enforcement, or real
+decision handling. At this point the real test database still contains only
+two `verified` reports. Real verification and rejection of separate
+`pending_verification` reports remain open by team decision. Real FastAPI
+`403`, scoped `404`, and frontend failure-state browser checks also remain
+open until each result is observed and recorded.

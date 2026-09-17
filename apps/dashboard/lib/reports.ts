@@ -59,7 +59,7 @@ export type ReportStatusHistory = {
 export type ReportDetail = ReportListItem & {
   citizen: { id: string; display_name: string };
   summary: string | null;
-  responsible_unit: null;
+  responsible_unit: { id: string; name: string } | null;
   ai_recommendation: Record<string, unknown>;
   attachments: unknown[];
   status_history: ReportStatusHistory[];
@@ -203,7 +203,9 @@ const mockReports: ReportDetail[] = Array.from({ length: 27 }, (_, index) => {
     location: { text: index === 0 ? `${topic.location}, dekat persimpangan menuju pasar desa dan halte angkutan warga` : topic.location, latitude: null, longitude: null },
     urgency: topic.urgency,
     status,
-    responsible_unit: null,
+    responsible_unit: index === 0
+      ? { id: "b5e83fd3-71e2-4ec3-b432-b7e970b57c6a", name: "Unit Infrastruktur Desa" }
+      : null,
     ai_recommendation: {},
     attachments: [],
     status_history: history,

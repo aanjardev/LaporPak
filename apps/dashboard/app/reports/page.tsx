@@ -141,11 +141,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
                     <Link href={`/reports/${report.id}`} className="text-sm font-bold text-sky-800 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-sky-700">{report.ticket_number}</Link>
                     <StatusBadge status={report.status} />
                   </div>
-                  <p className="text-sm font-medium leading-6 text-slate-900">{report.description}</p>
+                  <p className="break-words text-sm font-medium leading-6 text-slate-900">{report.description}</p>
                   <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                     <div><dt className="text-slate-500">Kategori</dt><dd className="mt-0.5 font-medium">{categoryLabels[report.category]}</dd></div>
                     <div><dt className="text-slate-500">Urgensi</dt><dd className="mt-0.5 font-medium">{urgencyLabels[report.urgency]}</dd></div>
-                    <div className="col-span-2"><dt className="text-slate-500">Lokasi</dt><dd className="mt-0.5 font-medium">{formatLocation(report.location)}</dd></div>
+                    <div className="col-span-2"><dt className="text-slate-500">Lokasi</dt><dd className="mt-0.5 break-words font-medium">{formatLocation(report.location)}</dd></div>
                   </dl>
                   <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-600">
                     <time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time>

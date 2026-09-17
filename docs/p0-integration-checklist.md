@@ -49,6 +49,13 @@ harus dibuat di dokumen sumber tersebut, bukan di checklist ini.
 - [ ] Periksa daftar, detail, formulir, serta pesan gagal pada layar ponsel dan
   desktop. Jangan menaruh credential backend atau akses tabel Supabase di UI.
 
+Pemeriksaan parsial 2026-09-18 ada di
+[p0-verification-evidence.md](p0-verification-evidence.md#frontend-integration-recheck--2026-09-18):
+dashboard terhubung ke dua laporan FastAPI nyata, sedangkan halaman kedua dan
+respons gagal sudah disiapkan serta diuji pada API simulasi. Semua kotak di atas
+tetap terbuka sampai pemeriksaan UI dan keputusan pada laporan
+`pending_verification` benar-benar selesai.
+
 ### Anjar — backend dan database (`services/api/`, `database/`)
 
 - [ ] Pastikan migration/seed yang diperlukan telah diterapkan di lingkungan

@@ -431,6 +431,9 @@ Response `200`:
 }
 ```
 
+`responsible_unit` bernilai `null` bila belum ditetapkan. Jika tersedia,
+backend mengirim objek `{ "id": "<uuid>", "name": "<nama unit>" }`.
+
 Jika tidak ada:
 
 ```http
