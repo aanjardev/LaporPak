@@ -12,7 +12,23 @@ npm run dev
 
 Isi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_ANON_KEY` di `.env.local` memakai URL proyek dan **anon key publik** dari Supabase. Jangan menyalin `SUPABASE_SERVICE_ROLE_KEY` atau secret backend. File `.env.local` diabaikan Git.
 
-Untuk menguji login sekarang, buat satu akun uji dengan email, kata sandi, dan email terkonfirmasi melalui **Supabase Dashboard → Authentication → Users**. Nonaktifkan pendaftaran pengguna publik pada pengaturan Auth. Tahap ini memakai akun yang dibuat admin secara manual; alur undangan dan redirect email akan disiapkan kemudian. Masukkan kata sandi langsung di halaman login, bukan di repository atau chat.
+Untuk menguji login, buat satu akun uji dengan email, kata sandi, dan email terkonfirmasi melalui **Supabase Dashboard → Authentication → Users**. Nonaktifkan **Allow new users to sign up** pada pengaturan Auth. Akun petugas tidak mendaftar sendiri. Masukkan kata sandi langsung di halaman login, bukan di repository atau chat.
+
+## Menguji undangan petugas
+
+1. Pada **Authentication → URL Configuration**, atur **Site URL** ke alamat dashboard yang sedang diuji, misalnya `http://localhost:3000`; tambahkan alamat tersebut ke daftar **Redirect URLs**. Untuk deployment, gunakan domain dashboard yang sebenarnya.
+2. Pada **Authentication → Email Templates → Invite user**, arahkan **tombol/tautan utama yang diklik penerima** ke halaman penerimaan aplikasi. Ganti `href="{{ .ConfirmationURL }}"` bawaan pada template, jangan hanya menambahkan tautan kedua. Gunakan:
+
+   ```html
+   <a href="{{ .SiteURL }}/invite/accept?token_hash={{ .TokenHash }}">Terima undangan</a>
+   ```
+
+3. **Simpan template sebelum mengirim undangan.** Email yang sudah terlanjur dikirim tetap memakai tautan lama. Pada **Authentication → Users**, pilih **Add user → Send invitation** untuk alamat email uji baru yang belum menjadi pengguna.
+4. Uji di jendela privat atau logout dahulu dari akun uji lama. Tautan email harus membuka `/invite/accept` dan menampilkan tombol **Terima undangan** milik aplikasi. Jika langsung membuka `/` atau `/reports`, periksa kembali template **Invite user** dan **Site URL**, lalu kirim undangan baru ke alamat email baru. Jangan membagikan URL lengkap karena memuat token.
+5. Petugas menekan **Terima undangan**, lalu mengatur kata sandi di `/set-password`. Penerimaan undangan dilakukan setelah tombol ditekan agar pembaca pratinjau email tidak menghabiskan tautan sekali pakai.
+6. Muat ulang `/reports`, keluar, lalu masuk lagi memakai kata sandi baru. Jika tautan kedaluwarsa atau gagal, pengelola mengirim undangan baru.
+
+Pengiriman undangan dilakukan dari Supabase Dashboard oleh pengelola. Frontend tidak menyimpan service role key dan tidak mempunyai formulir pendaftaran publik. Mode default `mock` hanya menampilkan laporan sintetis. Saat `REPORTS_DATA_SOURCE=api`, FastAPI saat ini memverifikasi token Supabase, tetapi belum memeriksa akun admin aktif, peran, dan cakupan desa per akun sesuai kontrak. Jangan gunakan mode API untuk data sensitif atau deployment publik sebelum pemeriksaan izin tersebut selesai di backend.
 
 Buka `http://localhost:3000/login`. Tanpa sesi, `/reports` dan detailnya mengarah ke login. Setelah login, sesi bertahan saat halaman dimuat ulang; tombol **Keluar** mengakhiri sesi. Secara default, `REPORTS_DATA_SOURCE=mock` memakai laporan sintetis. Pencarian, filter status/urgensi/kategori, dan pagination disimpan pada URL.
 
