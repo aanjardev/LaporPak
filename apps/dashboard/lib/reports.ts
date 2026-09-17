@@ -74,6 +74,18 @@ export type ReportQuery = {
   search?: string;
 };
 
+export type UpdateReportStatusRequest = {
+  status: "verified" | "rejected";
+  reason: string;
+};
+
+export type UpdateReportStatusResponse = {
+  id: string;
+  ticket_number: string;
+  status: ReportStatus;
+  updated_at: string;
+};
+
 const topics: Array<{
   category: ReportCategory;
   urgency: ReportUrgency;
@@ -147,7 +159,7 @@ function statusPath(status: ReportStatus): ReportStatus[] {
     return ["pending_verification", "verified", "in_progress", "forwarded"];
   }
   if (status === "resolved") {
-    return ["pending_verification", "verified", "in_progress", "resolved"];
+    return ["pending_verification", "verified", "in_progress", "forwarded", "resolved"];
   }
   return ["pending_verification", "verified", "in_progress"].slice(
     0,
@@ -165,7 +177,9 @@ const mockReports: ReportDetail[] = Array.from({ length: 27 }, (_, index) => {
     new_status: next,
     actor_type: step === 0 ? "system" : "admin",
     actor_identifier: step === 0 ? null : "admin-desa-demo",
-    notes: step === 0 ? "Laporan dibuat" : "Status diperbarui oleh petugas.",
+    notes: index === 4
+      ? `Tahap ${step + 1}: petugas meninjau informasi lokasi, berkoordinasi dengan unit terkait, dan mencatat tindak lanjut agar warga dapat memahami perjalanan laporan secara utuh.`
+      : step === 0 ? "Laporan dibuat" : "Status diperbarui oleh petugas.",
     created_at: new Date(created.getTime() + step * 3_600_000).toISOString(),
   }));
   const verified = history.find((entry) => entry.new_status === "verified");
@@ -179,9 +193,11 @@ const mockReports: ReportDetail[] = Array.from({ length: 27 }, (_, index) => {
       display_name: "Warga",
     },
     category: topic.category,
-    description: topic.description,
-    summary: topic.summary,
-    location: { text: topic.location, latitude: null, longitude: null },
+    description: index === 0
+      ? `${topic.description} Warga menyampaikan bahwa lubang semakin lebar setelah hujan. Sepeda motor harus berpindah jalur untuk menghindarinya, sementara di pagi hari ruas ini dipakai anak sekolah dan pedagang. Warga meminta petugas memeriksa kondisi jalan serta memasang penanda sementara sampai perbaikan dilakukan.\n\nMenurut warga, kerusakan sudah terlihat selama beberapa minggu dan air sering menutup bagian jalan yang berlubang.`
+      : topic.description,
+    summary: index === 0 ? null : topic.summary,
+    location: { text: index === 0 ? `${topic.location}, dekat persimpangan menuju pasar desa dan halte angkutan warga` : topic.location, latitude: null, longitude: null },
     urgency: topic.urgency,
     status,
     responsible_unit: null,
@@ -264,4 +280,37 @@ export async function getReportById(id: string): Promise<ReportDetail | null> {
   const scenario = await mockScenario();
   if (scenario === "empty") return null;
   return mockReports.find((report) => report.id === id) ?? null;
+}
+
+export async function updateReportStatus(
+  id: string,
+  request: UpdateReportStatusRequest,
+): Promise<UpdateReportStatusResponse> {
+  if (process.env.REPORTS_DATA_SOURCE === "api") {
+    throw new Error("Perubahan status API menunggu autentikasi admin");
+  }
+
+  const report = mockReports.find((item) => item.id === id);
+  if (!report || report.status !== "pending_verification") {
+    throw new Error("Laporan tidak tersedia untuk verifikasi");
+  }
+  if (!["verified", "rejected"].includes(request.status) || !request.reason.trim()) {
+    throw new Error("Keputusan dan alasan wajib diisi");
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    if (process.env.REPORTS_MOCK_MUTATION_SCENARIO === "slow") {
+      await new Promise((resolve) => setTimeout(resolve, 900));
+    }
+    if (process.env.REPORTS_MOCK_MUTATION_SCENARIO === "error") {
+      throw new Error("Simulasi kegagalan penyimpanan status");
+    }
+  }
+
+  return {
+    id: report.id,
+    ticket_number: report.ticket_number,
+    status: request.status,
+    updated_at: new Date().toISOString(),
+  };
 }
