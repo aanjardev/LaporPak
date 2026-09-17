@@ -146,6 +146,17 @@ def test_repository_queries_use_canonical_identity_and_ordering():
     assert session.commit_called is False
 
 
+def test_repository_uses_transaction_scoped_idempotency_lock():
+    session = RecordingSession()
+    repository = ReportRepository(session)
+
+    repository.acquire_idempotency_lock(123456789)
+
+    lock_query = compile_statement(session.statements[0])
+    assert "pg_advisory_xact_lock" in lock_query
+    assert session.commit_called is False
+
+
 def test_insert_report_leaves_ticket_generation_to_database():
     session = RecordingSession()
     repository = ReportRepository(session)

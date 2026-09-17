@@ -4,12 +4,19 @@ from uuid import UUID
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.schemas.reports import ReportCreate
 from app.services.exceptions import (
     CategoryNotFoundError,
+    DuplicateOperationError,
+    InvalidSenderIdentityError,
     ReportNotFoundError,
     ReportPersistenceError,
 )
-from app.services.reports import ReportPersistenceService
+from app.services.reports import (
+    ReportPersistenceService,
+    canonical_payload_hash,
+    normalize_phone_number,
+)
 
 
 class Transaction(AbstractContextManager):
@@ -53,6 +60,15 @@ class FakeRepository:
             "status": "verified",
             "ticket_number": "LP-2026-0001",
         }
+        self.existing_report = None
+        self.lock_key = None
+
+    def acquire_idempotency_lock(self, lock_key):
+        self.lock_key = lock_key
+
+    def find_report_by_idempotency_key(self, idempotency_key):
+        self.idempotency_key = idempotency_key
+        return self.existing_report
 
     def get_or_create_citizen(self, phone_number):
         self.phone_number = phone_number
@@ -91,27 +107,42 @@ class FakeRepository:
         return [{"id": "history-id"}]
 
 
+def valid_payload(**overrides):
+    values = {
+        "sender_phone_number": "+6281234567890",
+        "category": "infrastructure",
+        "description": "Jalan rusak.",
+        "location": {"text": "RT 03"},
+        "urgency": "high",
+        "source": "whatsapp",
+        "ai_analysis": {
+            "confidence": 0.94,
+            "summary": "Kerusakan jalan di RT 03.",
+        },
+    }
+    values.update(overrides)
+    return ReportCreate.model_validate(values)
+
+
 def test_create_report_and_initial_history_share_one_transaction():
     session = TransactionSession()
     repository = FakeRepository()
     service = ReportPersistenceService(session, repository)
 
-    result = service.create_report(
-        citizen_phone_number="+6281234567890",
-        category_code="infrastructure",
-        report_values={"description": "Jalan rusak."},
-        initial_history_values={
-            "old_status": None,
-            "new_status": "pending_verification",
-            "actor_type": "system",
-        },
+    result = service.create_idempotent_report(
+        payload=valid_payload(),
+        idempotency_key=UUID("ef51f99f-a47d-4a31-a3db-e520838997f5"),
     )
 
-    assert result["ticket_number"] == "LP-2026-0001"
+    assert result.report["ticket_number"] == "LP-2026-0001"
+    assert result.replayed is False
     assert repository.inserted_report["citizen_id"] == "citizen-id"
     assert repository.inserted_report["category_id"] == "category-id"
     assert "ticket_number" not in repository.inserted_report
     assert repository.inserted_history["report_id"] == "report-id"
+    assert repository.inserted_history["new_status"] == "pending_verification"
+    assert repository.inserted_history["notes"] == "Report created"
+    assert repository.lock_key is not None
     assert session.entered == 1
     assert session.exited == 1
     assert session.last_exception_type is None
@@ -124,11 +155,9 @@ def test_missing_category_aborts_create_transaction():
     service = ReportPersistenceService(session, repository)
 
     with pytest.raises(CategoryNotFoundError):
-        service.create_report(
-            citizen_phone_number="+6281234567890",
-            category_code="unknown",
-            report_values={"description": "Jalan rusak."},
-            initial_history_values={},
+        service.create_idempotent_report(
+            payload=valid_payload(category="other"),
+            idempotency_key=UUID("ef51f99f-a47d-4a31-a3db-e520838997f5"),
         )
 
     assert repository.inserted_report is None
@@ -180,14 +209,94 @@ def test_sqlalchemy_error_is_wrapped_without_fake_success():
     service = ReportPersistenceService(session, repository)
 
     with pytest.raises(ReportPersistenceError) as error:
-        service.create_report(
-            citizen_phone_number="+6281234567890",
-            category_code="infrastructure",
-            report_values={"description": "Jalan rusak."},
-            initial_history_values={},
+        service.create_idempotent_report(
+            payload=valid_payload(),
+            idempotency_key=UUID("ef51f99f-a47d-4a31-a3db-e520838997f5"),
         )
 
     assert error.value.operation == "report creation"
+
+
+def test_same_idempotency_key_and_payload_replays_existing_report():
+    session = TransactionSession()
+    repository = FakeRepository()
+    payload = valid_payload(sender_phone_number="0812-3456-7890")
+    normalized = normalize_phone_number(payload.sender_phone_number)
+    repository.existing_report = {
+        **repository.report,
+        "idempotency_payload_hash": canonical_payload_hash(payload, normalized),
+    }
+    service = ReportPersistenceService(session, repository)
+
+    result = service.create_idempotent_report(
+        payload=payload,
+        idempotency_key=UUID("ef51f99f-a47d-4a31-a3db-e520838997f5"),
+    )
+
+    assert result.replayed is True
+    assert result.report["ticket_number"] == "LP-2026-0001"
+    assert repository.inserted_report is None
+    assert repository.inserted_history is None
+    assert not hasattr(repository, "phone_number")
+
+
+def test_same_idempotency_key_with_different_payload_is_rejected():
+    session = TransactionSession()
+    repository = FakeRepository()
+    repository.existing_report = {
+        **repository.report,
+        "idempotency_payload_hash": "different-hash",
+    }
+    service = ReportPersistenceService(session, repository)
+
+    with pytest.raises(DuplicateOperationError):
+        service.create_idempotent_report(
+            payload=valid_payload(),
+            idempotency_key=UUID("ef51f99f-a47d-4a31-a3db-e520838997f5"),
+        )
+
+    assert repository.inserted_report is None
+    assert session.last_exception_type is DuplicateOperationError
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("+6281234567890", "+6281234567890"),
+        ("6281234567890", "+6281234567890"),
+        ("0812-3456-7890", "+6281234567890"),
+    ],
+)
+def test_phone_number_normalization(raw, expected):
+    assert normalize_phone_number(raw) == expected
+
+
+def test_equivalent_phone_formats_produce_same_payload_hash():
+    local_payload = valid_payload(sender_phone_number="0812-3456-7890")
+    international_payload = valid_payload(
+        sender_phone_number="+6281234567890"
+    )
+
+    assert canonical_payload_hash(
+        local_payload,
+        normalize_phone_number(local_payload.sender_phone_number),
+    ) == canonical_payload_hash(
+        international_payload,
+        normalize_phone_number(international_payload.sender_phone_number),
+    )
+
+
+def test_invalid_phone_number_is_rejected_before_transaction():
+    session = TransactionSession()
+    service = ReportPersistenceService(session, FakeRepository())
+
+    with pytest.raises(InvalidSenderIdentityError):
+        service.create_idempotent_report(
+            payload=valid_payload(sender_phone_number="not-a-phone"),
+            idempotency_key=UUID("ef51f99f-a47d-4a31-a3db-e520838997f5"),
+        )
+
+    assert session.entered == 0
 
 
 def test_detail_aggregates_attachments_and_ordered_history():

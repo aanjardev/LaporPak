@@ -18,3 +18,13 @@ class ReportPersistenceError(ReportServiceError):
     def __init__(self, operation: str) -> None:
         super().__init__(f"Report persistence failed during {operation}")
         self.operation = operation
+
+
+class DuplicateOperationError(ReportServiceError):
+    def __init__(self) -> None:
+        super().__init__("Idempotency key was already used for another payload")
+
+
+class InvalidSenderIdentityError(ReportServiceError):
+    def __init__(self) -> None:
+        super().__init__("Sender phone number is invalid")

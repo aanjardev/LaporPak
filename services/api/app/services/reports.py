@@ -1,4 +1,8 @@
+import hashlib
+import json
+import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -6,11 +10,51 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db.repositories import ReportRepository
+from app.schemas.reports import ReportCreate
 from app.services.exceptions import (
     CategoryNotFoundError,
+    DuplicateOperationError,
+    InvalidSenderIdentityError,
     ReportNotFoundError,
     ReportPersistenceError,
 )
+
+PHONE_NUMBER_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
+
+
+@dataclass(frozen=True)
+class IdempotentReportResult:
+    report: Mapping[str, Any]
+    replayed: bool
+
+
+def normalize_phone_number(value: str) -> str:
+    compact = re.sub(r"[\s().-]", "", value)
+    if compact.startswith("0"):
+        compact = "+62" + compact[1:]
+    elif compact.startswith("62"):
+        compact = "+" + compact
+
+    if not PHONE_NUMBER_PATTERN.fullmatch(compact):
+        raise InvalidSenderIdentityError
+    return compact
+
+
+def canonical_payload_hash(payload: ReportCreate, phone_number: str) -> str:
+    canonical_payload = payload.model_dump(mode="json")
+    canonical_payload["sender_phone_number"] = phone_number
+    serialized = json.dumps(
+        canonical_payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def advisory_lock_key(idempotency_key: UUID) -> int:
+    unsigned = idempotency_key.int & ((1 << 64) - 1)
+    return unsigned - (1 << 64) if unsigned >= (1 << 63) else unsigned
 
 
 class ReportPersistenceService:
@@ -22,38 +66,75 @@ class ReportPersistenceService:
         self.session = session
         self.repository = repository or ReportRepository(session)
 
-    def create_report(
+    def create_idempotent_report(
         self,
         *,
-        citizen_phone_number: str,
-        category_code: str,
-        report_values: Mapping[str, Any],
-        initial_history_values: Mapping[str, Any],
-    ) -> Mapping[str, Any]:
+        payload: ReportCreate,
+        idempotency_key: UUID,
+    ) -> IdempotentReportResult:
+        phone_number = normalize_phone_number(payload.sender_phone_number)
+        payload_hash = canonical_payload_hash(payload, phone_number)
+
         try:
             with self.session.begin():
-                citizen = self.repository.get_or_create_citizen(
-                    citizen_phone_number
+                self.repository.acquire_idempotency_lock(
+                    advisory_lock_key(idempotency_key)
                 )
-                category = self.repository.resolve_active_category(category_code)
-                if category is None:
-                    raise CategoryNotFoundError(category_code)
+                existing = self.repository.find_report_by_idempotency_key(
+                    idempotency_key
+                )
+                if existing is not None:
+                    if existing["idempotency_payload_hash"] != payload_hash:
+                        raise DuplicateOperationError
+                    return IdempotentReportResult(existing, replayed=True)
 
+                citizen = self.repository.get_or_create_citizen(phone_number)
+                category = self.repository.resolve_active_category(
+                    payload.category.value
+                )
+                if category is None:
+                    raise CategoryNotFoundError(payload.category.value)
+
+                ai_extraction = (
+                    payload.ai_analysis.model_dump(mode="json")
+                    if payload.ai_analysis is not None
+                    else {}
+                )
+                summary = (
+                    payload.ai_analysis.summary
+                    if payload.ai_analysis is not None
+                    else None
+                )
                 report = self.repository.insert_report(
                     {
-                        **report_values,
                         "citizen_id": citizen["id"],
                         "category_id": category["id"],
+                        "source": payload.source.value,
+                        "urgency": payload.urgency.value,
+                        "original_text": payload.original_text,
+                        "description": payload.description,
+                        "summary": summary,
+                        "location_text": payload.location.text,
+                        "latitude": payload.location.latitude,
+                        "longitude": payload.location.longitude,
+                        "ai_extraction": ai_extraction,
+                        "ai_recommendation": {},
+                        "idempotency_key": idempotency_key,
+                        "idempotency_payload_hash": payload_hash,
                     }
                 )
                 self.repository.insert_status_history(
                     {
-                        **initial_history_values,
                         "report_id": report["id"],
+                        "old_status": None,
+                        "new_status": "pending_verification",
+                        "actor_type": "system",
+                        "actor_identifier": None,
+                        "notes": "Report created",
                     }
                 )
-                return report
-        except CategoryNotFoundError:
+                return IdempotentReportResult(report, replayed=False)
+        except (CategoryNotFoundError, DuplicateOperationError):
             raise
         except SQLAlchemyError as exc:
             raise ReportPersistenceError("report creation") from exc

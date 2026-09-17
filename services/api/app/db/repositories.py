@@ -67,6 +67,10 @@ class ReportRepository:
         )
         return self.session.execute(statement).mappings().one_or_none()
 
+    def acquire_idempotency_lock(self, lock_key: int) -> None:
+        statement = select(func.pg_advisory_xact_lock(lock_key))
+        self.session.execute(statement).scalar_one()
+
     def insert_report(self, values: Mapping[str, Any]) -> RowMapping:
         statement = insert(reports).values(**values).returning(*reports.c)
         return self.session.execute(statement).mappings().one()
