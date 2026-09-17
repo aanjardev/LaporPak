@@ -35,27 +35,22 @@ test("mock daftar dan detail mengikuti alur laporan", async () => {
   assert.equal(await getReportById("unknown"), null);
 });
 
-test("mode API meneruskan filter urgensi pada query GET", async () => {
+test("mode API tidak mengambil data nyata sebelum otorisasi FastAPI tersedia", async () => {
   const oldSource = process.env.REPORTS_DATA_SOURCE;
-  const oldApiUrl = process.env.NEXT_PUBLIC_API_URL;
   const oldFetch = globalThis.fetch;
-  let requestedUrl;
+  let fetched = false;
   try {
     process.env.REPORTS_DATA_SOURCE = "api";
-    process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
-    globalThis.fetch = async (url) => {
-      requestedUrl = new URL(url);
-      return new Response(JSON.stringify({ items: [], page: 2, page_size: 20, total: 0 }), { status: 200 });
+    globalThis.fetch = async () => {
+      fetched = true;
+      throw new Error("API should not be called");
     };
-    await getReports({ page: 2, page_size: 20, urgency: "high" });
-    assert.equal(requestedUrl.pathname, "/api/v1/reports");
-    assert.equal(requestedUrl.searchParams.get("urgency"), "high");
-    assert.equal(requestedUrl.searchParams.get("page"), "2");
+    await assert.rejects(getReports({ page: 2, page_size: 20, urgency: "high" }));
+    await assert.rejects(getReportById("72af1a52-7016-48c7-aacc-000000000001"));
+    assert.equal(fetched, false);
   } finally {
     if (oldSource === undefined) delete process.env.REPORTS_DATA_SOURCE;
     else process.env.REPORTS_DATA_SOURCE = oldSource;
-    if (oldApiUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
-    else process.env.NEXT_PUBLIC_API_URL = oldApiUrl;
     globalThis.fetch = oldFetch;
   }
 });
