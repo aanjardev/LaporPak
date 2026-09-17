@@ -75,3 +75,23 @@ WhatsApp -> OpenClaw -> Gemini -> laporpak_create_report
 
 Confirm that OpenClaw reuses one stable report draft UUID for repeated citizen
 confirmation and sends only the allowlisted report-creation tool.
+
+## Full dashboard integration smoke test
+
+Verified manually on 2026-09-17 after enabling `REPORTS_DATA_SOURCE=api`:
+
+```text
+WhatsApp/OpenClaw -> FastAPI -> Supabase -> admin dashboard
+                  -> human verification -> persisted status history
+```
+
+Observed results:
+
+- WhatsApp-created ticket `LP-2026-0003` appeared in the authenticated report list.
+- Its database-backed category, location, urgency, status, and creation time rendered correctly.
+- The invited Supabase Auth admin could open the detail and submit a verification reason.
+- The verified status and history remained correct after page reload and list navigation.
+- Logging out prevented direct access to `/reports` and redirected to login.
+
+This completes the P0 REPORT happy path through the real citizen channel,
+database, authenticated dashboard, and human verification boundary.
