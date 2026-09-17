@@ -58,7 +58,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
     result = await getReports(query);
   } catch (error) {
     if (error instanceof ReportApiError && error.status === 401) {
-      redirect(`/login?next=${encodeURIComponent(pageHref(query, query.page))}`);
+      redirect(`/login?reauth=1&next=${encodeURIComponent(pageHref(query, query.page))}`);
     }
     if (error instanceof ReportApiError && error.status === 403) {
       redirect("/access-denied");

@@ -1,17 +1,27 @@
 "use server";
 
-import { updateReportStatus, type UpdateReportStatusRequest } from "@/lib/reports";
+import { getReportById, ReportApiError, updateReportStatus, type UpdateReportStatusRequest } from "@/lib/reports";
 import { requireSignedIn } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
 export async function saveReportDecision(id: string, request: UpdateReportStatusRequest) {
   await requireSignedIn(`/reports/${encodeURIComponent(id)}`);
+  let data;
   try {
-    const data = await updateReportStatus(id, request);
+    data = await updateReportStatus(id, request);
+  } catch (error) {
+    return { ok: false as const, status: error instanceof ReportApiError ? error.status : null };
+  }
+
+  try {
     revalidatePath("/reports");
     revalidatePath(`/reports/${id}`);
-    return { ok: true as const, data };
+    if (process.env.REPORTS_DATA_SOURCE !== "api") {
+      return { ok: true as const, data, report: null };
+    }
+    return { ok: true as const, data, report: await getReportById(id) };
   } catch {
-    return { ok: false as const };
+    // PATCH has already succeeded; a failed read must not invite a second write.
+    return { ok: true as const, data, report: null };
   }
 }
