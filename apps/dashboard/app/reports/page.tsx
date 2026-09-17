@@ -39,7 +39,6 @@ function pageHref(query: ReportQuery, page: number) {
 }
 
 export default async function ReportsPage({ searchParams }: { searchParams: SearchParams }) {
-  await requireSignedIn("/reports");
   const params = await searchParams;
   const requestedPage = Number(first(params.page));
   const status = first(params.status);
@@ -53,12 +52,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
     urgency: reportUrgencies.includes(urgency as ReportUrgency) ? (urgency as ReportUrgency) : undefined,
     category: reportCategories.includes(category as ReportCategory) ? (category as ReportCategory) : undefined,
   };
+  await requireSignedIn(pageHref(query, query.page));
   let result;
   try {
     result = await getReports(query);
   } catch (error) {
     if (error instanceof ReportApiError && error.status === 401) {
-      redirect(`/login?next=${encodeURIComponent("/reports")}`);
+      redirect(`/login?next=${encodeURIComponent(pageHref(query, query.page))}`);
     }
     if (error instanceof ReportApiError && error.status === 403) {
       redirect("/access-denied");
