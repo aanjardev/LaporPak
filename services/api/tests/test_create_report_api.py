@@ -33,6 +33,10 @@ class FakeCreateReportService:
                 "ticket_number": "LP-2026-0001",
                 "status": "pending_verification",
                 "created_at": datetime(2026, 9, 16, 14, tzinfo=UTC),
+                "citizen_id": UUID("5c242fc6-77a8-4fa7-a12f-a67bbc75839b"),
+                "category_id": UUID("600dc7e0-1cd8-4249-aa22-80a1ad65ee42"),
+                "description": "Jalan di RT 03 rusak parah.",
+                "idempotency_payload_hash": "internal-only",
             },
             replayed=self.replayed,
         )

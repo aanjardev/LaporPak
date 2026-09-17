@@ -1,5 +1,7 @@
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager
 from datetime import UTC, datetime
+from threading import Barrier, Lock
 from uuid import UUID
 
 import pytest
@@ -33,6 +35,10 @@ class Transaction(AbstractContextManager):
     def __exit__(self, exc_type, exc_value, traceback):
         self.session.exited += 1
         self.session.last_exception_type = exc_type
+        if exc_type is None:
+            self.session.committed += 1
+        else:
+            self.session.rolled_back += 1
         return False
 
 
@@ -41,6 +47,8 @@ class TransactionSession:
         self.entered = 0
         self.exited = 0
         self.last_exception_type = None
+        self.committed = 0
+        self.rolled_back = 0
 
     def begin(self):
         return Transaction(self)
@@ -181,6 +189,8 @@ def test_create_report_and_initial_history_share_one_transaction():
     assert session.entered == 1
     assert session.exited == 1
     assert session.last_exception_type is None
+    assert session.committed == 1
+    assert session.rolled_back == 0
 
 
 def test_missing_category_aborts_create_transaction():
@@ -197,6 +207,7 @@ def test_missing_category_aborts_create_transaction():
 
     assert repository.inserted_report is None
     assert session.last_exception_type is CategoryNotFoundError
+    assert session.rolled_back == 1
 
 
 def test_status_update_locks_report_and_writes_history_atomically():
@@ -222,6 +233,7 @@ def test_status_update_locks_report_and_writes_history_atomically():
     assert "verified_at" in repository.updated_values
     assert session.entered == 1
     assert session.exited == 1
+    assert session.committed == 1
 
 
 def test_status_update_rejects_missing_report_inside_transaction():
@@ -239,6 +251,7 @@ def test_status_update_rejects_missing_report_inside_transaction():
         )
 
     assert session.last_exception_type is ReportNotFoundError
+    assert session.rolled_back == 1
 
 
 @pytest.mark.parametrize(
@@ -323,6 +336,47 @@ def test_sqlalchemy_error_is_wrapped_without_fake_success():
         )
 
     assert error.value.operation == "report creation"
+    assert session.rolled_back == 1
+
+
+def test_create_rolls_back_when_initial_history_insert_fails():
+    session = TransactionSession()
+    repository = FakeRepository()
+    repository.insert_status_history = lambda values: (_ for _ in ()).throw(
+        SQLAlchemyError("history unavailable")
+    )
+    service = ReportPersistenceService(session, repository)
+
+    with pytest.raises(ReportPersistenceError):
+        service.create_idempotent_report(
+            payload=valid_payload(),
+            idempotency_key=UUID("ef51f99f-a47d-4a31-a3db-e520838997f5"),
+        )
+
+    assert repository.inserted_report is not None
+    assert session.committed == 0
+    assert session.rolled_back == 1
+
+
+def test_status_update_rolls_back_when_history_insert_fails():
+    session = TransactionSession()
+    repository = FakeRepository()
+    repository.insert_status_history = lambda values: (_ for _ in ()).throw(
+        SQLAlchemyError("history unavailable")
+    )
+    service = ReportPersistenceService(session, repository)
+
+    with pytest.raises(ReportPersistenceError):
+        service.update_report_status(
+            report_id=repository.report["id"],
+            new_status=ReportStatus.VERIFIED,
+            reason="Verified",
+            actor_identifier="admin-desa-demo",
+        )
+
+    assert repository.updated_report is not None
+    assert session.committed == 0
+    assert session.rolled_back == 1
 
 
 def test_same_idempotency_key_and_payload_replays_existing_report():
@@ -365,6 +419,90 @@ def test_same_idempotency_key_with_different_payload_is_rejected():
 
     assert repository.inserted_report is None
     assert session.last_exception_type is DuplicateOperationError
+
+
+class ConcurrentStore:
+    def __init__(self):
+        self.lock = Lock()
+        self.report = None
+        self.report_inserts = 0
+        self.history_inserts = 0
+
+
+class ConcurrentTransaction(AbstractContextManager):
+    def __init__(self, store):
+        self.store = store
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.store.lock.release()
+        return False
+
+
+class ConcurrentSession:
+    def __init__(self, store):
+        self.store = store
+
+    def begin(self):
+        return ConcurrentTransaction(self.store)
+
+
+class ConcurrentRepository:
+    def __init__(self, store):
+        self.store = store
+
+    def acquire_idempotency_lock(self, lock_key):
+        self.store.lock.acquire()
+
+    def find_report_by_idempotency_key(self, idempotency_key):
+        return self.store.report
+
+    def get_or_create_citizen(self, phone_number):
+        return {"id": UUID("5c242fc6-77a8-4fa7-a12f-a67bbc75839b")}
+
+    def resolve_active_category(self, category_code):
+        return {"id": UUID("600dc7e0-1cd8-4249-aa22-80a1ad65ee42")}
+
+    def insert_report(self, values):
+        self.store.report_inserts += 1
+        self.store.report = {
+            **values,
+            "id": UUID("72af1a52-7016-48c7-aacc-6c35417be819"),
+            "ticket_number": "LP-2026-0001",
+            "status": "pending_verification",
+            "created_at": datetime(2026, 9, 16, 14, tzinfo=UTC),
+        }
+        return self.store.report
+
+    def insert_status_history(self, values):
+        self.store.history_inserts += 1
+        return values
+
+
+def test_concurrent_same_key_requests_create_only_one_report():
+    store = ConcurrentStore()
+    barrier = Barrier(2)
+    idempotency_key = UUID("ef51f99f-a47d-4a31-a3db-e520838997f5")
+
+    def create_report():
+        service = ReportPersistenceService(
+            ConcurrentSession(store),
+            ConcurrentRepository(store),
+        )
+        barrier.wait()
+        return service.create_idempotent_report(
+            payload=valid_payload(),
+            idempotency_key=idempotency_key,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _index: create_report(), range(2)))
+
+    assert sorted(result.replayed for result in results) == [False, True]
+    assert store.report_inserts == 1
+    assert store.history_inserts == 1
 
 
 @pytest.mark.parametrize(

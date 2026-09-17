@@ -31,7 +31,7 @@ from app.services.exceptions import (
     ReportPersistenceError,
 )
 
-PHONE_NUMBER_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
+PHONE_NUMBER_PATTERN = re.compile(r"^\+[1-9][0-9]{7,14}$")
 
 ALLOWED_STATUS_TRANSITIONS = {
     ReportStatus.PENDING_VERIFICATION: {

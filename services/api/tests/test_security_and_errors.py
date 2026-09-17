@@ -135,6 +135,20 @@ def test_same_token_for_both_callers_is_rejected(monkeypatch):
     assert response.json()["error"]["code"] == "UNAUTHORIZED"
 
 
+def test_empty_or_unconfigured_tokens_never_authenticate(monkeypatch):
+    monkeypatch.setattr(settings, "openclaw_api_key", SecretStr(""))
+    monkeypatch.setattr(settings, "dashboard_api_key", None)
+    client = TestClient(build_test_app())
+
+    response = client.get(
+        "/admin",
+        headers={"Authorization": "Bearer any-value"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "UNAUTHORIZED"
+
+
 def test_request_validation_uses_standard_error(monkeypatch):
     configure_tokens(monkeypatch)
     client = TestClient(build_test_app())
