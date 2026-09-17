@@ -1,0 +1,128 @@
+{
+  "$defs": {
+    "AIIntent": {
+      "enum": ["REPORT", "UNKNOWN"],
+      "title": "AIIntent",
+      "type": "string"
+    },
+    "AILocation": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "anyOf": [
+            { "minLength": 1, "type": "string" },
+            { "type": "null" }
+          ],
+          "title": "Text"
+        },
+        "latitude": {
+          "anyOf": [
+            { "maximum": 90, "minimum": -90, "type": "number" },
+            { "type": "null" }
+          ],
+          "title": "Latitude"
+        },
+        "longitude": {
+          "anyOf": [
+            { "maximum": 180, "minimum": -180, "type": "number" },
+            { "type": "null" }
+          ],
+          "title": "Longitude"
+        }
+      },
+      "required": ["text", "latitude", "longitude"],
+      "title": "AILocation",
+      "type": "object"
+    },
+    "ReportCategory": {
+      "enum": [
+        "infrastructure",
+        "public_facility",
+        "cleanliness",
+        "security",
+        "social",
+        "administration",
+        "other"
+      ],
+      "title": "ReportCategory",
+      "type": "string"
+    },
+    "Urgency": {
+      "enum": ["low", "medium", "high", "critical"],
+      "title": "Urgency",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "intent": { "$ref": "#/$defs/AIIntent" },
+    "confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "category": {
+      "anyOf": [
+        { "$ref": "#/$defs/ReportCategory" },
+        { "type": "null" }
+      ]
+    },
+    "description": {
+      "anyOf": [
+        { "minLength": 1, "type": "string" },
+        { "type": "null" }
+      ],
+      "title": "Description"
+    },
+    "location": {
+      "anyOf": [
+        { "$ref": "#/$defs/AILocation" },
+        { "type": "null" }
+      ]
+    },
+    "urgency": {
+      "anyOf": [
+        { "$ref": "#/$defs/Urgency" },
+        { "type": "null" }
+      ]
+    },
+    "missing_fields": {
+      "items": { "minLength": 1, "type": "string" },
+      "title": "Missing Fields",
+      "type": "array"
+    },
+    "needs_clarification": {
+      "title": "Needs Clarification",
+      "type": "boolean"
+    },
+    "clarification_reason": {
+      "anyOf": [
+        { "minLength": 1, "type": "string" },
+        { "type": "null" }
+      ],
+      "title": "Clarification Reason"
+    },
+    "summary": {
+      "anyOf": [
+        { "minLength": 1, "type": "string" },
+        { "type": "null" }
+      ],
+      "title": "Summary"
+    }
+  },
+  "required": [
+    "intent",
+    "confidence",
+    "category",
+    "description",
+    "location",
+    "urgency",
+    "missing_fields",
+    "needs_clarification",
+    "clarification_reason",
+    "summary"
+  ],
+  "title": "AIAnalysis",
+  "type": "object"
+}

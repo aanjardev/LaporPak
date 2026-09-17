@@ -227,6 +227,15 @@ Untuk `source: "whatsapp"`, `sender_phone_number` berasal dari metadata kanal Op
 
 `conversation_id`, `urgency`, `original_text`, dan `ai_analysis` dapat optional sesuai source. `Idempotency-Key` wajib untuk create dari WhatsApp.
 
+Pemanggil OpenClaw wajib mengirim secret internal pada header:
+
+```http
+X-OpenClaw-API-Key: <server-only-secret>
+```
+
+`Idempotency-Key` harus berupa UUID draf laporan yang stabil. Kedua header
+bersifat server-to-server dan tidak boleh dikirim oleh frontend publik.
+
 ### Backend behavior
 
 Backend:
@@ -267,7 +276,10 @@ Backend menyimpan key dengan constraint unik dan mengikatnya ke laporan. Insert 
 - permintaan ulang menghasilkan `200` dengan body tiket yang sudah ada, tanpa laporan/history baru;
 - key sama dengan payload berbeda menghasilkan `409 DUPLICATE_OPERATION`.
 
-Lakukan perubahan schema melalui migration sebelum integrasi WhatsApp nyata. `external_message_id` dapat disimpan terpisah untuk deduplikasi event masuk; ID pesan saja tidak cukup karena warga dapat mengirim dua pesan konfirmasi untuk satu draf.
+Database menyimpan UUID draf pada `reports.idempotency_key` dan hash payload
+pada `reports.idempotency_payload_hash`. `conversation_messages.external_message_id`
+menangani deduplikasi event masuk secara terpisah; ID pesan saja tidak cukup
+karena warga dapat mengirim dua pesan konfirmasi untuk satu draf.
 
 ---
 
@@ -485,6 +497,22 @@ Canonical P0 analysis:
 | `needs_clarification` | bool | yes | AI suggestion |
 | `clarification_reason` | string/null | yes | reason |
 | `summary` | string/null | yes | generated summary |
+
+`location`, bila tidak `null`, selalu memiliki ketiga key berikut. Nilainya
+boleh `null` agar hasil ekstraksi yang belum lengkap tetap dapat divalidasi dan
+diteruskan ke alur klarifikasi.
+
+| Field | Type | Required | Meaning |
+|---|---|---:|---|
+| `text` | string/null | yes | lokasi tekstual dari input warga |
+| `latitude` | number/null | yes | latitude pada rentang `-90..90` |
+| `longitude` | number/null | yes | longitude pada rentang `-180..180` |
+
+Semua object pada Internal AI Output menolak field yang tidak tercantum dalam
+contract. String non-null harus berisi teks, bukan string kosong/whitespace.
+Output boleh valid secara schema tetapi belum lengkap secara bisnis; OpenClaw
+melakukan pemeriksaan provisional dan FastAPI menghitung ulang kelengkapan saat
+create report.
 
 ### Important
 

@@ -1,6 +1,9 @@
 # API LaporPak
 
-API menggunakan FastAPI, Pydantic, SQLAlchemy, dan PostgreSQL Supabase. Implementasi saat ini hanya menyediakan `/` dan `/health`; endpoint laporan dan integrasi WhatsApp belum dibuat.
+API menggunakan FastAPI, Pydantic, SQLAlchemy, dan PostgreSQL Supabase. Endpoint
+`POST /api/v1/reports` menerima create REPORT terautentikasi dari OpenClaw,
+menegakkan idempotency, lalu menyimpan laporan dan status history dalam satu
+transaksi.
 
 ## Menjalankan lokal
 
@@ -22,4 +25,6 @@ uv run ruff check .
 uv run python -m app.db.check
 ```
 
-Perintah terakhir memerlukan `DATABASE_URL` aktif dan hanya memeriksa koneksi, bukan menjalankan migrasi. Skrip skema dan seed ada di `../../database/`; penerapannya ke Supabase belum diotomatisasi di repository ini.
+Perintah terakhir memerlukan `DATABASE_URL` aktif dan hanya memeriksa koneksi,
+bukan menjalankan migrasi. Skrip schema, guard pembuatan laporan, hardening,
+dan seed tersedia di `../../database/` dan harus diterapkan berurutan.

@@ -113,14 +113,14 @@ FRONTEND_URL=http://localhost:3000
 
 DATABASE_URL=
 SUPABASE_URL=
-SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_ANON_KEY=
 SUPABASE_SECRET_KEY=
 
 WHATSAPP_ACCESS_TOKEN=
 WHATSAPP_PHONE_NUMBER_ID=
 WHATSAPP_VERIFY_TOKEN=
 
-OPENCLAW_URL=
+OPENCLAW_API_URL=
 OPENCLAW_API_KEY=
 ```
 
@@ -347,6 +347,15 @@ AI module:
 ```text
 services/api/app/services/ai/
 ```
+
+Version-controlled OpenClaw prompts and schema artifacts live in:
+
+```text
+integrations/openclaw/
+```
+
+Runtime configuration, auth profiles, channel/session state, and secrets remain
+local to the OpenClaw host and are not committed.
 
 Rules:
 

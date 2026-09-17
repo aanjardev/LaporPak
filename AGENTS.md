@@ -125,6 +125,9 @@ LaporPak/
 ├── data/
 │   └── knowledge-base/
 │
+├── integrations/
+│   └── openclaw/                # Secret-free prompts and schema artifacts
+│
 ├── docs/
 │   ├── project-context.md
 │   ├── architecture.md
@@ -513,3 +516,22 @@ Untuk P0 jangan menambahkan tanpa kebutuhan nyata:
 - advanced semantic duplicate rejection.
 
 Prioritas adalah vertical slice REPORT yang dapat dipahami, diuji, dan didemokan.
+
+---
+
+## 16. Minimal Implementation Rules
+
+Untuk implementasi, gunakan prinsip Ponytail: pahami flow yang disentuh, lalu
+berhenti pada solusi paling awal yang sudah memenuhi kebutuhan.
+
+1. Jangan membangun kebutuhan spekulatif.
+2. Gunakan kembali pattern atau helper repository yang sudah ada.
+3. Dahulukan standard library dan kemampuan native platform.
+4. Gunakan dependency yang sudah terpasang sebelum menambah dependency baru.
+5. Hindari abstraction, boilerplate, atau config yang baru punya satu use case.
+6. Untuk logic non-trivial, sisakan test runnable terkecil yang membuktikannya.
+
+Minimalisme tidak boleh mengurangi validation pada trust boundary, error
+handling yang mencegah kehilangan data, security, authorization, idempotency,
+atau requirement eksplisit. Tandai simplification dengan batas nyata memakai
+komentar `ponytail:` yang menjelaskan kapan implementasi perlu ditingkatkan.

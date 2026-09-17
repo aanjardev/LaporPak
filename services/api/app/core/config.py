@@ -8,8 +8,15 @@ class Settings(BaseSettings):
     database_url: str = ""
 
     supabase_url: str = ""
-    supabase_publishable_key: str = ""
+    supabase_anon_key: str = ""
     supabase_secret_key: str = ""
+
+    whatsapp_access_token: str = ""
+    whatsapp_phone_number_id: str = ""
+    whatsapp_verify_token: str = ""
+
+    openclaw_api_url: str = ""
+    openclaw_api_key: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

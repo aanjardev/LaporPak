@@ -90,9 +90,11 @@ OpenClaw
   ↓
 Gemini understanding/extraction
   ↓
-Backend validation
+OpenClaw provisional completeness check
   ↓
 Citizen confirmation
+  ↓
+FastAPI authoritative validation
   ↓
 Report persisted
   ↓
