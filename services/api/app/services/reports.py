@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -19,16 +20,33 @@ from app.schemas.reports import (
     ReportListResponse,
     ReportLocation,
     ReportStatusHistory,
+    ReportStatusUpdateResponse,
 )
 from app.services.exceptions import (
     CategoryNotFoundError,
     DuplicateOperationError,
     InvalidSenderIdentityError,
+    InvalidStatusTransitionError,
     ReportNotFoundError,
     ReportPersistenceError,
 )
 
 PHONE_NUMBER_PATTERN = re.compile(r"^\+[1-9]\d{7,14}$")
+
+ALLOWED_STATUS_TRANSITIONS = {
+    ReportStatus.PENDING_VERIFICATION: {
+        ReportStatus.VERIFIED,
+        ReportStatus.REJECTED,
+    },
+    ReportStatus.VERIFIED: {ReportStatus.IN_PROGRESS},
+    ReportStatus.IN_PROGRESS: {
+        ReportStatus.FORWARDED,
+        ReportStatus.RESOLVED,
+    },
+    ReportStatus.FORWARDED: {ReportStatus.RESOLVED},
+    ReportStatus.RESOLVED: set(),
+    ReportStatus.REJECTED: set(),
+}
 
 
 @dataclass(frozen=True)
@@ -237,18 +255,32 @@ class ReportPersistenceService:
             created_at=report["created_at"],
         )
 
-    def update_report_with_history(
+    def update_report_status(
         self,
         *,
         report_id: UUID,
-        report_values: Mapping[str, Any],
-        history_values: Mapping[str, Any],
-    ) -> Mapping[str, Any]:
+        new_status: ReportStatus,
+        reason: str,
+        actor_identifier: str,
+    ) -> ReportStatusUpdateResponse:
         try:
             with self.session.begin():
                 current = self.repository.lock_report(report_id)
                 if current is None:
                     raise ReportNotFoundError(report_id)
+
+                current_status = ReportStatus(current["status"])
+                if new_status not in ALLOWED_STATUS_TRANSITIONS[current_status]:
+                    raise InvalidStatusTransitionError(
+                        current_status.value,
+                        new_status.value,
+                    )
+
+                report_values: dict[str, Any] = {"status": new_status.value}
+                if new_status is ReportStatus.VERIFIED:
+                    report_values["verified_at"] = func.now()
+                if new_status is ReportStatus.RESOLVED:
+                    report_values["resolved_at"] = func.now()
 
                 updated = self.repository.update_report(report_id, report_values)
                 if updated is None:
@@ -256,14 +288,21 @@ class ReportPersistenceService:
 
                 self.repository.insert_status_history(
                     {
-                        **history_values,
                         "report_id": report_id,
-                        "old_status": current["status"],
-                        "new_status": updated["status"],
+                        "old_status": current_status.value,
+                        "new_status": new_status.value,
+                        "actor_type": "admin",
+                        "actor_identifier": actor_identifier,
+                        "notes": reason,
                     }
                 )
-                return updated
-        except ReportNotFoundError:
+                return ReportStatusUpdateResponse(
+                    id=updated["id"],
+                    ticket_number=updated["ticket_number"],
+                    status=updated["status"],
+                    updated_at=updated["updated_at"],
+                )
+        except (InvalidStatusTransitionError, ReportNotFoundError):
             raise
         except SQLAlchemyError as exc:
             raise ReportPersistenceError("status update") from exc

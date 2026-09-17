@@ -28,3 +28,10 @@ class DuplicateOperationError(ReportServiceError):
 class InvalidSenderIdentityError(ReportServiceError):
     def __init__(self) -> None:
         super().__init__("Sender phone number is invalid")
+
+
+class InvalidStatusTransitionError(ReportServiceError):
+    def __init__(self, old_status: str, new_status: str) -> None:
+        super().__init__(f"Invalid status transition: {old_status} -> {new_status}")
+        self.old_status = old_status
+        self.new_status = new_status

@@ -11,6 +11,7 @@ from app.services.exceptions import (
     CategoryNotFoundError,
     DuplicateOperationError,
     InvalidSenderIdentityError,
+    InvalidStatusTransitionError,
     ReportNotFoundError,
     ReportPersistenceError,
 )
@@ -78,11 +79,7 @@ class FakeRepository:
         self.inserted_report = None
         self.inserted_history = None
         self.locked_report = {"id": "report-id", "status": "pending_verification"}
-        self.updated_report = {
-            "id": "report-id",
-            "status": "verified",
-            "ticket_number": "LP-2026-0001",
-        }
+        self.updated_report = None
         self.existing_report = None
         self.lock_key = None
 
@@ -115,6 +112,11 @@ class FakeRepository:
 
     def update_report(self, report_id, values):
         self.updated_values = values
+        self.updated_report = {
+            **self.report,
+            **values,
+            "updated_at": datetime(2026, 9, 16, 15, tzinfo=UTC),
+        }
         return self.updated_report
 
     def list_reports(self, **parameters):
@@ -203,16 +205,21 @@ def test_status_update_locks_report_and_writes_history_atomically():
     service = ReportPersistenceService(session, repository)
     report_id = UUID("72af1a52-7016-48c7-aacc-6c35417be819")
 
-    result = service.update_report_with_history(
+    result = service.update_report_status(
         report_id=report_id,
-        report_values={"status": "verified"},
-        history_values={"actor_type": "admin", "notes": "Verified"},
+        new_status=ReportStatus.VERIFIED,
+        reason="Verified",
+        actor_identifier="admin-desa-demo",
     )
 
-    assert result["status"] == "verified"
+    assert result.status is ReportStatus.VERIFIED
     assert repository.report_id == report_id
     assert repository.inserted_history["old_status"] == "pending_verification"
     assert repository.inserted_history["new_status"] == "verified"
+    assert repository.inserted_history["actor_type"] == "admin"
+    assert repository.inserted_history["actor_identifier"] == "admin-desa-demo"
+    assert repository.inserted_history["notes"] == "Verified"
+    assert "verified_at" in repository.updated_values
     assert session.entered == 1
     assert session.exited == 1
 
@@ -224,13 +231,81 @@ def test_status_update_rejects_missing_report_inside_transaction():
     service = ReportPersistenceService(session, repository)
 
     with pytest.raises(ReportNotFoundError):
-        service.update_report_with_history(
+        service.update_report_status(
             report_id=UUID("72af1a52-7016-48c7-aacc-6c35417be819"),
-            report_values={"status": "verified"},
-            history_values={},
+            new_status=ReportStatus.VERIFIED,
+            reason="Verified",
+            actor_identifier="admin-desa-demo",
         )
 
     assert session.last_exception_type is ReportNotFoundError
+
+
+@pytest.mark.parametrize(
+    ("old_status", "new_status"),
+    [
+        (ReportStatus.PENDING_VERIFICATION, ReportStatus.VERIFIED),
+        (ReportStatus.PENDING_VERIFICATION, ReportStatus.REJECTED),
+        (ReportStatus.VERIFIED, ReportStatus.IN_PROGRESS),
+        (ReportStatus.IN_PROGRESS, ReportStatus.FORWARDED),
+        (ReportStatus.IN_PROGRESS, ReportStatus.RESOLVED),
+        (ReportStatus.FORWARDED, ReportStatus.RESOLVED),
+    ],
+)
+def test_all_canonical_status_transitions_are_allowed(old_status, new_status):
+    session = TransactionSession()
+    repository = FakeRepository()
+    repository.locked_report = {
+        "id": repository.report["id"],
+        "status": old_status.value,
+    }
+    service = ReportPersistenceService(session, repository)
+
+    result = service.update_report_status(
+        report_id=repository.report["id"],
+        new_status=new_status,
+        reason="Status updated",
+        actor_identifier="admin-desa-demo",
+    )
+
+    assert result.status is new_status
+    if new_status is ReportStatus.RESOLVED:
+        assert "resolved_at" in repository.updated_values
+
+
+@pytest.mark.parametrize(
+    ("old_status", "new_status"),
+    [
+        (ReportStatus.PENDING_VERIFICATION, ReportStatus.RESOLVED),
+        (ReportStatus.VERIFIED, ReportStatus.REJECTED),
+        (ReportStatus.RESOLVED, ReportStatus.IN_PROGRESS),
+        (ReportStatus.REJECTED, ReportStatus.VERIFIED),
+    ],
+)
+def test_invalid_status_transitions_are_rejected_without_update(
+    old_status,
+    new_status,
+):
+    session = TransactionSession()
+    repository = FakeRepository()
+    repository.locked_report = {
+        "id": repository.report["id"],
+        "status": old_status.value,
+    }
+    service = ReportPersistenceService(session, repository)
+
+    with pytest.raises(InvalidStatusTransitionError) as error:
+        service.update_report_status(
+            report_id=repository.report["id"],
+            new_status=new_status,
+            reason="Invalid change",
+            actor_identifier="admin-desa-demo",
+        )
+
+    assert error.value.old_status == old_status.value
+    assert error.value.new_status == new_status.value
+    assert repository.updated_report is None
+    assert repository.inserted_history is None
 
 
 def test_sqlalchemy_error_is_wrapped_without_fake_success():

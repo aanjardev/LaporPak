@@ -16,12 +16,15 @@ from app.schemas.reports import (
     ReportCreateResponse,
     ReportDetail,
     ReportListResponse,
+    ReportStatusUpdate,
+    ReportStatusUpdateResponse,
 )
 from app.services.dependencies import ReportServiceDependency
 from app.services.exceptions import (
     CategoryNotFoundError,
     DuplicateOperationError,
     InvalidSenderIdentityError,
+    InvalidStatusTransitionError,
     ReportNotFoundError,
     ReportPersistenceError,
 )
@@ -81,7 +84,12 @@ def create_report(
     if result.replayed:
         response.status_code = status.HTTP_200_OK
 
-    return ReportCreateResponse.model_validate(result.report)
+    return ReportCreateResponse(
+        id=result.report["id"],
+        ticket_number=result.report["ticket_number"],
+        status=result.report["status"],
+        created_at=result.report["created_at"],
+    )
 
 
 @router.get("", response_model=ReportListResponse)
@@ -134,4 +142,42 @@ def get_report_detail(
             status_code=503,
             code="DATABASE_UNAVAILABLE",
             message="Report could not be loaded",
+        ) from exc
+
+
+@router.patch("/{report_id}/status", response_model=ReportStatusUpdateResponse)
+def update_report_status(
+    report_id: UUID,
+    payload: ReportStatusUpdate,
+    caller: AdminCaller,
+    report_service: ReportServiceDependency,
+) -> ReportStatusUpdateResponse:
+    try:
+        return report_service.update_report_status(
+            report_id=report_id,
+            new_status=payload.status,
+            reason=payload.reason,
+            actor_identifier=caller.identifier,
+        )
+    except ReportNotFoundError as exc:
+        raise APIError(
+            status_code=404,
+            code="REPORT_NOT_FOUND",
+            message="Report not found",
+        ) from exc
+    except InvalidStatusTransitionError as exc:
+        raise APIError(
+            status_code=409,
+            code="INVALID_STATUS_TRANSITION",
+            message="Report status transition is not allowed",
+            details={
+                "old_status": exc.old_status,
+                "new_status": exc.new_status,
+            },
+        ) from exc
+    except ReportPersistenceError as exc:
+        raise APIError(
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Report status could not be updated",
         ) from exc
