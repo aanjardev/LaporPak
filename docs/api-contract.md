@@ -23,6 +23,32 @@ Status/category/urgency API memakai lowercase.
 
 Intent AI memakai uppercase.
 
+### Autentikasi P0
+
+Endpoint P0 yang dilindungi menggunakan bearer token backend-only:
+
+```http
+Authorization: Bearer <token>
+```
+
+Izin caller:
+
+| Caller | Operasi P0 yang diizinkan |
+|---|---|
+| OpenClaw | Membuat laporan WhatsApp melalui `POST /api/v1/reports` |
+| Admin dashboard | Membaca laporan dan mengubah status laporan |
+
+OpenClaw dan dashboard menggunakan token berbeda. FastAPI memetakan token
+dashboard ke identitas admin dan, untuk demo satu desa, administrative unit
+yang diizinkan. Token valid untuk operasi yang salah menghasilkan
+`403 FORBIDDEN`; token yang hilang atau tidak valid menghasilkan
+`401 UNAUTHORIZED`.
+
+Token dashboard hanya digunakan server Next.js. Token tidak boleh diekspos
+melalui `NEXT_PUBLIC_*`, JavaScript browser, source code, atau log. Mekanisme
+token sederhana ini adalah baseline demo P0 dan dapat diganti dengan identity
+provider lengkap tanpa memindahkan aturan otorisasi ke frontend.
+
 ---
 
 ## 2. Canonical Enums

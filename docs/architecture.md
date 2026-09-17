@@ -659,6 +659,19 @@ Bucket bersifat private.
 
 Day 1 dapat melakukan local development sebelum auth dashboard selesai.
 
+Baseline autentikasi demo P0 menggunakan dua bearer token backend-only yang
+berbeda:
+
+```text
+OpenClaw token  -> POST report dari kanal WhatsApp
+Dashboard token -> GET report dan PATCH status
+```
+
+FastAPI memetakan token ke caller/principal dan menegakkan izin endpoint.
+Untuk demo satu desa, dashboard principal juga membawa administrative unit
+yang diizinkan. Token dashboard hanya boleh digunakan dari server Next.js dan
+tidak boleh menjadi environment variable `NEXT_PUBLIC_*`.
+
 Namun sebelum dashboard/API dibuka ke deployment publik:
 
 ```text
