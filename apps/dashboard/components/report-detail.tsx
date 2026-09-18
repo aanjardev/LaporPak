@@ -6,22 +6,22 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Clock3, MapPin, UserRound } from "lucide-react";
 import { saveReportDecision } from "@/app/reports/[id]/actions";
 import { categoryLabels, formatLocation, formatReportDate, StatusBadge, statusLabels, urgencyLabels } from "@/components/report-display";
-import type { ReportDetail } from "@/lib/reports";
-
-type Decision = "verified" | "rejected";
+import { reportStatusActions } from "@/lib/report-status-actions";
+import type { ReportDetail, ReportStatus } from "@/lib/reports";
 
 export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { initialReport: ReportDetail; actionsEnabled: boolean; isMock: boolean }) {
   const router = useRouter();
   const [report, setReport] = useState(initialReport);
-  const [decision, setDecision] = useState<Decision | "">("");
+  const [decision, setDecision] = useState<ReportStatus | "">("");
   const [reason, setReason] = useState("");
   const [state, setState] = useState<"idle" | "saving" | "success" | "saved_unavailable" | "conflict" | "error">("idle");
   const saving = useRef(false);
+  const availableActions = reportStatusActions[report.status];
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving.current || !actionsEnabled || state === "saved_unavailable" || state === "conflict" || report.status !== "pending_verification") return;
-    if (!decision || !reason.trim()) {
+    if (saving.current || !actionsEnabled || state === "saved_unavailable" || state === "conflict") return;
+    if (!decision || !availableActions.includes(decision) || !reason.trim()) {
       setState("error");
       return;
     }
@@ -29,7 +29,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
     saving.current = true;
     setState("saving");
     try {
-      const result = await saveReportDecision(report.id, { status: decision, reason: reason.trim() });
+      const result = await saveReportDecision(report.id, { status: decision, reason: reason.trim() }, isMock ? report.status : undefined);
       if (!result.ok) {
         if (result.status === 401) {
           router.replace(`/login?reauth=1&next=${encodeURIComponent(`/reports/${encodeURIComponent(report.id)}`)}`);
@@ -48,6 +48,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
           status: result.data.status,
           updated_at: result.data.updated_at,
           verified_at: result.data.status === "verified" ? result.data.updated_at : current.verified_at,
+          resolved_at: result.data.status === "resolved" ? result.data.updated_at : current.resolved_at,
           status_history: [
             ...current.status_history,
             {
@@ -66,6 +67,8 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
         setState("saved_unavailable");
         return;
       }
+      setDecision("");
+      setReason("");
       setState("success");
     } catch {
       setState("error");
@@ -78,7 +81,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
     <div className="mx-auto max-w-5xl space-y-6">
       <Link href="/reports" className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-semibold text-sky-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"><ArrowLeft aria-hidden="true" size={17} /> Kembali ke daftar laporan</Link>
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-2"><p className="text-sm font-semibold text-sky-800">Detail laporan</p><h1 className="break-words text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{report.ticket_number}</h1><p className="text-sm text-slate-600">Dibuat <time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time></p>{actionsEnabled && report.status === "pending_verification" && <a href="#keputusan-petugas" className="inline-flex min-h-11 items-center text-sm font-semibold text-sky-800 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 lg:hidden">Lompat ke keputusan petugas</a>}</div>
+        <div className="min-w-0 space-y-2"><p className="text-sm font-semibold text-sky-800">Detail laporan</p><h1 className="break-words text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">{report.ticket_number}</h1><p className="text-sm text-slate-600">Dibuat <time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time></p>{actionsEnabled && availableActions.length > 0 && <a href="#keputusan-petugas" className="inline-flex min-h-11 items-center text-sm font-semibold text-sky-800 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 lg:hidden">Lompat ke aksi petugas</a>}</div>
         <StatusBadge status={report.status} />
       </header>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_290px]">
@@ -124,33 +127,32 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
               <div><dt className="flex items-center gap-1.5 text-slate-600"><Clock3 aria-hidden="true" size={15} /> Terakhir diperbarui</dt><dd className="mt-1 font-medium">{formatReportDate(report.updated_at)}</dd></div>
             </dl>
           </section>
-          {actionsEnabled && report.status === "pending_verification" && state !== "saved_unavailable" && state !== "conflict" && (
+          {actionsEnabled && availableActions.length > 0 && state !== "saved_unavailable" && state !== "conflict" && (
             <section aria-labelledby="keputusan-petugas" className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 id="keputusan-petugas" className="text-base font-semibold">Keputusan petugas</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Periksa laporan sebelum menentukan keputusan.</p>
+              <h2 id="keputusan-petugas" className="text-base font-semibold">Aksi petugas</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Periksa laporan dan pilih langkah penanganan berikutnya.</p>
               <form onSubmit={handleSubmit} className="mt-5 space-y-4" aria-busy={state === "saving"}>
                 <fieldset disabled={state === "saving"} className="space-y-4">
-                  <legend className="text-sm font-semibold">Pilih keputusan</legend>
+                  <legend className="text-sm font-semibold">Pilih tindakan</legend>
                   <div className="mt-2 space-y-2">
-                    <label className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm"><input type="radio" name="decision" value="verified" required checked={decision === "verified"} onChange={() => setDecision("verified")} /> Verifikasi laporan</label>
-                    <label className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm"><input type="radio" name="decision" value="rejected" required checked={decision === "rejected"} onChange={() => setDecision("rejected")} /> Tolak laporan</label>
+                    {availableActions.map((action) => <label key={action} className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm"><input type="radio" name="decision" value={action} required checked={decision === action} onChange={() => { setDecision(action); setState("idle"); }} /> {action === "verified" ? "Verifikasi laporan" : action === "rejected" ? "Tolak laporan" : action === "in_progress" ? "Mulai penanganan" : action === "forwarded" ? "Teruskan laporan" : "Selesaikan laporan"}</label>)}
                   </div>
                   <div>
-                    <label htmlFor="decision-reason" className="text-sm font-semibold">Alasan keputusan</label>
-                    <textarea id="decision-reason" name="reason" required value={reason} onChange={(event) => setReason(event.target.value)} rows={4} className="mt-2 w-full rounded-lg border border-slate-300 p-3 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-sky-700" placeholder="Jelaskan hasil pemeriksaan laporan" />
+                    <label htmlFor="decision-reason" className="text-sm font-semibold">Alasan atau catatan tindakan</label>
+                    <textarea id="decision-reason" name="reason" required value={reason} onChange={(event) => { setReason(event.target.value); setState("idle"); }} rows={4} className="mt-2 w-full rounded-lg border border-slate-300 p-3 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-sky-700" placeholder="Jelaskan tindakan petugas" />
                   </div>
-                  <button type="submit" className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-sky-800 px-4 text-sm font-semibold text-white hover:bg-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:cursor-wait disabled:opacity-60">{state === "saving" ? "Menyimpan…" : "Simpan keputusan"}</button>
+                  <button type="submit" className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-sky-800 px-4 text-sm font-semibold text-white hover:bg-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:cursor-wait disabled:opacity-60">{state === "saving" ? "Menyimpan…" : "Simpan tindakan"}</button>
                 </fieldset>
               </form>
-              {state === "saving" && <p role="status" className="mt-3 text-sm text-slate-600">Keputusan sedang disimpan…</p>}
-              {state === "error" && <p role="alert" className="mt-3 text-sm text-rose-800">Keputusan belum tersimpan. Periksa pilihan dan alasan, lalu coba lagi.</p>}
+              {state === "saving" && <p role="status" className="mt-3 text-sm text-slate-600">Tindakan sedang disimpan…</p>}
+              {state === "error" && <p role="alert" className="mt-3 text-sm text-rose-800">Tindakan belum tersimpan. Periksa pilihan dan alasan, lalu coba lagi.</p>}
               {isMock && <p className="mt-3 text-xs leading-5 text-amber-900">Simulasi: perubahan hanya terlihat sampai halaman dimuat ulang.</p>}
             </section>
           )}
-          {state === "success" && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">{isMock ? "Keputusan berhasil disimulasikan. Status kembali semula setelah halaman dimuat ulang." : "Keputusan berhasil disimpan."}</p>}
+          {state === "success" && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">{isMock ? "Tindakan berhasil disimulasikan. Status kembali semula setelah halaman dimuat ulang." : "Tindakan berhasil disimpan."}</p>}
           {state === "conflict" && <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-950"><p>Status laporan telah berubah. Muat ulang halaman sebelum membuat keputusan lagi.</p><button type="button" onClick={() => window.location.reload()} className="mt-3 min-h-11 rounded-lg border border-rose-300 px-4 text-sm font-semibold">Muat ulang halaman</button></div>}
           {state === "saved_unavailable" && <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950"><p>Keputusan berhasil disimpan, tetapi detail terbaru belum dapat dimuat. Muat ulang halaman untuk melihat status resmi.</p><button type="button" onClick={() => window.location.reload()} className="mt-3 min-h-11 rounded-lg border border-amber-400 px-4 text-sm font-semibold">Muat ulang halaman</button></div>}
-          <p className="rounded-xl border border-sky-100 bg-sky-50 p-4 text-sm leading-6 text-sky-950">Informasi dan rekomendasi AI membantu petugas meninjau laporan. Keputusan penanganan tetap dilakukan oleh petugas berwenang.</p>
+          <p className="rounded-xl border border-sky-100 bg-sky-50 p-4 text-sm leading-6 text-sky-950">Ringkasan dan urgensi membantu petugas meninjau laporan. Keputusan penanganan tetap dilakukan oleh petugas berwenang.</p>
         </aside>
       </div>
     </div>

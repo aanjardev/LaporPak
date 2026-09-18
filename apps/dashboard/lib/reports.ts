@@ -1,3 +1,5 @@
+import { reportStatusActions } from "./report-status-actions.ts";
+
 export const reportStatuses = [
   "pending_verification",
   "verified",
@@ -78,7 +80,7 @@ export type ReportQuery = {
 };
 
 export type UpdateReportStatusRequest = {
-  status: "verified" | "rejected";
+  status: ReportStatus;
   reason: string;
 };
 
@@ -335,6 +337,7 @@ export async function updateReportStatus(
   id: string,
   request: UpdateReportStatusRequest,
   accessToken?: string,
+  mockCurrentStatus?: ReportStatus,
 ): Promise<UpdateReportStatusResponse> {
   if (process.env.REPORTS_DATA_SOURCE === "api") {
     return apiRequest(
@@ -345,11 +348,12 @@ export async function updateReportStatus(
   }
 
   const report = mockReports.find((item) => item.id === id);
-  if (!report || report.status !== "pending_verification") {
-    throw new Error("Laporan tidak tersedia untuk verifikasi");
+  // ponytail: current status comes from the mock UI only; real writes always use FastAPI.
+  if (!report || !reportStatusActions[mockCurrentStatus ?? report.status]?.includes(request.status)) {
+    throw new Error("Transisi status laporan tidak tersedia");
   }
-  if (!["verified", "rejected"].includes(request.status) || !request.reason.trim()) {
-    throw new Error("Keputusan dan alasan wajib diisi");
+  if (!request.reason.trim()) {
+    throw new Error("Alasan perubahan status wajib diisi");
   }
 
   if (process.env.NODE_ENV === "development") {
