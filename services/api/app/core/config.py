@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     openclaw_api_url: str = ""
     openclaw_api_key: SecretStr | None = None
     dashboard_admin_unit_id: UUID | None = None
+    knowledge_storage_bucket: str = "knowledge-files"
+    knowledge_max_upload_bytes: int = 10 * 1024 * 1024
+    allow_legacy_admin_fallback: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

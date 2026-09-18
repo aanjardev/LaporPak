@@ -3,8 +3,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, Query, Response, status
 
+from app.core.config import settings
 from app.core.errors import APIError
-from app.core.security import AdminCaller, OpenClawCaller
+from app.core.security import (
+    AdminCaller,
+    AdminRole,
+    OpenClawCaller,
+    resolve_channel_unit,
+)
 from app.schemas.enums import (
     ReportCategory,
     ReportSource,
@@ -43,6 +49,9 @@ def create_report(
     _caller: OpenClawCaller,
     report_service: ReportServiceDependency,
     idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+    channel_account_id: Annotated[
+        str | None, Header(alias="X-Channel-Account-ID")
+    ] = None,
 ) -> ReportCreateResponse:
     if payload.source is not ReportSource.WHATSAPP:
         raise APIError(
@@ -52,10 +61,19 @@ def create_report(
         )
 
     try:
-        result = report_service.create_idempotent_report(
-            payload=payload,
-            idempotency_key=idempotency_key,
+        unit_id = (
+            resolve_channel_unit(report_service.session, channel_account_id)
+            if channel_account_id
+            else settings.dashboard_admin_unit_id
         )
+        if channel_account_id is None and not settings.allow_legacy_admin_fallback:
+            raise APIError(422, "VALIDATION_ERROR", "X-Channel-Account-ID is required")
+        if unit_id is None:
+            raise APIError(422, "VALIDATION_ERROR", "X-Channel-Account-ID is required")
+        create_arguments = {"payload": payload, "idempotency_key": idempotency_key}
+        if channel_account_id:
+            create_arguments["administrative_unit_id"] = unit_id
+        result = report_service.create_idempotent_report(**create_arguments)
     except InvalidSenderIdentityError as exc:
         raise APIError(
             status_code=422,
@@ -94,7 +112,7 @@ def create_report(
 
 @router.get("", response_model=ReportListResponse)
 def list_reports(
-    _caller: AdminCaller,
+    caller: AdminCaller,
     report_service: ReportServiceDependency,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -107,6 +125,11 @@ def list_reports(
     search: Annotated[str | None, Query(max_length=200)] = None,
 ) -> ReportListResponse:
     try:
+        unit_ids = (
+            None
+            if caller.admin_account_id is None or caller.role is AdminRole.SYSTEM_ADMIN
+            else caller.unit_ids
+        )
         return report_service.list_reports(
             page=page,
             page_size=page_size,
@@ -114,6 +137,7 @@ def list_reports(
             urgency=urgency,
             category=category,
             search=search,
+            unit_ids=unit_ids,
         )
     except ReportPersistenceError as exc:
         raise APIError(
@@ -126,11 +150,18 @@ def list_reports(
 @router.get("/{report_id}", response_model=ReportDetail)
 def get_report_detail(
     report_id: UUID,
-    _caller: AdminCaller,
+    caller: AdminCaller,
     report_service: ReportServiceDependency,
 ) -> ReportDetail:
     try:
-        return report_service.get_report_detail(report_id)
+        unit_ids = (
+            None
+            if caller.admin_account_id is None or caller.role is AdminRole.SYSTEM_ADMIN
+            else caller.unit_ids
+        )
+        if unit_ids is None:
+            return report_service.get_report_detail(report_id)
+        return report_service.get_report_detail(report_id, unit_ids)
     except ReportNotFoundError as exc:
         raise APIError(
             status_code=404,
@@ -153,11 +184,17 @@ def update_report_status(
     report_service: ReportServiceDependency,
 ) -> ReportStatusUpdateResponse:
     try:
+        unit_ids = (
+            None
+            if caller.admin_account_id is None or caller.role is AdminRole.SYSTEM_ADMIN
+            else caller.unit_ids
+        )
         return report_service.update_report_status(
             report_id=report_id,
             new_status=payload.status,
             reason=payload.reason,
             actor_identifier=caller.identifier,
+            unit_ids=unit_ids,
         )
     except ReportNotFoundError as exc:
         raise APIError(

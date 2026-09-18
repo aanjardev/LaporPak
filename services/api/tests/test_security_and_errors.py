@@ -58,6 +58,7 @@ def build_test_app() -> FastAPI:
 
 
 def configure_tokens(monkeypatch):
+    monkeypatch.setattr(settings, "allow_legacy_admin_fallback", True)
     monkeypatch.setattr(settings, "openclaw_api_key", SecretStr("openclaw-token"))
     monkeypatch.setattr(settings, "supabase_url", "https://project.supabase.co")
     monkeypatch.setattr(settings, "supabase_anon_key", "anon-key")

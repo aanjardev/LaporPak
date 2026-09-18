@@ -98,6 +98,7 @@ class ReportPersistenceService:
         *,
         payload: ReportCreate,
         idempotency_key: UUID,
+        administrative_unit_id: UUID | None = None,
     ) -> IdempotentReportResult:
         phone_number = normalize_phone_number(payload.sender_phone_number)
         payload_hash = canonical_payload_hash(payload, phone_number)
@@ -136,6 +137,11 @@ class ReportPersistenceService:
                     {
                         "citizen_id": citizen["id"],
                         "category_id": category["id"],
+                        **(
+                            {"administrative_unit_id": administrative_unit_id}
+                            if administrative_unit_id
+                            else {}
+                        ),
                         "source": payload.source.value,
                         "urgency": payload.urgency.value,
                         "original_text": payload.original_text,
@@ -161,7 +167,7 @@ class ReportPersistenceService:
                     }
                 )
                 return IdempotentReportResult(report, replayed=False)
-        except (CategoryNotFoundError, DuplicateOperationError):
+        except CategoryNotFoundError, DuplicateOperationError:
             raise
         except SQLAlchemyError as exc:
             raise ReportPersistenceError("report creation") from exc
@@ -175,17 +181,21 @@ class ReportPersistenceService:
         urgency: ReportUrgency | None = None,
         category: ReportCategory | None = None,
         search: str | None = None,
+        unit_ids: tuple[UUID, ...] | None = None,
     ) -> ReportListResponse:
         normalized_search = search.strip() if search else None
         try:
-            rows, total = self.repository.list_reports(
-                offset=(page - 1) * page_size,
-                limit=page_size,
-                status=status.value if status else None,
-                urgency=urgency.value if urgency else None,
-                category=category.value if category else None,
-                search=normalized_search or None,
-            )
+            kwargs = {
+                "offset": (page - 1) * page_size,
+                "limit": page_size,
+                "status": status.value if status else None,
+                "urgency": urgency.value if urgency else None,
+                "category": category.value if category else None,
+                "search": normalized_search or None,
+            }
+            if unit_ids is not None:
+                kwargs["unit_ids"] = unit_ids
+            rows, total = self.repository.list_reports(**kwargs)
         except SQLAlchemyError as exc:
             raise ReportPersistenceError("report list") from exc
 
@@ -196,9 +206,15 @@ class ReportPersistenceService:
             total=total,
         )
 
-    def get_report_detail(self, report_id: UUID) -> ReportDetail:
+    def get_report_detail(
+        self, report_id: UUID, unit_ids: tuple[UUID, ...] | None = None
+    ) -> ReportDetail:
         try:
-            report = self.repository.get_report_detail(report_id)
+            report = (
+                self.repository.get_report_detail(report_id)
+                if unit_ids is None
+                else self.repository.get_report_detail(report_id, unit_ids)
+            )
             if report is None:
                 raise ReportNotFoundError(report_id)
 
@@ -207,10 +223,7 @@ class ReportPersistenceService:
             ]
             history = [
                 ReportStatusHistory.model_validate(
-                    {
-                        field: row[field]
-                        for field in ReportStatusHistory.model_fields
-                    }
+                    {field: row[field] for field in ReportStatusHistory.model_fields}
                 )
                 for row in self.repository.list_status_history(report_id)
             ]
@@ -267,10 +280,15 @@ class ReportPersistenceService:
         new_status: ReportStatus,
         reason: str,
         actor_identifier: str,
+        unit_ids: tuple[UUID, ...] | None = None,
     ) -> ReportStatusUpdateResponse:
         try:
             with self.session.begin():
-                current = self.repository.lock_report(report_id)
+                current = (
+                    self.repository.lock_report(report_id)
+                    if unit_ids is None
+                    else self.repository.lock_report(report_id, unit_ids)
+                )
                 if current is None:
                     raise ReportNotFoundError(report_id)
 
@@ -307,7 +325,7 @@ class ReportPersistenceService:
                     status=updated["status"],
                     updated_at=updated["updated_at"],
                 )
-        except (InvalidStatusTransitionError, ReportNotFoundError):
+        except InvalidStatusTransitionError, ReportNotFoundError:
             raise
         except SQLAlchemyError as exc:
             raise ReportPersistenceError("status update") from exc
