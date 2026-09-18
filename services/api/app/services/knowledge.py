@@ -143,14 +143,15 @@ class KnowledgeService:
             raise ReportPersistenceError("knowledge creation") from exc
 
     def _upload(self, path: str, data: bytes) -> None:
-        if not settings.supabase_url or not settings.supabase_secret_key:
+        server_key = settings.supabase_secret_key or settings.supabase_service_role_key
+        if not settings.supabase_url or not server_key:
             raise ReportPersistenceError("knowledge storage is not configured")
         try:
             response = httpx.post(
                 f"{settings.supabase_url.rstrip('/')}/storage/v1/object/{settings.knowledge_storage_bucket}/{path}",
                 headers={
-                    "Authorization": f"Bearer {settings.supabase_secret_key}",
-                    "apikey": settings.supabase_secret_key,
+                    "Authorization": f"Bearer {server_key}",
+                    "apikey": server_key,
                     "Content-Type": "application/octet-stream",
                     "x-upsert": "false",
                 },

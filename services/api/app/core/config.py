@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_publishable_key: str = ""
     supabase_secret_key: str = ""
+    supabase_service_role_key: str = ""
 
     whatsapp_access_token: str = ""
     whatsapp_phone_number_id: str = ""
