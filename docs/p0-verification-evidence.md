@@ -151,3 +151,25 @@ channel were not tested here. Human verification/rejection of two tickets,
 reload persistence, scope enforcement, and live fallback remain open.
 Ferdi chose to defer the manual dashboard decisions until the API and
 OpenClaw blockers are corrected; no second synthetic ticket was created.
+
+## Dashboard status action after backend transaction fix — 2026-09-18
+
+Backend commit: `21d39a5` (`main`, merged PR #18). Environment: local Next.js,
+local FastAPI, development Supabase. Ferdi reported that the dashboard
+verification action succeeded after the backend update. A read-only database
+check found synthetic ticket `LP-2026-0005` as `verified` with `verified_at`
+populated, and `LP-2026-0004` as `rejected`. Each has two status-history
+entries, including an admin action with a nonempty reason. This supports
+persistence of both decision types. Ferdi subsequently reported that the
+dashboard status progression worked. A later read-only check found
+`LP-2026-0005` as `resolved`, with `resolved_at` populated and five history
+entries, matching verification, start, forwarding, and resolution. The full
+WhatsApp-to-ticket flow and remaining P0 integration scenarios are not yet
+recorded as passed.
+
+On the same backend commit, `uv run pytest -q` produced 95 passed and 4 failed.
+The failures are in `tests/test_create_report_api.py`: its older POST fixture
+does not supply a channel account ID or fallback village ID, so the route
+returns `422` before the mocked create service is called. This test-fixture
+issue is separate from the dashboard PATCH result and remains for Anjar to
+resolve.

@@ -1,14 +1,14 @@
 "use server";
 
-import { getReportById, ReportApiError, updateReportStatus, type UpdateReportStatusRequest } from "@/lib/reports";
+import { getReportById, ReportApiError, updateReportStatus, type ReportStatus, type UpdateReportStatusRequest } from "@/lib/reports";
 import { requireSignedIn } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 
-export async function saveReportDecision(id: string, request: UpdateReportStatusRequest) {
+export async function saveReportDecision(id: string, request: UpdateReportStatusRequest, mockCurrentStatus?: ReportStatus) {
   await requireSignedIn(`/reports/${encodeURIComponent(id)}`);
   let data;
   try {
-    data = await updateReportStatus(id, request);
+    data = await updateReportStatus(id, request, undefined, mockCurrentStatus);
   } catch (error) {
     return { ok: false as const, status: error instanceof ReportApiError ? error.status : null };
   }

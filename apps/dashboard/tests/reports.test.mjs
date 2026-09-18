@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import { getReportById, getReports, ReportApiError, updateReportStatus } from "../lib/reports.ts";
+import { reportStatusActions } from "../lib/report-status-actions.ts";
 
 test("mock daftar dan detail mengikuti alur laporan", async () => {
   const firstPage = await getReports({ page: 1, page_size: 20 });
@@ -99,6 +100,26 @@ test("simulasi keputusan mengikuti response PATCH tanpa mengubah fixture", async
   await assert.rejects(updateReportStatus(id, { status: "verified", reason: "   " }));
   await assert.rejects(updateReportStatus("unknown", { status: "verified", reason: "Alasan" }));
   await assert.rejects(updateReportStatus("72af1a52-7016-48c7-aacc-000000000002", { status: "rejected", reason: "Alasan" }));
+});
+
+test("aksi status mengikuti transisi kontrak dan mock dapat melanjutkan status di halaman terbuka", async () => {
+  assert.deepEqual(reportStatusActions.pending_verification, ["verified", "rejected"]);
+  assert.deepEqual(reportStatusActions.verified, ["in_progress"]);
+  assert.deepEqual(reportStatusActions.in_progress, ["forwarded", "resolved"]);
+  assert.deepEqual(reportStatusActions.forwarded, ["resolved"]);
+  assert.deepEqual(reportStatusActions.resolved, []);
+  assert.deepEqual(reportStatusActions.rejected, []);
+
+  const id = "72af1a52-7016-48c7-aacc-000000000001";
+  let status = "pending_verification";
+  for (const next of ["verified", "in_progress", "forwarded", "resolved"]) {
+    const result = await updateReportStatus(id, { status: next, reason: "Catatan tindakan petugas." }, undefined, status);
+    assert.equal(result.status, next);
+    status = next;
+  }
+  assert.equal((await getReportById(id)).status, "pending_verification");
+  await assert.rejects(updateReportStatus(id, { status: "rejected", reason: "Tidak sah" }, undefined, status));
+  await assert.rejects(updateReportStatus(id, { status: "resolved", reason: "Tidak sah" }));
 });
 
 test("skenario gagal mock dan mode API mengirim PATCH", async () => {
