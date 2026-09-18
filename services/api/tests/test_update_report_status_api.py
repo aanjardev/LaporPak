@@ -39,11 +39,16 @@ class FakeStatusService:
 
 @pytest.fixture
 def auth_tokens(monkeypatch):
+    monkeypatch.setattr(settings, "allow_legacy_admin_fallback", True)
     monkeypatch.setattr(settings, "openclaw_api_key", SecretStr("openclaw-token"))
+
     def verify(token):
         if token != "admin-token":
-            raise APIError(status_code=401, code="UNAUTHORIZED", message="Invalid token")
+            raise APIError(
+                status_code=401, code="UNAUTHORIZED", message="Invalid token"
+            )
         return UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+
     monkeypatch.setattr(security, "verify_supabase_access_token", verify)
 
 

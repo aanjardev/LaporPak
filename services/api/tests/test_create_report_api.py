@@ -65,6 +65,7 @@ def valid_payload():
 
 @pytest.fixture
 def auth_tokens(monkeypatch):
+    monkeypatch.setattr(settings, "allow_legacy_admin_fallback", True)
     monkeypatch.setattr(settings, "openclaw_api_key", SecretStr("openclaw-token"))
 
 
@@ -103,9 +104,7 @@ def test_create_report_returns_201_for_new_operation(auth_tokens):
         "status": "pending_verification",
         "created_at": "2026-09-16T14:00:00Z",
     }
-    assert service.calls[0][1] == UUID(
-        "ef51f99f-a47d-4a31-a3db-e520838997f5"
-    )
+    assert service.calls[0][1] == UUID("ef51f99f-a47d-4a31-a3db-e520838997f5")
 
 
 def test_create_report_returns_200_for_idempotent_replay(auth_tokens):
@@ -155,9 +154,7 @@ def test_create_report_requires_openclaw_token_and_idempotency_key(auth_tokens):
 
     no_token = client.post(
         "/api/v1/reports",
-        headers={
-            "Idempotency-Key": "ef51f99f-a47d-4a31-a3db-e520838997f5"
-        },
+        headers={"Idempotency-Key": "ef51f99f-a47d-4a31-a3db-e520838997f5"},
         json=valid_payload(),
     )
     invalid_token = client.post(

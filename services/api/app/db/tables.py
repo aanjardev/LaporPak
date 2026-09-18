@@ -130,6 +130,12 @@ reports = Table(
         UUID(as_uuid=True),
         ForeignKey("public.administrative_units.id"),
     ),
+    Column(
+        "administrative_unit_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.administrative_units.id"),
+        nullable=False,
+    ),
     Column("source", Text, nullable=False, server_default=text("'whatsapp'")),
     Column(
         "status",
@@ -167,6 +173,162 @@ reports = Table(
     ),
     Column("idempotency_key", UUID(as_uuid=True), unique=True),
     Column("idempotency_payload_hash", Text),
+)
+
+admin_accounts = Table(
+    "admin_accounts",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column("auth_user_id", UUID(as_uuid=True), nullable=False, unique=True),
+    Column("role", Text, nullable=False),
+    Column("display_name", Text),
+    Column("is_active", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+admin_unit_memberships = Table(
+    "admin_unit_memberships",
+    metadata,
+    Column(
+        "admin_account_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.admin_accounts.id"),
+        primary_key=True,
+    ),
+    Column(
+        "administrative_unit_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.administrative_units.id"),
+        primary_key=True,
+    ),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+channel_integrations = Table(
+    "channel_integrations",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column("channel", Text, nullable=False),
+    Column("external_account_id", Text, nullable=False),
+    Column(
+        "administrative_unit_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.administrative_units.id"),
+        nullable=False,
+    ),
+    Column("is_active", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+service_request_types = Table(
+    "service_request_types",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column("code", Text, nullable=False, unique=True),
+    Column("name", Text, nullable=False),
+    Column("is_active", Boolean, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+service_requests = Table(
+    "service_requests",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column("ticket_number", Text, nullable=False, unique=True),
+    Column(
+        "request_type_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.service_request_types.id"),
+        nullable=False,
+    ),
+    Column(
+        "citizen_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.citizens.id"),
+        nullable=False,
+    ),
+    Column(
+        "administrative_unit_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.administrative_units.id"),
+        nullable=False,
+    ),
+    Column("status", Text, nullable=False),
+    Column("applicant_name", Text, nullable=False),
+    Column("domicile_address", Text, nullable=False),
+    Column("domicile_duration", Text, nullable=False),
+    Column("purpose", Text, nullable=False),
+    Column("idempotency_key", UUID(as_uuid=True), nullable=False, unique=True),
+    Column("idempotency_payload_hash", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+service_request_status_history = Table(
+    "service_request_status_history",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "service_request_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.service_requests.id"),
+        nullable=False,
+    ),
+    Column("old_status", Text),
+    Column("new_status", Text, nullable=False),
+    Column("actor_type", Text, nullable=False),
+    Column("actor_identifier", Text),
+    Column("notes", Text),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+)
+
+knowledge_documents = Table(
+    "knowledge_documents",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column("title", Text, nullable=False),
+    Column("document_type", Text),
+    Column("source_name", Text),
+    Column("source_url", Text),
+    Column("version", Text),
+    Column("metadata", JSONB, nullable=False),
+    Column("is_active", Boolean, nullable=False),
+    Column(
+        "administrative_unit_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.administrative_units.id"),
+    ),
+    Column("category", Text),
+    Column("content", Text),
+    Column("source_type", Text),
+    Column("storage_bucket", Text),
+    Column("storage_path", Text),
+    Column("is_mandatory", Boolean, nullable=False),
+    Column("processing_status", Text, nullable=False),
+    Column("checksum", Text),
+    Column("failure_message", Text),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+knowledge_chunks = Table(
+    "knowledge_chunks",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "document_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.knowledge_documents.id"),
+        nullable=False,
+    ),
+    Column("chunk_index", Numeric, nullable=False),
+    Column("content", Text, nullable=False),
+    Column("metadata", JSONB, nullable=False),
+    Column("checksum", Text),
+    Column("created_at", DateTime(timezone=True), nullable=False),
 )
 
 report_attachments = Table(

@@ -56,12 +56,8 @@ class TransactionSession:
 
 class FakeRepository:
     def __init__(self):
-        self.category = {
-            "id": UUID("600dc7e0-1cd8-4249-aa22-80a1ad65ee42")
-        }
-        self.citizen = {
-            "id": UUID("5c242fc6-77a8-4fa7-a12f-a67bbc75839b")
-        }
+        self.category = {"id": UUID("600dc7e0-1cd8-4249-aa22-80a1ad65ee42")}
+        self.citizen = {"id": UUID("5c242fc6-77a8-4fa7-a12f-a67bbc75839b")}
         self.report = {
             "id": UUID("72af1a52-7016-48c7-aacc-6c35417be819"),
             "status": "pending_verification",
@@ -521,9 +517,7 @@ def test_phone_number_normalization(raw, expected):
 
 def test_equivalent_phone_formats_produce_same_payload_hash():
     local_payload = valid_payload(sender_phone_number="0812-3456-7890")
-    international_payload = valid_payload(
-        sender_phone_number="+6281234567890"
-    )
+    international_payload = valid_payload(sender_phone_number="+6281234567890")
 
     assert canonical_payload_hash(
         local_payload,

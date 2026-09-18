@@ -22,9 +22,7 @@ class ReportRepository:
         self.session = session
 
     def find_citizen_by_phone(self, phone_number: str) -> RowMapping | None:
-        statement = select(citizens).where(
-            citizens.c.phone_number == phone_number
-        )
+        statement = select(citizens).where(citizens.c.phone_number == phone_number)
         return self.session.execute(statement).mappings().one_or_none()
 
     def get_or_create_citizen(
@@ -62,9 +60,7 @@ class ReportRepository:
         self,
         idempotency_key: UUID,
     ) -> RowMapping | None:
-        statement = select(reports).where(
-            reports.c.idempotency_key == idempotency_key
-        )
+        statement = select(reports).where(reports.c.idempotency_key == idempotency_key)
         return self.session.execute(statement).mappings().one_or_none()
 
     def acquire_idempotency_lock(self, lock_key: int) -> None:
@@ -92,12 +88,15 @@ class ReportRepository:
         urgency: str | None = None,
         category: str | None = None,
         search: str | None = None,
+        unit_ids: tuple[UUID, ...] | None = None,
     ) -> tuple[list[RowMapping], int]:
         report_join = reports.join(
             report_categories,
             report_categories.c.id == reports.c.category_id,
         )
         conditions = []
+        if unit_ids is not None:
+            conditions.append(reports.c.administrative_unit_id.in_(unit_ids))
         if status is not None:
             conditions.append(reports.c.status == status)
         if urgency is not None:
@@ -106,9 +105,7 @@ class ReportRepository:
             conditions.append(report_categories.c.code == category)
         if search:
             escaped_search = (
-                search.replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_")
+                search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             )
             search_pattern = f"%{escaped_search}%"
             conditions.append(
@@ -134,7 +131,9 @@ class ReportRepository:
         total = self.session.execute(count_statement).scalar_one()
         return rows, total
 
-    def get_report_detail(self, report_id: UUID) -> RowMapping | None:
+    def get_report_detail(
+        self, report_id: UUID, unit_ids: tuple[UUID, ...] | None = None
+    ) -> RowMapping | None:
         statement = (
             select(
                 *reports.c,
@@ -151,8 +150,10 @@ class ReportRepository:
                 administrative_units,
                 administrative_units.c.id == reports.c.responsible_unit_id,
             )
-            .where(reports.c.id == report_id)
         )
+        statement = statement.where(reports.c.id == report_id)
+        if unit_ids is not None:
+            statement = statement.where(reports.c.administrative_unit_id.in_(unit_ids))
         return self.session.execute(statement).mappings().one_or_none()
 
     def list_attachments(self, report_id: UUID) -> list[RowMapping]:
@@ -177,12 +178,13 @@ class ReportRepository:
         )
         return list(self.session.execute(statement).mappings().all())
 
-    def lock_report(self, report_id: UUID) -> RowMapping | None:
-        statement = (
-            select(reports)
-            .where(reports.c.id == report_id)
-            .with_for_update()
-        )
+    def lock_report(
+        self, report_id: UUID, unit_ids: tuple[UUID, ...] | None = None
+    ) -> RowMapping | None:
+        statement = select(reports).where(reports.c.id == report_id)
+        if unit_ids is not None:
+            statement = statement.where(reports.c.administrative_unit_id.in_(unit_ids))
+        statement = statement.with_for_update()
         return self.session.execute(statement).mappings().one_or_none()
 
     def update_report(

@@ -25,9 +25,7 @@ def normalize_database_url(url: str) -> str:
 
 
 if not settings.database_url:
-    raise RuntimeError(
-        "DATABASE_URL is not configured."
-    )
+    raise RuntimeError("DATABASE_URL is not configured.")
 
 
 engine = create_engine(

@@ -699,7 +699,32 @@ Jangan mengimplementasikan endpoint tersebut jika menghambat REPORT.
 
 ---
 
-## 17. Breaking Change Rule
+## 17. Production Backend Extensions
+
+All citizen/OpenClaw operations require `X-OpenClaw-API-Key` and
+`X-Channel-Account-ID`. The backend resolves the village from the active
+channel integration; model-generated payloads cannot select a village.
+
+- `POST /api/v1/track` reads only the authenticated sender's `LP-*` or `REQ-*`
+  ticket. Omitting the ticket returns at most five recent owned items.
+- `POST /api/v1/service-requests` creates an idempotent `residency_letter`.
+  Admin list/detail/status routes use the same village scope as REPORT.
+- `/api/v1/knowledge/preview` and `/api/v1/knowledge/documents` support pasted
+  text, Markdown, and PDF up to 10 MB. Files are stored in a private bucket.
+- `/api/v1/tools/knowledge/embedding-jobs` is the OpenClaw embedding boundary.
+  Embeddings contain exactly 768 values and a document becomes `ready` only
+  after every chunk is supplied atomically.
+- `POST /api/v1/ask` performs village-scoped FTS/vector retrieval and returns
+  evidence blocks and source IDs. Gemini response generation remains in
+  OpenClaw.
+
+Admin tokens are accepted only when the Supabase Auth UUID maps to an active
+`admin_accounts` row. `system_admin` is global; `village_admin` is limited by
+`admin_unit_memberships`. Out-of-scope detail/mutation returns `404`.
+
+---
+
+## 18. Breaking Change Rule
 
 Perubahan berikut menaikkan contract minor/breaking baseline dan wajib dikomunikasikan:
 
