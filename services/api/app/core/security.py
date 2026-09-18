@@ -93,6 +93,16 @@ def authenticate_caller(
             if settings.dashboard_admin_unit_id
             else (),
         )
+    if account is None and settings.allow_legacy_admin_fallback:
+        return AuthenticatedCaller(
+            caller_type=CallerType.ADMIN,
+            identifier=f"supabase:{user_id}",
+            administrative_unit_id=settings.dashboard_admin_unit_id,
+            role=AdminRole.VILLAGE_ADMIN,
+            unit_ids=(settings.dashboard_admin_unit_id,)
+            if settings.dashboard_admin_unit_id
+            else (),
+        )
     if account is None or not account["is_active"]:
         raise APIError(
             status_code=403, code="FORBIDDEN", message="Active admin account required"
