@@ -123,3 +123,31 @@ two `verified` reports. Real verification and rejection of separate
 `pending_verification` reports remain open by team decision. Real FastAPI
 `403`, scoped `404`, and frontend failure-state browser checks also remain
 open until each result is observed and recorded.
+
+## REPORT integration recheck after backend readiness merge — 2026-09-18
+
+Commit: `0ae9b9b` (`main`, tested on branch
+`docs/p0-report-integration-recheck`). Environment: local Next.js on port
+3000, local FastAPI on port 8000, development Supabase. Test payloads and
+database records are synthetic. No token or secret is recorded here.
+
+| Check | Source | Observed result |
+|---|---|---|
+| `/health` | Running FastAPI | `200`; the reloaded OpenAPI schema has 16 paths |
+| GET list/detail and PATCH without a session | Running FastAPI | All returned `401 UNAUTHORIZED` |
+| Migration and seed baseline | Development Supabase, read-only query | New admin, membership, channel, and service-request tables exist; three active admins and one active WhatsApp channel |
+| Create REPORT with temporary in-memory OpenClaw key and seeded channel ID | In-process FastAPI `TestClient` + development Supabase | `503 DATABASE_UNAVAILABLE`; no ticket from that API request |
+| Transaction diagnosis | Backend service + development Supabase | `resolve_channel_unit()` starts a session transaction; `create_idempotent_report()` then calls `session.begin()`, raising `InvalidRequestError` wrapped as `ReportPersistenceError` |
+| Service persistence in isolation | Backend service + development Supabase, **bypasses API/channel** | Synthetic ticket `LP-2026-0004` was created as `pending_verification`; this does not prove the citizen flow |
+| Backend pytest / Ruff | Local on commit above | 90 passed, 6 failed; Ruff passed. The six failing tests are in `tests/test_create_report_api.py` and exercise the now-required channel configuration/header and an invalid positional `APIError(...)` call |
+| OpenClaw plugin tests | Local on commit above | 2 passed; plugin request code does not send required `X-Channel-Account-ID` header |
+
+**Open blockers:** Anjar must repair the transaction boundary in REPORT POST,
+the positional `APIError` calls, and update the affected tests. Farel must
+provide the channel account ID from trusted WhatsApp metadata in the OpenClaw
+tool request and test the deployed host. Local FastAPI has no configured
+OpenClaw key, so the live server's authenticated POST and the actual WhatsApp
+channel were not tested here. Human verification/rejection of two tickets,
+reload persistence, scope enforcement, and live fallback remain open.
+Ferdi chose to defer the manual dashboard decisions until the API and
+OpenClaw blockers are corrected; no second synthetic ticket was created.
