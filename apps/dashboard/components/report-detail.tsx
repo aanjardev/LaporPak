@@ -2,12 +2,56 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Clock3, MapPin, UserRound } from "lucide-react";
 import { saveReportDecision } from "@/app/reports/[id]/actions";
 import { categoryLabels, formatLocation, formatReportDate, StatusBadge, statusLabels, urgencyLabels } from "@/components/report-display";
 import { reportStatusActions } from "@/lib/report-status-actions";
-import type { ReportDetail, ReportStatus } from "@/lib/reports";
+import type { ReportAttachment, ReportDetail, ReportStatus } from "@/lib/reports";
+
+function ReportPhoto({ attachment, reportId, ticketNumber, index, isMock }: {
+  attachment: ReportAttachment;
+  reportId: string;
+  ticketNumber: string;
+  index: number;
+  isMock: boolean;
+}) {
+  const [failed, setFailed] = useState(false);
+  const src = `/api/reports/${encodeURIComponent(reportId)}/attachments/${encodeURIComponent(attachment.id)}`;
+  const supported = ["image/jpeg", "image/png", "image/webp"].includes(attachment.mime_type ?? "");
+
+  return (
+    <li className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+      <div className="relative aspect-[4/3] bg-slate-100">
+        {supported && !failed ? (
+          <Image
+            src={src}
+            alt={`Foto lampiran ${index + 1} untuk laporan ${ticketNumber}`}
+            fill
+            unoptimized
+            sizes="(max-width: 640px) 100vw, 50vw"
+            className="object-contain"
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <p role="status" className="flex h-full items-center justify-center px-4 text-center text-sm text-slate-600">
+            Foto belum dapat ditampilkan. Muat ulang halaman untuk mencoba lagi.
+          </p>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+        <span className="min-w-0 break-all text-slate-700">{attachment.file_name || `Foto ${index + 1}`}</span>
+        {supported && !failed && (
+          <a href={src} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-semibold text-sky-800 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">
+            Buka foto
+          </a>
+        )}
+      </div>
+      {isMock && <p className="px-3 pb-3 text-xs text-amber-900">Foto simulasi untuk uji tampilan.</p>}
+    </li>
+  );
+}
 
 export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { initialReport: ReportDetail; actionsEnabled: boolean; isMock: boolean }) {
   const router = useRouter();
@@ -97,9 +141,21 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
                 <div><dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500"><MapPin aria-hidden="true" size={15} /> Lokasi</dt><dd className="mt-2 break-words text-sm font-medium">{formatLocation(report.location)}</dd></div>
                 <div><dt className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500"><UserRound aria-hidden="true" size={15} /> Pelapor</dt><dd className="mt-2 text-sm font-medium">{report.citizen.display_name}</dd></div>
                 <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Unit penanggung jawab</dt><dd className="mt-2 break-words text-sm font-medium">{report.responsible_unit?.name ?? "Belum ditetapkan"}</dd></div>
-                <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lampiran</dt><dd className="mt-2 text-sm font-medium">{report.attachments.length === 0 ? "Belum ada lampiran" : `${report.attachments.length} lampiran`}</dd></div>
+                <div><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Foto laporan</dt><dd className="mt-2 text-sm font-medium">{report.attachments.length === 0 ? "Belum ada foto" : `${report.attachments.length} foto`}</dd></div>
               </dl>
             </div>
+          </section>
+          <section aria-labelledby="foto-laporan" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+            <h2 id="foto-laporan" className="text-lg font-semibold">Foto laporan</h2>
+            {report.attachments.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-600">Belum ada foto pada laporan ini.</p>
+            ) : (
+              <ul className="mt-5 grid gap-4 sm:grid-cols-2">
+                {report.attachments.map((attachment, index) => (
+                  <ReportPhoto key={attachment.id} attachment={attachment} reportId={report.id} ticketNumber={report.ticket_number} index={index} isMock={isMock} />
+                ))}
+              </ul>
+            )}
           </section>
           <section aria-labelledby="riwayat-status" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <h2 id="riwayat-status" className="text-lg font-semibold">Riwayat status</h2>

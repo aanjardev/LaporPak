@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
-import { getReportById, getReports, ReportApiError, updateReportStatus } from "../lib/reports.ts";
+import { getReportAttachment, getReportById, getReports, ReportApiError, updateReportStatus } from "../lib/reports.ts";
 import { reportStatusActions } from "../lib/report-status-actions.ts";
 
 test("mock daftar dan detail mengikuti alur laporan", async () => {
@@ -38,7 +38,69 @@ test("mock daftar dan detail mengikuti alur laporan", async () => {
     id: "b5e83fd3-71e2-4ec3-b432-b7e970b57c6a",
     name: "Unit Infrastruktur Desa",
   });
+  assert.deepEqual(detail?.attachments, [
+    { id: "9a0d1245-4e4e-40be-bbba-000000000001", file_name: "foto-jalan-rusak.png", mime_type: "image/png" },
+    { id: "9a0d1245-4e4e-40be-bbba-000000000002", file_name: "foto-kondisi-sekitar.png", mime_type: "image/png" },
+  ]);
   assert.equal(await getReportById("unknown"), null);
+});
+
+test("lampiran mock hanya ada pada laporan pemiliknya", async () => {
+  const reportId = "72af1a52-7016-48c7-aacc-000000000001";
+  const attachmentId = "9a0d1245-4e4e-40be-bbba-000000000001";
+  const image = await getReportAttachment(reportId, attachmentId, "test-token");
+  assert.equal(image.status, 200);
+  assert.equal(image.headers.get("Content-Type"), "image/png");
+  const imageBytes = Buffer.from(await image.arrayBuffer());
+  assert.equal(imageBytes.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(imageBytes.readUInt32BE(16), 160);
+  assert.equal(imageBytes.readUInt32BE(20), 120);
+  assert.equal((await getReportAttachment("72af1a52-7016-48c7-aacc-000000000002", attachmentId, "test-token")).status, 404);
+  assert.equal((await getReportAttachment(reportId, "9a0d1245-4e4e-40be-bbba-000000000003", "test-token")).status, 404);
+});
+
+test("mode API meneruskan token foto dan membuang path Storage dari detail", async () => {
+  const previousSource = process.env.REPORTS_DATA_SOURCE;
+  const previousUrl = process.env.NEXT_PUBLIC_API_URL;
+  const reportId = "72af1a52-7016-48c7-aacc-000000000001";
+  const attachmentId = "9a0d1245-4e4e-40be-bbba-000000000001";
+  let attachmentStatus = 200;
+  const server = createServer((request, response) => {
+    assert.equal(request.headers.authorization, "Bearer test-token");
+    if (request.url === `/api/v1/reports/${reportId}`) {
+      response.setHeader("Content-Type", "application/json");
+      response.end(JSON.stringify({ attachments: [{ id: attachmentId, file_name: "foto.png", mime_type: "image/png", storage_path: "internal/private/path", storage_bucket: "report-attachments" }] }));
+      return;
+    }
+    assert.equal(request.url, `/api/v1/reports/${reportId}/attachments/${attachmentId}`);
+    if (attachmentStatus !== 200) {
+      response.writeHead(attachmentStatus);
+      response.end();
+      return;
+    }
+    response.setHeader("Content-Type", "image/png");
+    response.end(Buffer.from([137, 80, 78, 71]));
+  });
+  try {
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    process.env.REPORTS_DATA_SOURCE = "api";
+    process.env.NEXT_PUBLIC_API_URL = `http://127.0.0.1:${server.address().port}`;
+    const detail = await getReportById(reportId, "test-token");
+    assert.deepEqual(detail.attachments, [{ id: attachmentId, file_name: "foto.png", mime_type: "image/png" }]);
+    const image = await getReportAttachment(reportId, attachmentId, "test-token");
+    assert.equal(image.status, 200);
+    assert.equal(image.headers.get("Content-Type"), "image/png");
+    for (const status of [401, 403, 404, 503]) {
+      attachmentStatus = status;
+      assert.equal((await getReportAttachment(reportId, attachmentId, "test-token")).status, status);
+    }
+  } finally {
+    if (previousSource === undefined) delete process.env.REPORTS_DATA_SOURCE;
+    else process.env.REPORTS_DATA_SOURCE = previousSource;
+    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = previousUrl;
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 test("mode API meneruskan filter dan access token ke FastAPI", async () => {

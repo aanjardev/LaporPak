@@ -36,6 +36,8 @@ Untuk memeriksa state kosong, error, atau loading pada mode development, set `RE
 
 Pada detail laporan, pilih aksi yang tersedia untuk status saat ini: verifikasi/tolak, mulai penanganan, teruskan, atau selesaikan. Semua tindakan memerlukan alasan. Dalam mode mock, badge dan riwayat berubah selama halaman terbuka; muat ulang untuk kembali ke fixture awal. Pada mode API, dashboard membaca ulang detail resmi setelah PATCH berhasil. Untuk menguji proses lambat atau gagal, set `REPORTS_MOCK_MUTATION_SCENARIO=slow` atau `error` di `.env.local` dan mulai ulang server. Laporan pertama memiliki deskripsi panjang dan ringkasan kosong; laporan kelima memiliki riwayat status panjang. Lokasi mock hanya berupa teks tanpa koordinat.
 
+Detail laporan pertama juga memiliki dua foto sintetis untuk menguji galeri. Foto dibaca melalui route Next.js yang memerlukan sesi petugas; pada mode API route tersebut meneruskan token ke FastAPI. Endpoint foto FastAPI masih berupa [usulan kontrak](../../docs/api-contract.md#usulan-akses-foto-laporan-belum-aktif-menunggu-persetujuan-dan-implementasi-backend) untuk ditinjau Anjar. Sampai endpoint itu tersedia, galeri mode API dapat menampilkan pesan foto belum dapat dimuat. Browser tidak memakai URL bucket privat. Pada layar sempit, foto tersusun satu kolom; petugas dapat membuka gambar lewat tautan **Buka foto**.
+
 Lapisan data berada di `lib/reports.ts`. Set `REPORTS_DATA_SOURCE=api` untuk
 menggunakan GET/detail/PATCH FastAPI. Pemanggilan dilakukan server-side dan
 meneruskan access token Supabase milik sesi petugas; dashboard tidak menyimpan

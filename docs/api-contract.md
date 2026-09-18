@@ -453,6 +453,30 @@ Jika tidak ada:
 404 REPORT_NOT_FOUND
 ```
 
+### Usulan akses foto laporan (belum aktif; menunggu persetujuan dan implementasi backend)
+
+Frontend memerlukan endpoint berikut agar foto dari bucket privat dapat dibaca
+oleh petugas tanpa mengekspos URL atau path Storage ke browser:
+
+```http
+GET /api/v1/reports/{report_id}/attachments/{attachment_id}
+Authorization: Bearer <supabase_access_token>
+```
+
+Respons `200` berisi bytes gambar dengan `Content-Type` `image/jpeg`,
+`image/png`, atau `image/webp` dan `Cache-Control: private, no-store`.
+FastAPI harus memeriksa akun admin, cakupan desa laporan, dan hubungan lampiran
+dengan laporan pada **setiap** permintaan. Gunakan `401 UNAUTHORIZED` untuk
+sesi tidak sah, `403 FORBIDDEN` untuk akun yang tidak berhak memakai dashboard,
+`404 REPORT_NOT_FOUND` untuk laporan/lampiran yang tidak ada atau di luar
+cakupan, dan respons `503` dengan error envelope umum bila layanan gagal.
+
+Saat disepakati, setiap item `attachments` pada detail hanya perlu mengirim
+`id` (UUID), `file_name` (string atau `null`), dan `mime_type` (string atau
+`null`). Jangan kirim `storage_bucket`, `storage_path`, atau URL Storage.
+Frontend saat ini hanya memakai metadata tersebut dan meneruskan token lewat
+route Next.js; foto nyata belum tersedia sampai endpoint FastAPI di atas ada.
+
 ---
 
 ## 9. Update Report Status
