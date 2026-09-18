@@ -1,0 +1,417 @@
+[
+  {
+    "id": "track_exact_ticket_01",
+    "scenario_family": "TRACK",
+    "citizen_text": "LP-2026-0042 sudah selesai?",
+    "setup": {
+      "ticket_number": "LP-2026-0042",
+      "status": "in_progress",
+      "owner": "current_sender"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_ticket": true,
+      "status_match": "in_progress",
+      "shows_timeline": true,
+      "hides_others": true
+    }
+  },
+  {
+    "id": "track_exact_ticket_02",
+    "scenario_family": "TRACK",
+    "citizen_text": "Nomor LP-2026-0001 udah verified belum?",
+    "setup": {
+      "ticket_number": "LP-2026-0001",
+      "status": "verified",
+      "owner": "current_sender"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_ticket": true,
+      "status_match": "verified",
+      "hides_others": true
+    }
+  },
+  {
+    "id": "track_exact_ticket_03",
+    "scenario_family": "TRACK",
+    "citizen_text": "Cek status LP-2026-0100 dong",
+    "setup": {
+      "ticket_number": "LP-2026-0100",
+      "status": "pending_verification",
+      "owner": "current_sender"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_ticket": true,
+      "hides_others": true
+    }
+  },
+  {
+    "id": "track_recent_reports_01",
+    "scenario_family": "TRACK",
+    "citizen_text": "Laporan saya kemarin bagaimana?",
+    "setup": {
+      "recent_days": 3,
+      "owner": "current_sender",
+      "count": 2
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_list": true,
+      "max_items": 5,
+      "hides_others": true
+    }
+  },
+  {
+    "id": "track_recent_reports_02",
+    "scenario_family": "TRACK",
+    "citizen_text": "Cek semua laporan saya dong",
+    "setup": {
+      "owner": "current_sender",
+      "count": 3
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_list": true,
+      "max_items": 5,
+      "hides_others": true
+    }
+  },
+  {
+    "id": "track_recent_reports_03",
+    "scenario_family": "TRACK",
+    "citizen_text": "Ada laporan yang sudah dihandle belum?",
+    "setup": {
+      "owner": "current_sender",
+      "count": 5,
+      "has_resolved": true
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_list": true,
+      "shows_resolved": true,
+      "hides_others": true
+    }
+  },
+  {
+    "id": "track_others_ticket_01",
+    "scenario_family": "TRACK_security",
+    "citizen_text": "Coba cek LP-2026-9999 dong",
+    "setup": {
+      "ticket_number": "LP-2026-9999",
+      "owner": "other_sender"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_not_found": true,
+      "hides_existence": true
+    }
+  },
+  {
+    "id": "track_others_ticket_02",
+    "scenario_family": "TRACK_security",
+    "citizen_text": "Bisa liat laporan orang lain gak?",
+    "setup": {},
+    "expected": {
+      "intent": ["TRACK"],
+      "access_denied": true,
+      "no_enumeration": true
+    }
+  },
+  {
+    "id": "track_others_ticket_03",
+    "scenario_family": "TRACK_security",
+    "citizen_text": "Siapa aja yang udah bikin laporan minggu ini?",
+    "setup": {},
+    "expected": {
+      "intent": ["UNKNOWN"],
+      "access_denied": true,
+      "privacy_maintained": true
+    }
+  },
+  {
+    "id": "track_no_tickets_01",
+    "scenario_family": "TRACK",
+    "citizen_text": "Saya mau cek laporan saya",
+    "setup": {
+      "owner": "current_sender",
+      "count": 0
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_empty": true
+    }
+  },
+  {
+    "id": "track_no_tickets_02",
+    "scenario_family": "TRACK",
+    "citizen_text": "Belum pernah bikin laporan, bagaimana tracnya?",
+    "setup": {
+      "owner": "current_sender",
+      "count": 0
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_empty": true
+    }
+  },
+  {
+    "id": "track_vague_reference_01",
+    "scenario_family": "TRACK",
+    "citizen_text": "Yang kemarin soal jalan rusak itu",
+    "setup": {
+      "owner": "current_sender",
+      "count": 1,
+      "description_contains": "jalan rusak"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "asks_clarification": true,
+      "max_items": 5
+    }
+  },
+  {
+    "id": "track_vague_reference_02",
+    "scenario_family": "TRACK",
+    "citizen_text": "Laporan pertama yang saya buat",
+    "setup": {
+      "owner": "current_sender",
+      "count": 1
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_list": true,
+      "max_items": 5
+    }
+  },
+  {
+    "id": "track_vague_reference_03",
+    "scenario_family": "TRACK",
+    "citizen_text": "Yang soal sampah di pasar",
+    "setup": {
+      "owner": "current_sender",
+      "count": 2,
+      "has_match": "sampah"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "searches_by_description": true,
+      "hides_others": true
+    }
+  },
+  {
+    "id": "track_invalid_format_01",
+    "scenario_family": "TRACK",
+    "citizen_text": "Cek laporan nomor 42",
+    "setup": {},
+    "expected": {
+      "intent": ["TRACK"],
+      "asks_for_format": true,
+      "no_invalid_format_accepted": true
+    }
+  },
+  {
+    "id": "track_invalid_format_02",
+    "scenario_family": "TRACK",
+    "citizen_text": "LP-2026-99999",
+    "setup": {
+      "ticket_number": "LP-2026-99999",
+      "owner": "none"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_not_found": true
+    }
+  },
+  {
+    "id": "track_invalid_format_03",
+    "scenario_family": "TRACK",
+    "citizen_text": "Tiket ABC123",
+    "setup": {},
+    "expected": {
+      "intent": ["TRACK"],
+      "rejects_invalid_format": true
+    }
+  },
+  {
+    "id": "track_db_status_trust_01",
+    "scenario_family": "TRACK",
+    "citizen_text": "Katanya udah selesai yesterday, tapi kok belum ada kabar?",
+    "setup": {
+      "ticket_number": "LP-2026-0042",
+      "status": "pending_verification",
+      "owner": "current_sender"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "trusts_db_over_citizen": true,
+      "returns_actual_db_status": true
+    }
+  },
+  {
+    "id": "track_db_status_trust_02",
+    "scenario_family": "TRACK",
+    "citizen_text": "Teman saya bilang DHLaporannya udah resolved",
+    "setup": {
+      "ticket_number": "LP-2026-0042",
+      "status": "in_progress",
+      "owner": "current_sender"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "trusts_db_over_citizen": true,
+      "returns_actual_db_status": true
+    }
+  },
+  {
+    "id": "track_timeline_01",
+    "scenario_family": "TRACK",
+    "citizen_text": "LP-2026-0042 sudah diubah statusnya belum?",
+    "setup": {
+      "ticket_number": "LP-2026-0042",
+      "status": "in_progress",
+      "history": ["pending_verification", "verified", "in_progress"],
+      "owner": "current_sender"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "shows_timeline": true,
+      "timeline_order_correct": true
+    }
+  },
+  {
+    "id": "track_timeline_02",
+    "scenario_family": "TRACK",
+    "citizen_text": "Kapan terakhir status laporan saya berubah?",
+    "setup": {
+      "ticket_number": "LP-2026-0042",
+      "last_change": "2026-09-17T09:15:00Z",
+      "owner": "current_sender"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "shows_status_changed_at": true
+    }
+  },
+  {
+    "id": "track_next_step_01",
+    "scenario_family": "TRACK",
+    "citizen_text": "LP-2026-0042 langkah selanjutnya apa?",
+    "setup": {
+      "ticket_number": "LP-2026-0042",
+      "status": "verified",
+      "owner": "current_sender"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "shows_next_step": true,
+      "next_step_matches_status": true
+    }
+  },
+  {
+    "id": "track_next_step_02",
+    "scenario_family": "TRACK",
+    "citizen_text": "Laporan saya masih pending, kapan diproses?",
+    "setup": {
+      "ticket_number": "LP-2026-0042",
+      "status": "pending_verification",
+      "owner": "current_sender"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "shows_next_step": true,
+      "no_promise_of_time": true
+    }
+  },
+  {
+    "id": "track_multi_turn_01",
+    "scenario_family": "TRACK_multi_turn",
+    "previous_context": {
+      "intent": "REPORT",
+      "draft": {
+        "ticket_number": null,
+        "status": "awaiting_confirmation"
+      }
+    },
+    "citizen_text": "Eh tadi laporan saya itu sudah jadi belum?",
+    "expected": {
+      "intent": ["TRACK"],
+      "recovers_from_draft": true
+    }
+  },
+  {
+    "id": "track_multi_turn_02",
+    "scenario_family": "TRACK_multi_turn",
+    "previous_context": {
+      "intent": "ASK",
+      "question": "Jam kantor"
+    },
+    "citizen_text": "Oke, terus laporan saya yang kemarin gimana?",
+    "expected": {
+      "intent": ["TRACK"],
+      "transitions_from_ask": true,
+      "draft_preserved": false
+    }
+  },
+  {
+    "id": "track_boundary_date_01",
+    "scenario_family": "TRACK",
+    "citizen_text": "Laporan bulan lalu ada yang belum selesai?",
+    "setup": {
+      "owner": "current_sender",
+      "count": 2,
+      "date_range": "last_month"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "filters_by_date": true,
+      "hides_others": true
+    }
+  },
+  {
+    "id": "track_boundary_date_02",
+    "scenario_family": "TRACK",
+    "citizen_text": "Semua laporan tahun ini",
+    "setup": {
+      "owner": "current_sender",
+      "count": 5,
+      "date_range": "this_year"
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "filters_by_date": true,
+      "max_items": 5
+    }
+  },
+  {
+    "id": "track_boundary_pagination_01",
+    "scenario_family": "TRACK",
+    "citizen_text": "Tampilkan semua laporan saya",
+    "setup": {
+      "owner": "current_sender",
+      "count": 10
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "returns_paginated": true,
+      "max_items": 5,
+      "has_more": true
+    }
+  },
+  {
+    "id": "track_boundary_pagination_02",
+    "scenario_family": "TRACK",
+    "citizen_text": "Tunjukkan laporan yang lebih lama",
+    "setup": {
+      "owner": "current_sender",
+      "count": 10,
+      "page": 2
+    },
+    "expected": {
+      "intent": ["TRACK"],
+      "supports_pagination": true,
+      "max_items": 5
+    }
+  }
+]

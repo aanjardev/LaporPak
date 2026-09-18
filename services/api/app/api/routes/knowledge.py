@@ -15,6 +15,7 @@ from app.schemas.knowledge import (
     EmbeddingFailure,
     EmbeddingJob,
     KnowledgeDocument,
+    KnowledgeDocumentDetail,
     KnowledgeDocumentList,
     KnowledgePreview,
     KnowledgeUpdate,
@@ -95,6 +96,7 @@ async def create_document(
     is_mandatory: Annotated[bool, Form()] = False,
     administrative_unit_id: Annotated[UUID | None, Form()] = None,
     pasted_content: Annotated[str | None, Form()] = None,
+    service_key: Annotated[str | None, Form(pattern=r"^[a-z0-9_-]+$")] = None,
     file: Annotated[UploadFile | None, File()] = None,
 ) -> KnowledgeDocument:
     data, content, source_type = await read_source(file, pasted_content)
@@ -108,6 +110,7 @@ async def create_document(
             source_type=source_type,
             filename=file.filename if file else None,
             data=data,
+            service_key=service_key,
         )
     except ReportPersistenceError as exc:
         raise APIError(
@@ -131,12 +134,12 @@ def list_documents(
         ) from exc
 
 
-@router.get("/documents/{document_id}", response_model=KnowledgeDocument)
+@router.get("/documents/{document_id}", response_model=KnowledgeDocumentDetail)
 def document_detail(
     document_id: UUID,
     caller: AdminCaller,
     session: Annotated[Session, Depends(get_db_session)],
-) -> KnowledgeDocument:
+) -> KnowledgeDocumentDetail:
     try:
         return KnowledgeService(session).detail(document_id, unit_scope(caller))
     except ReportNotFoundError as exc:
@@ -147,13 +150,13 @@ def document_detail(
         ) from exc
 
 
-@router.patch("/documents/{document_id}", response_model=KnowledgeDocument)
+@router.patch("/documents/{document_id}", response_model=KnowledgeDocumentDetail)
 def update_document(
     document_id: UUID,
     payload: KnowledgeUpdate,
     caller: AdminCaller,
     session: Annotated[Session, Depends(get_db_session)],
-) -> KnowledgeDocument:
+) -> KnowledgeDocumentDetail:
     try:
         return KnowledgeService(session).update(
             document_id, payload.model_dump(), unit_scope(caller)
@@ -169,6 +172,28 @@ def update_document(
             status_code=503,
             code="DATABASE_UNAVAILABLE",
             message="Knowledge document could not be updated",
+        ) from exc
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+def deactivate_document(
+    document_id: UUID,
+    caller: AdminCaller,
+    session: Annotated[Session, Depends(get_db_session)],
+) -> None:
+    try:
+        KnowledgeService(session).deactivate(document_id, unit_scope(caller))
+    except ReportNotFoundError as exc:
+        raise APIError(
+            status_code=404,
+            code="NOT_FOUND",
+            message="Knowledge document not found",
+        ) from exc
+    except ReportPersistenceError as exc:
+        raise APIError(
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Knowledge document could not be deactivated",
         ) from exc
 
 

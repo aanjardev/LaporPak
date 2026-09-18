@@ -64,10 +64,40 @@ class CitizenRepository:
     def hybrid_search(
         self,
         question: str,
-        embedding: list[float],
+        embedding: list[float] | None,
         unit_id: UUID,
         service_key: str | None,
     ) -> list[dict]:
+        if embedding is None:
+            return list(
+                self.session.execute(
+                    text("""
+                select d.id document_id, c.id chunk_id, d.title, d.source_url,
+                       c.content
+                from public.knowledge_chunks c
+                join public.knowledge_documents d on d.id=c.document_id
+                where d.administrative_unit_id=:unit
+                  and d.is_active
+                  and d.processing_status in ('pending', 'processing', 'ready')
+                  and coalesce(d.metadata->>'approval_status', 'approved')='approved'
+                  and (:service_key is null or
+                       coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=:service_key)
+                  and c.search_vector @@ websearch_to_tsquery('simple', :question)
+                order by ts_rank_cd(
+                    c.search_vector,
+                    websearch_to_tsquery('simple', :question)
+                ) desc
+                limit 5
+            """),
+                    {
+                        "question": question,
+                        "unit": unit_id,
+                        "service_key": service_key,
+                    },
+                )
+                .mappings()
+                .all()
+            )
         vector = "[" + ",".join(str(value) for value in embedding) + "]"
         return list(
             self.session.execute(
@@ -75,14 +105,18 @@ class CitizenRepository:
             with fts as (
               select c.id, row_number() over(order by ts_rank_cd(c.search_vector, websearch_to_tsquery('simple', :question)) desc) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
-              where d.administrative_unit_id=:unit and d.is_active and d.processing_status='ready'
-                and (:service_key is null or c.metadata->>'service_key'=:service_key)
+              where d.administrative_unit_id=:unit and d.is_active
+                and d.processing_status in ('pending', 'processing', 'ready')
+                and coalesce(d.metadata->>'approval_status', 'approved')='approved'
+                and (:service_key is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=:service_key)
                 and c.search_vector @@ websearch_to_tsquery('simple', :question) limit 20
             ), semantic as (
               select c.id, row_number() over(order by c.embedding <=> cast(:embedding as vector)) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
               where d.administrative_unit_id=:unit and d.is_active and d.processing_status='ready'
-                and c.embedding is not null and (:service_key is null or c.metadata->>'service_key'=:service_key) limit 20
+                and coalesce(d.metadata->>'approval_status', 'approved')='approved'
+                and c.embedding is not null
+                and (:service_key is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=:service_key) limit 20
             ), ranked as (
               select coalesce(f.id,s.id) id, coalesce(1.0/(60+f.rank),0)+coalesce(1.0/(60+s.rank),0) score
               from fts f full join semantic s on s.id=f.id

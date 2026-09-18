@@ -1,7 +1,7 @@
 {
   "id": "laporpak-tools",
   "name": "LaporPak Tools",
-  "description": "Create confirmed LaporPak reports through the FastAPI boundary.",
+  "description": "ASK, REPORT, TRACK, and citizen support tools through the FastAPI boundary.",
   "version": "0.1.0",
   "configSchema": {
     "type": "object",
@@ -13,11 +13,36 @@
   },
   "contracts": {
     "tools": [
-      "laporpak_create_report"
+      "laporpak_create_report",
+      "laporpak_ask",
+      "laporpak_track_report",
+      "laporpak_detect_emergency",
+      "laporpak_check_similar",
+      "laporpak_confirm_resolution"
     ]
   },
   "toolMetadata": {
     "laporpak_create_report": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_ask": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_track_report": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_detect_emergency": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_check_similar": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_confirm_resolution": {
       "optional": true,
       "replaySafe": true
     }

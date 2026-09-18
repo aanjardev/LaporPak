@@ -79,6 +79,14 @@ class ReportRepository:
         )
         return self.session.execute(statement).mappings().one()
 
+    def insert_attachment(self, values: Mapping[str, Any]) -> RowMapping:
+        statement = (
+            insert(report_attachments)
+            .values(**values)
+            .returning(*report_attachments.c)
+        )
+        return self.session.execute(statement).mappings().one()
+
     def list_reports(
         self,
         *,

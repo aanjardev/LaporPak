@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildCreateReportTool } from "./index.js";
+import {
+  buildAskTool,
+  buildConfirmResolutionTool,
+  buildCreateReportTool,
+  buildTrackTool,
+} from "./index.js";
 
 const input = {
-  report_draft_id: "f054d94f-b37d-4dfc-a62b-c48eec95e104",
   category: "infrastructure",
   description: "Jalan di RT 03 rusak parah.",
   location: { text: "RT 03 dekat masjid", latitude: null, longitude: null },
@@ -13,19 +17,33 @@ const input = {
   confidence: 0.94,
   summary: "Kerusakan jalan di RT 03.",
 };
+const testEnv = {
+  LAPORPAK_API_URL: "http://localhost:8000",
+  LAPORPAK_API_KEY: "secret",
+  LAPORPAK_CHANNEL_ACCOUNT_ID: "whatsapp-demo",
+};
+const testAttachments = async () => [
+  {
+    data_base64: Buffer.from("photo").toString("base64"),
+    mime_type: "image/jpeg",
+    filename: "foto_jalan.jpg",
+    size: 5,
+    sourceId: "wa-message-1",
+  },
+];
 
-test("uses trusted channel identity and sends idempotency headers", async () => {
+test("uses trusted identity, media, unit, and a derived idempotency key", async () => {
   let request;
   const fetchImpl = async (url, options) => {
     request = { url: String(url), options };
-    return new Response(
-      JSON.stringify({
+    return Response.json(
+      {
         id: "72af1a52-7016-48c7-aacc-6c35417be819",
         ticket_number: "LP-2026-0001",
         status: "pending_verification",
         created_at: "2026-09-17T05:00:00Z",
-      }),
-      { status: 201, headers: { "Content-Type": "application/json" } },
+      },
+      { status: 201 },
     );
   };
   const tool = buildCreateReportTool(
@@ -35,30 +53,118 @@ test("uses trusted channel identity and sends idempotency headers", async () => 
       sessionId: "c5b17858-4046-4d4f-a718-6ea19c1da781",
     },
     fetchImpl,
-    { LAPORPAK_API_URL: "http://localhost:8000", LAPORPAK_API_KEY: "secret" },
+    testEnv,
+    testAttachments,
   );
 
   const result = await tool.execute("call-1", input);
   const body = JSON.parse(request.options.body);
+  const firstIdempotencyKey = request.options.headers["Idempotency-Key"];
 
   assert.equal(request.url, "http://localhost:8000/api/v1/reports");
-  assert.equal(request.options.headers["Idempotency-Key"], input.report_draft_id);
+  assert.match(firstIdempotencyKey, /^[0-9a-f-]{36}$/);
   assert.equal(request.options.headers["X-OpenClaw-API-Key"], "secret");
+  assert.equal(
+    request.options.headers["X-Channel-Account-ID"],
+    testEnv.LAPORPAK_CHANNEL_ACCOUNT_ID,
+  );
   assert.equal(body.sender_phone_number, "6281234567890");
   assert.equal(body.conversation_id, "c5b17858-4046-4d4f-a718-6ea19c1da781");
+  assert.equal(body.attachments[0].data_base64, Buffer.from("photo").toString("base64"));
+  assert.equal("sourceId" in body.attachments[0], false);
   assert.equal(result.details.ticket_number, "LP-2026-0001");
-  assert.equal(result.details.replayed, false);
+
+  await tool.execute("call-1-retry", {
+    ...input,
+    location: { longitude: null, text: "RT 03 dekat masjid", latitude: null },
+  });
+  assert.equal(request.options.headers["Idempotency-Key"], firstIdempotencyKey);
 });
 
 test("rejects calls without authenticated WhatsApp context", async () => {
   const tool = buildCreateReportTool(
     { messageChannel: "webchat", requesterSenderId: "6281234567890" },
     async () => assert.fail("fetch should not run"),
-    { LAPORPAK_API_URL: "http://localhost:8000", LAPORPAK_API_KEY: "secret" },
+    testEnv,
+    testAttachments,
   );
 
   await assert.rejects(
     tool.execute("call-2", input),
     /requires an authenticated WhatsApp sender/,
   );
+});
+
+test("rejects calls without trusted inbound media", async () => {
+  const tool = buildCreateReportTool(
+    { messageChannel: "whatsapp", requesterSenderId: "6281234567890" },
+    async () => assert.fail("fetch should not run"),
+    testEnv,
+    async () => [],
+  );
+
+  await assert.rejects(
+    tool.execute("call-3", input),
+    /No trusted WhatsApp photo is available/,
+  );
+});
+
+test("ASK returns approved knowledge payload", async () => {
+  let body;
+  const tool = buildAskTool(
+    { messageChannel: "whatsapp", requesterSenderId: "6281234567890" },
+    async (_url, options) => {
+      body = JSON.parse(options.body);
+      return Response.json({
+        outcome: "answered",
+        answer_blocks: ["SIMULASI: Kantor buka Senin-Jumat."],
+        sources: [],
+      });
+    },
+    testEnv,
+  );
+
+  const result = await tool.execute("call-4", { question: "Kapan kantor buka?" });
+  assert.equal(body.question, "Kapan kantor buka?");
+  assert.equal(result.details.outcome, "answered");
+});
+
+test("TRACK injects trusted sender identity", async () => {
+  let body;
+  const tool = buildTrackTool(
+    { messageChannel: "whatsapp", requesterSenderId: "6281234567890" },
+    async (_url, options) => {
+      body = JSON.parse(options.body);
+      return Response.json({ items: [], checked_at: "2026-09-17T05:00:00Z" });
+    },
+    testEnv,
+  );
+
+  await tool.execute("call-5", { ticket_number: "LP-2026-0001" });
+  assert.equal(body.sender_phone_number, "6281234567890");
+  assert.equal(body.ticket_number, "LP-2026-0001");
+});
+
+test("resolution confirmation injects trusted sender identity", async () => {
+  let body;
+  const tool = buildConfirmResolutionTool(
+    { messageChannel: "whatsapp", requesterSenderId: "6281234567890" },
+    async (_url, options) => {
+      body = JSON.parse(options.body);
+      return Response.json({
+        ticket_number: "LP-2026-0001",
+        status: "confirmed",
+      });
+    },
+    testEnv,
+  );
+
+  await tool.execute("call-6", {
+    ticket_number: "LP-2026-0001",
+    confirmed: true,
+    feedback: "Sudah selesai",
+  });
+
+  assert.equal(body.sender_phone_number, "6281234567890");
+  assert.equal(body.confirmed, true);
 });

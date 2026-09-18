@@ -4,6 +4,14 @@
 
 **/.env*
 
+# ========================================
+# OpenClaw workspace (session/memory files)
+# ========================================
+# Izinkan file policy yang version-controlled
+integrations/openclaw/workspace/memory/
+integrations/openclaw/workspace/*.session.*
+integrations/openclaw/workspace/DREAMS.md
+
 !**/.env.example
 
 
@@ -50,3 +58,9 @@ Thumbs.db
 
 *.log
 npm-debug.log*
+
+# Generated AI evaluation reports
+integrations/openclaw/eval-results.json
+integrations/openclaw/evals/eval-results.json
+integrations/openclaw/evals/gap-analysis.json
+integrations/openclaw/evals/test-report.html
