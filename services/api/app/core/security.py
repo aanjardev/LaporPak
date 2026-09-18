@@ -76,8 +76,46 @@ def authenticate_caller(
             .mappings()
             .one_or_none()
         )
+        if account is None and settings.allow_legacy_admin_fallback:
+            return AuthenticatedCaller(
+                caller_type=CallerType.ADMIN,
+                identifier=f"supabase:{user_id}",
+                administrative_unit_id=settings.dashboard_admin_unit_id,
+                role=AdminRole.VILLAGE_ADMIN,
+                unit_ids=(settings.dashboard_admin_unit_id,)
+                if settings.dashboard_admin_unit_id
+                else (),
+            )
+        if account is None or not account["is_active"]:
+            raise APIError(
+                status_code=403,
+                code="FORBIDDEN",
+                message="Active admin account required",
+            )
+        units = tuple(
+            session.execute(
+                select(admin_unit_memberships.c.administrative_unit_id).where(
+                    admin_unit_memberships.c.admin_account_id == account["id"]
+                )
+            )
+            .scalars()
+            .all()
+        )
+        role = AdminRole(account["role"])
+        if role is AdminRole.VILLAGE_ADMIN and not units:
+            raise APIError(
+                status_code=403,
+                code="FORBIDDEN",
+                message="Admin has no village access",
+            )
+        return AuthenticatedCaller(
+            caller_type=CallerType.ADMIN,
+            identifier=f"supabase:{user_id}",
+            admin_account_id=account["id"],
+            role=role,
+            unit_ids=units,
+        )
     except SQLAlchemyError as exc:
-        session.rollback()
         if not settings.allow_legacy_admin_fallback:
             raise APIError(
                 status_code=503,
@@ -93,41 +131,11 @@ def authenticate_caller(
             if settings.dashboard_admin_unit_id
             else (),
         )
-    if account is None and settings.allow_legacy_admin_fallback:
-        return AuthenticatedCaller(
-            caller_type=CallerType.ADMIN,
-            identifier=f"supabase:{user_id}",
-            administrative_unit_id=settings.dashboard_admin_unit_id,
-            role=AdminRole.VILLAGE_ADMIN,
-            unit_ids=(settings.dashboard_admin_unit_id,)
-            if settings.dashboard_admin_unit_id
-            else (),
-        )
-    if account is None or not account["is_active"]:
-        raise APIError(
-            status_code=403, code="FORBIDDEN", message="Active admin account required"
-        )
-    units = tuple(
-        session.execute(
-            select(admin_unit_memberships.c.administrative_unit_id).where(
-                admin_unit_memberships.c.admin_account_id == account["id"]
-            )
-        )
-        .scalars()
-        .all()
-    )
-    role = AdminRole(account["role"])
-    if role is AdminRole.VILLAGE_ADMIN and not units:
-        raise APIError(
-            status_code=403, code="FORBIDDEN", message="Admin has no village access"
-        )
-    return AuthenticatedCaller(
-        caller_type=CallerType.ADMIN,
-        identifier=f"supabase:{user_id}",
-        admin_account_id=account["id"],
-        role=role,
-        unit_ids=units,
-    )
+    finally:
+        # Authentication reads use the request-scoped session and therefore
+        # autobegin a transaction. End it before a downstream write service
+        # opens its own explicit atomic transaction on the same session.
+        session.rollback()
 
 
 def verify_supabase_access_token(access_token: str) -> UUID:
@@ -215,13 +223,25 @@ AdminCaller = Annotated[AuthenticatedCaller, Depends(require_admin)]
 
 
 def resolve_channel_unit(session: Session, external_account_id: str) -> UUID:
-    row = session.execute(
-        select(channel_integrations.c.administrative_unit_id).where(
-            channel_integrations.c.channel == "whatsapp",
-            channel_integrations.c.external_account_id == external_account_id,
-            channel_integrations.c.is_active.is_(True),
-        )
-    ).scalar_one_or_none()
+    try:
+        row = session.execute(
+            select(channel_integrations.c.administrative_unit_id).where(
+                channel_integrations.c.channel == "whatsapp",
+                channel_integrations.c.external_account_id == external_account_id,
+                channel_integrations.c.is_active.is_(True),
+            )
+        ).scalar_one_or_none()
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise APIError(
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Channel authorization is unavailable",
+        ) from exc
+
+    # End the implicit read transaction before a write service starts its
+    # explicit atomic transaction on the same request-scoped session.
+    session.rollback()
     if row is None:
         raise APIError(
             status_code=403, code="FORBIDDEN", message="Channel is not authorized"

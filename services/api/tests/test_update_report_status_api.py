@@ -1,13 +1,16 @@
 from datetime import UTC, datetime
+from typing import Annotated
 from uuid import UUID
 
 import pytest
+from fastapi import Depends
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from app.core import security
 from app.core.config import settings
 from app.core.errors import APIError
+from app.db.session import get_db_session
 from app.main import app
 from app.schemas.reports import ReportStatusUpdateResponse
 from app.services.dependencies import get_report_service
@@ -88,6 +91,95 @@ def test_update_status_returns_contract_response_and_admin_actor(auth_tokens):
     assert call["new_status"].value == "verified"
     assert call["reason"] == "Sudah diperiksa."
     assert call["actor_identifier"] == "supabase:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+
+
+def test_authenticated_patch_ends_auth_transaction_before_write(monkeypatch):
+    admin_id = UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+    unit_id = UUID("00000000-0000-4000-8000-000000000002")
+
+    class Result:
+        def __init__(self, value):
+            self.value = value
+
+        def mappings(self):
+            return self
+
+        def one_or_none(self):
+            return self.value
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return self.value
+
+    class SharedSession:
+        def __init__(self):
+            self.results = [
+                Result(
+                    {
+                        "id": admin_id,
+                        "is_active": True,
+                        "role": "village_admin",
+                    }
+                ),
+                Result([unit_id]),
+            ]
+            self.transaction_active = False
+            self.rollback_count = 0
+
+        def execute(self, _statement):
+            self.transaction_active = True
+            return self.results.pop(0)
+
+        def rollback(self):
+            self.transaction_active = False
+            self.rollback_count += 1
+
+        def close(self):
+            pass
+
+    session = SharedSession()
+    service = FakeStatusService()
+    original_update = service.update_report_status
+
+    def update_report_status(**parameters):
+        assert session.transaction_active is False
+        return original_update(**parameters)
+
+    service.update_report_status = update_report_status
+    monkeypatch.setattr(settings, "allow_legacy_admin_fallback", False)
+    monkeypatch.setattr(
+        security,
+        "verify_supabase_access_token",
+        lambda _token: UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+    )
+
+    def override_session():
+        yield session
+
+    def override_service(
+        db_session: Annotated[object, Depends(get_db_session)],
+    ):
+        assert db_session is session
+        return service
+
+    app.dependency_overrides[get_db_session] = override_session
+    app.dependency_overrides[get_report_service] = override_service
+    client = TestClient(app)
+
+    response = client.patch(
+        f"/api/v1/reports/{REPORT_ID}/status",
+        headers=headers(),
+        json={"status": "verified", "reason": "Sudah diperiksa."},
+    )
+
+    assert response.status_code == 200
+    assert session.rollback_count == 1
+    assert service.calls[0]["unit_ids"] == (unit_id,)
+    assert service.calls[0]["actor_identifier"] == (
+        "supabase:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    )
 
 
 def test_update_status_requires_admin_and_valid_request(auth_tokens):
