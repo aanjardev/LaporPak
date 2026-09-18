@@ -17,6 +17,16 @@ export type KnowledgeDocumentDetail = KnowledgeDocument & {
   service_key: string | null;
 };
 
+export class KnowledgeApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super("Knowledge API request failed");
+    this.name = "KnowledgeApiError";
+    this.status = status;
+  }
+}
+
 function endpoint(path: string) {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
   if (!baseUrl) throw new Error("NEXT_PUBLIC_API_URL is not configured");
@@ -32,7 +42,7 @@ async function request<T>(path: string, token: string, init?: RequestInit): Prom
       Authorization: `Bearer ${token}`,
     },
   });
-  if (!response.ok) throw new Error(`Knowledge API failed (${response.status})`);
+  if (!response.ok) throw new KnowledgeApiError(response.status);
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
