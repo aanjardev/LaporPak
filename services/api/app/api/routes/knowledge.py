@@ -29,7 +29,11 @@ tools_router = APIRouter(prefix="/api/v1/tools/knowledge", tags=["Knowledge tool
 async def read_source(file: UploadFile | None, pasted_content: str | None):
     data = await file.read() if file else None
     if data is not None and len(data) > settings.knowledge_max_upload_bytes:
-        raise APIError(413, "VALIDATION_ERROR", "Knowledge file exceeds 10 MB")
+        raise APIError(
+            status_code=413,
+            code="VALIDATION_ERROR",
+            message="Knowledge file exceeds 10 MB",
+        )
     try:
         content, source_type = extract_content(
             data,
@@ -38,7 +42,9 @@ async def read_source(file: UploadFile | None, pasted_content: str | None):
             file.content_type if file else None,
         )
     except (ValueError, UnicodeError) as exc:
-        raise APIError(422, "VALIDATION_ERROR", str(exc)) from exc
+        raise APIError(
+            status_code=422, code="VALIDATION_ERROR", message=str(exc)
+        ) from exc
     return data, content, source_type
 
 
@@ -50,13 +56,17 @@ def choose_unit(caller, requested: UUID | None) -> UUID:
     if caller.role is AdminRole.SYSTEM_ADMIN:
         if requested is None:
             raise APIError(
-                422,
-                "VALIDATION_ERROR",
-                "administrative_unit_id is required for system admin",
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="administrative_unit_id is required for system admin",
             )
         return requested
     if requested is not None and requested not in caller.unit_ids:
-        raise APIError(403, "FORBIDDEN", "Village is outside admin scope")
+        raise APIError(
+            status_code=403,
+            code="FORBIDDEN",
+            message="Village is outside admin scope",
+        )
     return requested or caller.unit_ids[0]
 
 
@@ -101,7 +111,9 @@ async def create_document(
         )
     except ReportPersistenceError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Knowledge document could not be stored"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Knowledge document could not be stored",
         ) from exc
 
 
@@ -113,7 +125,9 @@ def list_documents(
         return KnowledgeService(session).list(unit_scope(caller))
     except ReportPersistenceError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Knowledge documents could not be loaded"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Knowledge documents could not be loaded",
         ) from exc
 
 
@@ -126,7 +140,11 @@ def document_detail(
     try:
         return KnowledgeService(session).detail(document_id, unit_scope(caller))
     except ReportNotFoundError as exc:
-        raise APIError(404, "NOT_FOUND", "Knowledge document not found") from exc
+        raise APIError(
+            status_code=404,
+            code="NOT_FOUND",
+            message="Knowledge document not found",
+        ) from exc
 
 
 @router.patch("/documents/{document_id}", response_model=KnowledgeDocument)
@@ -141,10 +159,16 @@ def update_document(
             document_id, payload.model_dump(), unit_scope(caller)
         )
     except ReportNotFoundError as exc:
-        raise APIError(404, "NOT_FOUND", "Knowledge document not found") from exc
+        raise APIError(
+            status_code=404,
+            code="NOT_FOUND",
+            message="Knowledge document not found",
+        ) from exc
     except ReportPersistenceError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Knowledge document could not be updated"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Knowledge document could not be updated",
         ) from exc
 
 
@@ -184,7 +208,9 @@ def embedding_job(
             return EmbeddingJob(document_id=document["id"], chunks=list(chunks))
     except SQLAlchemyError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Embedding job is unavailable"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Embedding job is unavailable",
         ) from exc
 
 
@@ -210,9 +236,9 @@ def complete_embedding(
             supplied = {item.chunk_id for item in payload.embeddings}
             if not expected or supplied != expected:
                 raise APIError(
-                    422,
-                    "VALIDATION_ERROR",
-                    "Embeddings must cover every document chunk exactly once",
+                    status_code=422,
+                    code="VALIDATION_ERROR",
+                    message="Embeddings must cover every document chunk exactly once",
                 )
             for item in payload.embeddings:
                 vector = "[" + ",".join(str(value) for value in item.embedding) + "]"
@@ -233,7 +259,9 @@ def complete_embedding(
         raise
     except SQLAlchemyError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Embeddings could not be stored"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Embeddings could not be stored",
         ) from exc
 
 
@@ -253,11 +281,17 @@ def fail_embedding(
                 {"id": document_id, "message": payload.message},
             )
             if result.rowcount == 0:
-                raise APIError(404, "NOT_FOUND", "Knowledge document not found")
+                raise APIError(
+                    status_code=404,
+                    code="NOT_FOUND",
+                    message="Knowledge document not found",
+                )
         return {"document_id": document_id, "processing_status": "failed"}
     except APIError:
         raise
     except SQLAlchemyError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Embedding failure could not be stored"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Embedding failure could not be stored",
         ) from exc

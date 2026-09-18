@@ -215,13 +215,25 @@ AdminCaller = Annotated[AuthenticatedCaller, Depends(require_admin)]
 
 
 def resolve_channel_unit(session: Session, external_account_id: str) -> UUID:
-    row = session.execute(
-        select(channel_integrations.c.administrative_unit_id).where(
-            channel_integrations.c.channel == "whatsapp",
-            channel_integrations.c.external_account_id == external_account_id,
-            channel_integrations.c.is_active.is_(True),
-        )
-    ).scalar_one_or_none()
+    try:
+        row = session.execute(
+            select(channel_integrations.c.administrative_unit_id).where(
+                channel_integrations.c.channel == "whatsapp",
+                channel_integrations.c.external_account_id == external_account_id,
+                channel_integrations.c.is_active.is_(True),
+            )
+        ).scalar_one_or_none()
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise APIError(
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Channel authorization is unavailable",
+        ) from exc
+
+    # End the implicit read transaction before a write service starts its
+    # explicit atomic transaction on the same request-scoped session.
+    session.rollback()
     if row is None:
         raise APIError(
             status_code=403, code="FORBIDDEN", message="Channel is not authorized"

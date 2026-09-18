@@ -48,19 +48,27 @@ def create(
         return result.item
     except InvalidSenderIdentityError as exc:
         raise APIError(
-            422, "VALIDATION_ERROR", "Sender phone number is invalid"
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Sender phone number is invalid",
         ) from exc
     except DuplicateOperationError as exc:
         raise APIError(
-            409, "DUPLICATE_OPERATION", "Idempotency key was used for another payload"
+            status_code=409,
+            code="DUPLICATE_OPERATION",
+            message="Idempotency key was used for another payload",
         ) from exc
     except ReportNotFoundError as exc:
         raise APIError(
-            422, "VALIDATION_ERROR", "Service request type is unavailable"
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Service request type is unavailable",
         ) from exc
     except ReportPersistenceError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Service request could not be persisted"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Service request could not be persisted",
         ) from exc
 
 
@@ -79,7 +87,9 @@ def list_requests(
         return ServiceRequestService(session).list(page, page_size, scope(caller))
     except ReportPersistenceError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Service requests could not be loaded"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Service requests could not be loaded",
         ) from exc
 
 
@@ -92,10 +102,16 @@ def detail(
     try:
         return ServiceRequestService(session).detail(request_id, scope(caller))
     except ReportNotFoundError as exc:
-        raise APIError(404, "NOT_FOUND", "Service request not found") from exc
+        raise APIError(
+            status_code=404,
+            code="NOT_FOUND",
+            message="Service request not found",
+        ) from exc
     except ReportPersistenceError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Service request could not be loaded"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Service request could not be loaded",
         ) from exc
 
 
@@ -111,14 +127,20 @@ def update_status(
             request_id, payload.status, payload.reason, caller.identifier, scope(caller)
         )
     except ReportNotFoundError as exc:
-        raise APIError(404, "NOT_FOUND", "Service request not found") from exc
+        raise APIError(
+            status_code=404,
+            code="NOT_FOUND",
+            message="Service request not found",
+        ) from exc
     except InvalidStatusTransitionError as exc:
         raise APIError(
-            409,
-            "INVALID_STATUS_TRANSITION",
-            "Service request transition is not allowed",
+            status_code=409,
+            code="INVALID_STATUS_TRANSITION",
+            message="Service request transition is not allowed",
         ) from exc
     except ReportPersistenceError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Service request could not be updated"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Service request could not be updated",
         ) from exc

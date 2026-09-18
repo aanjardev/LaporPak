@@ -67,9 +67,17 @@ def create_report(
             else settings.dashboard_admin_unit_id
         )
         if channel_account_id is None and not settings.allow_legacy_admin_fallback:
-            raise APIError(422, "VALIDATION_ERROR", "X-Channel-Account-ID is required")
+            raise APIError(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="X-Channel-Account-ID is required",
+            )
         if unit_id is None:
-            raise APIError(422, "VALIDATION_ERROR", "X-Channel-Account-ID is required")
+            raise APIError(
+                status_code=422,
+                code="VALIDATION_ERROR",
+                message="X-Channel-Account-ID is required",
+            )
         create_arguments = {"payload": payload, "idempotency_key": idempotency_key}
         if channel_account_id:
             create_arguments["administrative_unit_id"] = unit_id

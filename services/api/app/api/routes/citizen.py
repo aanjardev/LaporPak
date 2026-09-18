@@ -32,12 +32,20 @@ def track(
         )
     except InvalidSenderIdentityError as exc:
         raise APIError(
-            422, "VALIDATION_ERROR", "Sender phone number is invalid"
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Sender phone number is invalid",
         ) from exc
     except ReportNotFoundError as exc:
-        raise APIError(404, "NOT_FOUND", "Ticket not found") from exc
+        raise APIError(
+            status_code=404, code="NOT_FOUND", message="Ticket not found"
+        ) from exc
     except ReportPersistenceError as exc:
-        raise APIError(503, "DATABASE_UNAVAILABLE", "Tracking is unavailable") from exc
+        raise APIError(
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Tracking is unavailable",
+        ) from exc
 
 
 @router.post("/ask", response_model=AskResponse)
@@ -53,5 +61,7 @@ def ask(
         )
     except ReportPersistenceError as exc:
         raise APIError(
-            503, "DATABASE_UNAVAILABLE", "Knowledge search is unavailable"
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Knowledge search is unavailable",
         ) from exc
