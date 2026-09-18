@@ -29,6 +29,7 @@ from app.services.dependencies import ReportServiceDependency
 from app.services.exceptions import (
     CategoryNotFoundError,
     DuplicateOperationError,
+    InvalidAttachmentError,
     InvalidSenderIdentityError,
     InvalidStatusTransitionError,
     ReportNotFoundError,
@@ -93,6 +94,12 @@ def create_report(
             status_code=422,
             code="VALIDATION_ERROR",
             message="Report category is not available",
+        ) from exc
+    except InvalidAttachmentError as exc:
+        raise APIError(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message=exc.message,
         ) from exc
     except DuplicateOperationError as exc:
         raise APIError(

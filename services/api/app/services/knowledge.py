@@ -1,5 +1,6 @@
 import hashlib
 import io
+import json
 import re
 from uuid import UUID
 
@@ -10,7 +11,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.schemas.knowledge import KnowledgeDocument, KnowledgeDocumentList
+from app.schemas.knowledge import (
+    KnowledgeDocument,
+    KnowledgeDocumentDetail,
+    KnowledgeDocumentList,
+)
 from app.services.exceptions import ReportNotFoundError, ReportPersistenceError
 
 
@@ -78,6 +83,18 @@ class KnowledgeService:
             {field: row[field] for field in KnowledgeDocument.model_fields}
         )
 
+    @staticmethod
+    def _detail_model(row) -> KnowledgeDocumentDetail:
+        metadata = row["metadata"] or {}
+        return KnowledgeDocumentDetail(
+            **{
+                field: row[field]
+                for field in KnowledgeDocument.model_fields
+            },
+            content=row["content"] or "",
+            service_key=metadata.get("service_key"),
+        )
+
     def create(
         self,
         *,
@@ -89,6 +106,7 @@ class KnowledgeService:
         source_type: str,
         filename: str | None,
         data: bytes | None,
+        service_key: str | None = None,
     ) -> KnowledgeDocument:
         chunks = chunk_content(content)
         checksum = hashlib.sha256(content.encode()).hexdigest()
@@ -104,7 +122,7 @@ class KnowledgeService:
                     (title, document_type, source_name, metadata, is_active, administrative_unit_id,
                      category, content, source_type, storage_bucket, storage_path, is_mandatory,
                      processing_status, checksum)
-                    values (:title,:source_type,:filename,'{"approval_status":"approved"}'::jsonb,true,:unit,
+                    values (:title,:source_type,:filename,cast(:metadata as jsonb),true,:unit,
                             :category,:content,:source_type,:bucket,:path,:mandatory,'pending',:checksum)
                     returning *
                 """),
@@ -112,6 +130,16 @@ class KnowledgeService:
                             "title": title,
                             "source_type": source_type,
                             "filename": filename,
+                            "metadata": json.dumps(
+                                {
+                                    "approval_status": "approved",
+                                    **(
+                                        {"service_key": service_key}
+                                        if service_key
+                                        else {}
+                                    ),
+                                }
+                            ),
                             "unit": unit_id,
                             "category": category,
                             "content": content,
@@ -130,11 +158,14 @@ class KnowledgeService:
                     self.session.execute(
                         text("""insert into public.knowledge_chunks
                         (document_id,chunk_index,content,metadata,checksum)
-                        values (:document,:index,:content,'{}'::jsonb,:checksum)"""),
+                        values (:document,:index,:content,cast(:metadata as jsonb),:checksum)"""),
                         {
                             "document": document["id"],
                             "index": index,
                             "content": chunk,
+                            "metadata": json.dumps(
+                                {"service_key": service_key} if service_key else {}
+                            ),
                             "checksum": hashlib.sha256(chunk.encode()).hexdigest(),
                         },
                     )
@@ -181,7 +212,11 @@ class KnowledgeService:
         except SQLAlchemyError as exc:
             raise ReportPersistenceError("knowledge list") from exc
 
-    def detail(self, document_id: UUID, unit_ids: tuple[UUID, ...] | None):
+    def detail(
+        self,
+        document_id: UUID,
+        unit_ids: tuple[UUID, ...] | None,
+    ) -> KnowledgeDocumentDetail:
         condition = (
             "" if unit_ids is None else "and administrative_unit_id = any(:units)"
         )
@@ -197,7 +232,7 @@ class KnowledgeService:
         )
         if row is None:
             raise ReportNotFoundError(document_id)
-        return self._model(row)
+        return self._detail_model(row)
 
     def update(
         self, document_id: UUID, values: dict, unit_ids: tuple[UUID, ...] | None
@@ -205,7 +240,92 @@ class KnowledgeService:
         allowed = {key: value for key, value in values.items() if value is not None}
         if not allowed:
             return self.detail(document_id, unit_ids)
-        assignments = ",".join(f"{key}=:{key}" for key in allowed)
+        content = allowed.pop("content", None)
+        service_key = allowed.pop("service_key", None)
+        assignments = [f"{key}=:{key}" for key in allowed]
+        if content is not None:
+            allowed["content"] = content.strip()
+            allowed["checksum"] = hashlib.sha256(content.strip().encode()).hexdigest()
+            assignments.extend(
+                [
+                    "content=:content",
+                    "checksum=:checksum",
+                    "processing_status='pending'",
+                    "failure_message=null",
+                ]
+            )
+        if service_key is not None:
+            allowed["service_key"] = service_key
+            assignments.append(
+                "metadata=jsonb_set(metadata, '{service_key}', to_jsonb(cast(:service_key as text)), true)"
+            )
+        condition = (
+            "" if unit_ids is None else "and administrative_unit_id = any(:units)"
+        )
+        try:
+            with self.session.begin():
+                if not assignments:
+                    return self.detail(document_id, unit_ids)
+                result = self.session.execute(
+                    text(
+                        f"update public.knowledge_documents set {','.join(assignments)}, updated_at=now() where id=:id {condition}"
+                    ),
+                    {**allowed, "id": document_id, "units": list(unit_ids or [])},
+                )
+                if result.rowcount == 0:
+                    raise ReportNotFoundError(document_id)
+                if content is not None:
+                    self.session.execute(
+                        text(
+                            "delete from public.knowledge_chunks where document_id=:id"
+                        ),
+                        {"id": document_id},
+                    )
+                    for index, chunk in enumerate(chunk_content(content.strip())):
+                        self.session.execute(
+                            text("""
+                                insert into public.knowledge_chunks
+                                    (document_id, chunk_index, content, metadata, checksum)
+                                values
+                                    (:document, :index, :content, cast(:metadata as jsonb), :checksum)
+                            """),
+                            {
+                                "document": document_id,
+                                "index": index,
+                                "content": chunk,
+                                "metadata": json.dumps(
+                                    {"service_key": service_key}
+                                    if service_key
+                                    else {}
+                                ),
+                                "checksum": hashlib.sha256(chunk.encode()).hexdigest(),
+                            },
+                        )
+                elif service_key is not None:
+                    self.session.execute(
+                        text("""
+                            update public.knowledge_chunks
+                            set metadata=jsonb_set(
+                                metadata,
+                                '{service_key}',
+                                to_jsonb(cast(:service_key as text)),
+                                true
+                            )
+                            where document_id=:id
+                        """),
+                        {"id": document_id, "service_key": service_key},
+                    )
+            return self.detail(document_id, unit_ids)
+        except ReportNotFoundError:
+            raise
+        except SQLAlchemyError as exc:
+            raise ReportPersistenceError("knowledge update") from exc
+
+    def deactivate(
+        self,
+        document_id: UUID,
+        unit_ids: tuple[UUID, ...] | None,
+    ) -> None:
         condition = (
             "" if unit_ids is None else "and administrative_unit_id = any(:units)"
         )
@@ -213,14 +333,13 @@ class KnowledgeService:
             with self.session.begin():
                 result = self.session.execute(
                     text(
-                        f"update public.knowledge_documents set {assignments}, updated_at=now() where id=:id {condition}"
+                        f"update public.knowledge_documents set is_active=false, updated_at=now() where id=:id {condition}"
                     ),
-                    {**allowed, "id": document_id, "units": list(unit_ids or [])},
+                    {"id": document_id, "units": list(unit_ids or [])},
                 )
                 if result.rowcount == 0:
                     raise ReportNotFoundError(document_id)
-            return self.detail(document_id, unit_ids)
         except ReportNotFoundError:
             raise
         except SQLAlchemyError as exc:
-            raise ReportPersistenceError("knowledge update") from exc
+            raise ReportPersistenceError("knowledge deactivation") from exc

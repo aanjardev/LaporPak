@@ -60,6 +60,14 @@ def valid_payload():
             "confidence": 0.94,
             "summary": "Kerusakan jalan di RT 03 dekat masjid.",
         },
+        "attachments": [
+            {
+                "data_base64": "/9j/AA==",
+                "mime_type": "image/jpeg",
+                "filename": "jalan.jpg",
+                "size": 4,
+            }
+        ],
     }
 
 
@@ -67,6 +75,11 @@ def valid_payload():
 def auth_tokens(monkeypatch):
     monkeypatch.setattr(settings, "allow_legacy_admin_fallback", True)
     monkeypatch.setattr(settings, "openclaw_api_key", SecretStr("openclaw-token"))
+    monkeypatch.setattr(
+        settings,
+        "dashboard_admin_unit_id",
+        UUID("00000000-0000-4000-8000-000000000002"),
+    )
 
 
 def request_headers(token="openclaw-token", include_idempotency=True):

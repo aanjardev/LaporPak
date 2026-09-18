@@ -24,6 +24,14 @@ from app.services.reports import (
 )
 
 
+@pytest.fixture(autouse=True)
+def stub_attachment_upload(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.reports.upload_report_attachment",
+        lambda report_id, data, mime_type: f"{report_id}/photo.jpg",
+    )
+
+
 class Transaction(AbstractContextManager):
     def __init__(self, session):
         self.session = session
@@ -82,6 +90,7 @@ class FakeRepository:
         }
         self.inserted_report = None
         self.inserted_history = None
+        self.inserted_attachment = None
         self.locked_report = {"id": "report-id", "status": "pending_verification"}
         self.updated_report = None
         self.existing_report = None
@@ -108,6 +117,10 @@ class FakeRepository:
 
     def insert_status_history(self, values):
         self.inserted_history = values
+        return values
+
+    def insert_attachment(self, values):
+        self.inserted_attachment = values
         return values
 
     def lock_report(self, report_id):
@@ -160,6 +173,14 @@ def valid_payload(**overrides):
             "confidence": 0.94,
             "summary": "Kerusakan jalan di RT 03.",
         },
+        "attachments": [
+            {
+                "data_base64": "/9j/AA==",
+                "mime_type": "image/jpeg",
+                "filename": "jalan.jpg",
+                "size": 4,
+            }
+        ],
     }
     values.update(overrides)
     return ReportCreate.model_validate(values)
@@ -476,6 +497,9 @@ class ConcurrentRepository:
 
     def insert_status_history(self, values):
         self.store.history_inserts += 1
+        return values
+
+    def insert_attachment(self, values):
         return values
 
 

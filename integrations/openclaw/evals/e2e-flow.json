@@ -1,0 +1,53 @@
+{
+  "id": "complete_e2e_flow",
+  "description": "End-to-end smoke test for full citizen flow",
+  "steps": [
+    {
+      "step": 1,
+      "action": "ASK",
+      "input": {
+        "question": "Kapan kantor buka?"
+      },
+      "expected": {
+        "intent": "ASK",
+        "outcome": "answered",
+        "has_sources": true
+      }
+    },
+    {
+      "step": 2,
+      "action": "REPORT",
+      "input": {
+        "message": "Jalan di RT 03 dekat masjid rusak parah."
+      },
+      "expected": {
+        "intent": "REPORT",
+        "needs_clarification": false,
+        "ready_for_confirmation": true
+      }
+    },
+    {
+      "step": 3,
+      "action": "CONFIRM",
+      "input": {
+        "confirmation": "Ya, benar."
+      },
+      "expected": {
+        "ticket_created": true,
+        "ticket_number_pattern": "LP-2026-\\d{4}"
+      }
+    },
+    {
+      "step": 4,
+      "action": "TRACK",
+      "input": {
+        "ticket_number": "<from step 3>"
+      },
+      "expected": {
+        "intent": "TRACK",
+        "returns_ticket": true,
+        "status_match": "pending_verification"
+      }
+    }
+  ]
+}

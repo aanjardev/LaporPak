@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList } from "lucide-react";
+import { BookOpen, ClipboardList } from "lucide-react";
 import { logoutAction } from "@/app/auth-actions";
 
 export default function ReportsLayout({ children }: { children: React.ReactNode }) {
@@ -22,6 +22,11 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
             <Link href="/reports" aria-current="page" className="flex min-h-11 items-center gap-3 rounded-lg bg-sky-50 px-3 text-sm font-semibold text-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">
               <ClipboardList aria-hidden="true" size={18} /> Laporan warga
             </Link>
+            {process.env.REPORTS_DATA_SOURCE === "api" && (
+              <Link href="/reports/knowledge" className="mt-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">
+                <BookOpen aria-hidden="true" size={18} /> Sumber ASK
+              </Link>
+            )}
           </nav>
           <form action={logoutAction} className="mt-5 lg:mt-8">
             <button type="submit" className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">Keluar</button>

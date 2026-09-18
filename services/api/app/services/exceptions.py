@@ -30,6 +30,12 @@ class InvalidSenderIdentityError(ReportServiceError):
         super().__init__("Sender phone number is invalid")
 
 
+class InvalidAttachmentError(ReportServiceError):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message
+
+
 class InvalidStatusTransitionError(ReportServiceError):
     def __init__(self, old_status: str, new_status: str) -> None:
         super().__init__(f"Invalid status transition: {old_status} -> {new_status}")

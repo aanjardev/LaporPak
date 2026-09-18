@@ -1,0 +1,47 @@
+{
+  "version": "0.1.0",
+  "description": "Placeholder for knowledge gap tracking",
+  "gaps": [
+    {
+      "id": "gap-1789686809400-3wdn2mpzk",
+      "question": "besok buka nggak?",
+      "service_key": "office_hours",
+      "source": "user_interaction",
+      "created_at": "2026-09-17T23:13:29.400Z",
+      "status": "pending",
+      "priority": "low",
+      "frequency": 1,
+      "notes": "",
+      "suggested_answer": ""
+    },
+    {
+      "id": "gap-1789686809486-clzfw4rov",
+      "question": "KTP rusak gimana?",
+      "service_key": "ktp_replacement",
+      "source": "user_interaction",
+      "created_at": "2026-09-17T23:13:29.486Z",
+      "status": "pending",
+      "priority": "medium",
+      "frequency": 1,
+      "notes": "",
+      "suggested_answer": ""
+    },
+    {
+      "id": "gap-1789686809577-pf0jjt7ei",
+      "question": "nama beda sama akta lahir",
+      "service_key": "ktp_change",
+      "source": "user_interaction",
+      "created_at": "2026-09-17T23:13:29.577Z",
+      "status": "pending",
+      "priority": "low",
+      "frequency": 1,
+      "notes": "",
+      "suggested_answer": ""
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "lastUpdated": "2026-09-17T23:13:29.578Z",
+    "totalQuestions": 3
+  }
+}

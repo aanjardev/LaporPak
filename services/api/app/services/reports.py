@@ -1,11 +1,14 @@
+import base64
 import hashlib
 import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
+import httpx
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -25,6 +28,7 @@ from app.schemas.reports import (
 from app.services.exceptions import (
     CategoryNotFoundError,
     DuplicateOperationError,
+    InvalidAttachmentError,
     InvalidSenderIdentityError,
     InvalidStatusTransitionError,
     ReportNotFoundError,
@@ -32,6 +36,12 @@ from app.services.exceptions import (
 )
 
 PHONE_NUMBER_PATTERN = re.compile(r"^\+[1-9][0-9]{7,14}$")
+MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
+MIME_EXTENSIONS = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
 
 ALLOWED_STATUS_TRANSITIONS = {
     ReportStatus.PENDING_VERIFICATION: {
@@ -82,6 +92,40 @@ def canonical_payload_hash(payload: ReportCreate, phone_number: str) -> str:
 def advisory_lock_key(idempotency_key: UUID) -> int:
     unsigned = idempotency_key.int & ((1 << 64) - 1)
     return unsigned - (1 << 64) if unsigned >= (1 << 63) else unsigned
+
+
+def validate_image_signature(data: bytes, mime_type: str) -> None:
+    signatures = {
+        "image/jpeg": data.startswith(b"\xff\xd8\xff"),
+        "image/png": data.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/webp": data.startswith(b"RIFF") and data[8:12] == b"WEBP",
+    }
+    if not signatures.get(mime_type, False):
+        raise ValueError("attachment bytes do not match the declared image type")
+
+
+def upload_report_attachment(report_id: UUID, data: bytes, mime_type: str) -> str:
+    from app.core.config import settings
+
+    server_key = settings.supabase_secret_key or settings.supabase_service_role_key
+    if not settings.supabase_url or not server_key:
+        raise RuntimeError("report attachment storage is not configured")
+
+    storage_path = f"{report_id}/{uuid4()}.{MIME_EXTENSIONS[mime_type]}"
+    response = httpx.post(
+        f"{settings.supabase_url.rstrip('/')}/storage/v1/object/"
+        f"report-attachments/{storage_path}",
+        headers={
+            "Authorization": f"Bearer {server_key}",
+            "apikey": server_key,
+            "Content-Type": mime_type,
+            "x-upsert": "false",
+        },
+        content=data,
+        timeout=30,
+    )
+    response.raise_for_status()
+    return storage_path
 
 
 class ReportPersistenceService:
@@ -166,10 +210,36 @@ class ReportPersistenceService:
                         "notes": "Report created",
                     }
                 )
+                for attachment in payload.attachments:
+                    data = base64.b64decode(attachment.data_base64, validate=True)
+                    if len(data) > MAX_ATTACHMENT_BYTES:
+                        raise InvalidAttachmentError("attachment exceeds 5 MB")
+                    try:
+                        validate_image_signature(data, attachment.mime_type)
+                    except ValueError as exc:
+                        raise InvalidAttachmentError(str(exc)) from exc
+                    storage_path = upload_report_attachment(
+                        report["id"], data, attachment.mime_type
+                    )
+                    filename = (
+                        Path(attachment.filename).name
+                        if attachment.filename
+                        else f"photo.{MIME_EXTENSIONS[attachment.mime_type]}"
+                    )
+                    self.repository.insert_attachment(
+                        {
+                            "report_id": report["id"],
+                            "storage_bucket": "report-attachments",
+                            "storage_path": storage_path,
+                            "file_name": filename,
+                            "mime_type": attachment.mime_type,
+                            "metadata": {"file_size": len(data)},
+                        }
+                    )
                 return IdempotentReportResult(report, replayed=False)
-        except CategoryNotFoundError, DuplicateOperationError:
+        except CategoryNotFoundError, DuplicateOperationError, InvalidAttachmentError:
             raise
-        except SQLAlchemyError as exc:
+        except (httpx.HTTPError, RuntimeError, SQLAlchemyError) as exc:
             raise ReportPersistenceError("report creation") from exc
 
     def list_reports(

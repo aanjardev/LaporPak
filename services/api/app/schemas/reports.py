@@ -1,11 +1,14 @@
+import base64
+import binascii
 from datetime import datetime
-from typing import Any, Self
+from typing import Annotated, Any, Self
 from uuid import UUID
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StringConstraints,
     field_validator,
     model_validator,
 )
@@ -65,6 +68,39 @@ class ReportCreateAIAnalysis(StrictSchema):
         return normalized or None
 
 
+ALLOWED_ATTACHMENT_MIME_TYPES = frozenset(
+    {"image/jpeg", "image/png", "image/webp"}
+)
+
+
+class ReportAttachmentInput(StrictSchema):
+    data_base64: Annotated[
+        str,
+        StringConstraints(min_length=1, max_length=7_000_000),
+    ]
+    mime_type: str
+    filename: str | None = Field(default=None, max_length=255)
+    size: int | None = Field(default=None, gt=0, le=5 * 1024 * 1024)
+
+    @field_validator("mime_type")
+    @classmethod
+    def validate_mime_type(cls, value: str) -> str:
+        if value not in ALLOWED_ATTACHMENT_MIME_TYPES:
+            raise ValueError("attachment must be a JPEG, PNG, or WebP image")
+        return value
+
+    @field_validator("data_base64")
+    @classmethod
+    def validate_data(cls, value: str) -> str:
+        try:
+            data = base64.b64decode(value, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError("attachment must contain valid base64") from exc
+        if len(data) > 5 * 1024 * 1024:
+            raise ValueError("attachment must not exceed 5 MB")
+        return value
+
+
 class ReportCreate(StrictSchema):
     sender_phone_number: str = Field(min_length=1)
     conversation_id: UUID | None = None
@@ -75,6 +111,7 @@ class ReportCreate(StrictSchema):
     original_text: str | None = None
     source: ReportSource = ReportSource.WHATSAPP
     ai_analysis: ReportCreateAIAnalysis | None = None
+    attachments: list[ReportAttachmentInput] = Field(min_length=1, max_length=3)
 
     @field_validator("sender_phone_number", "description")
     @classmethod

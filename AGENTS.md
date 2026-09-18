@@ -240,6 +240,7 @@ citizen
 category
 description
 location
+attachment
 ```
 
 Location dianggap tersedia bila setidaknya salah satu terpenuhi:
@@ -247,7 +248,7 @@ Location dianggap tersedia bila setidaknya salah satu terpenuhi:
 - `location_text` tidak kosong; atau
 - `latitude` dan `longitude` keduanya tersedia dan valid.
 
-Attachment dan urgency bukan mandatory input citizen.
+Attachment (minimal 1 foto) wajib; urgency bukan mandatory input citizen.
 
 AI dapat menyarankan nilai, tetapi backend menentukan apakah data sudah cukup.
 

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.citizen import router as citizen_router
+from app.api.routes.enhanced import router as enhanced_router
 from app.api.routes.health import router as health_router
 from app.api.routes.knowledge import router as knowledge_router
 from app.api.routes.knowledge import tools_router as knowledge_tools_router
@@ -29,6 +30,7 @@ register_error_handlers(app)
 app.include_router(health_router)
 app.include_router(reports_router)
 app.include_router(citizen_router)
+app.include_router(enhanced_router)
 app.include_router(service_requests_router)
 app.include_router(knowledge_router)
 app.include_router(knowledge_tools_router)

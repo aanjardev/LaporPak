@@ -235,7 +235,15 @@ Ticket number dihasilkan server-side dan **tidak** dikirim client.
   "ai_analysis": {
     "confidence": 0.94,
     "summary": "Kerusakan jalan di RT 03 dekat masjid."
-  }
+  },
+  "attachments": [
+    {
+      "data_base64": "<trusted-staged-whatsapp-image>",
+      "mime_type": "image/jpeg",
+      "filename": "whatsapp-image-1.jpg",
+      "size": 245760
+    }
+  ]
 }
 ```
 
@@ -248,6 +256,7 @@ identitas warga yang dapat dipetakan backend ke citizen_id
 category
 description
 location
+attachment (minimal 1 foto)
 ```
 
 `location` valid jika:
@@ -263,23 +272,27 @@ Pemanggil OpenClaw wajib mengirim secret internal pada header:
 
 ```http
 X-OpenClaw-API-Key: <server-only-secret>
+X-Channel-Account-ID: <authenticated-channel-account>
 ```
 
-`Idempotency-Key` harus berupa UUID draf laporan yang stabil. Kedua header
-bersifat server-to-server dan tidak boleh dikirim oleh frontend publik.
+`Idempotency-Key` adalah UUID stabil yang diturunkan plugin dari metadata sesi
+dan media terautentikasi. Semua header tersebut bersifat server-to-server dan
+tidak boleh dikirim oleh frontend publik. Backend memetakan channel account ke
+unit administratif aktif; model tidak dapat memilih desa.
 
 ### Backend behavior
 
 Backend:
 
 1. validates schema;
-2. resolves citizen dari metadata sender dan category code;
+2. resolves citizen, category, dan unit desa dari metadata kanal;
 3. validates required fields;
 4. verifies idempotency dalam transaksi;
 5. generates unique ticket number;
 6. inserts report;
 7. inserts initial status history;
-8. returns success only after persistence succeeds.
+8. uploads 1–3 foto ke bucket private `report-attachments` dan menyimpan metadata;
+9. returns success only after persistence succeeds.
 
 ### Response `201`
 
@@ -299,7 +312,7 @@ Backend:
 Satu draf laporan memperoleh satu ID stabil saat OpenClaw mulai mengumpulkan fakta. ID ini dipertahankan saat klarifikasi, konfirmasi, retry, atau warga mengirim jawaban konfirmasi dua kali. Dua laporan berbeda memperoleh ID berbeda.
 
 ```http
-Idempotency-Key: <report-draft-uuid>
+Idempotency-Key: <plugin-derived-stable-uuid>
 ```
 
 Backend menyimpan key dengan constraint unik dan mengikatnya ke laporan. Insert laporan, initial status history, dan key harus berhasil dalam satu transaksi. Untuk key dan payload yang sama:
@@ -667,7 +680,11 @@ untuk state yang sudah divalidasi backend/human.
 
 ## 15. Attachment Contract
 
-Binary upload flow boleh ditambahkan sebagai endpoint terpisah saat diperlukan.
+OpenClaw membaca foto dari staged media path yang disediakan runtime kanal,
+kemudian mengirimkannya server-to-server sebagai base64. Model tidak dapat
+memberikan path, URL, atau bytes attachment. API menerima 1–3 gambar JPEG,
+PNG, atau WebP dengan ukuran maksimal 5 MB per gambar dan memverifikasi magic
+bytes sebelum menyimpan.
 
 Storage:
 
@@ -685,17 +702,17 @@ Do not embed binary/base64 ke `reports` JSON.
 
 ---
 
-## 16. Reserved Future APIs
+## 16. Citizen APIs
 
-Belum P0:
-
-```text
-/api/v1/ask
-/api/v1/track
-/api/v1/requests
-```
-
-Jangan mengimplementasikan endpoint tersebut jika menghambat REPORT.
+- `POST /api/v1/ask` mengambil evidence dari knowledge source aktif dalam
+  cakupan channel. `query_embedding` optional; tanpa embedding backend memakai
+  FTS, dan dengan embedding backend memakai hybrid retrieval.
+- `POST /api/v1/track` hanya membaca REPORT atau REQUEST milik nomor WhatsApp
+  terautentikasi dalam unit channel yang sama.
+- `POST /api/v1/service-requests` membuat REQUEST sesuai contract layanan.
+- `POST /api/v1/detect-emergency`, `/api/v1/check-similar`, dan
+  `/api/v1/confirm-resolution/{ticket_number}` adalah advisory/support flow;
+  endpoint tersebut tidak dapat mengubah status resmi laporan.
 
 ---
 
@@ -713,7 +730,8 @@ channel integration; model-generated payloads cannot select a village.
   text, Markdown, and PDF up to 10 MB. Files are stored in a private bucket.
 - `/api/v1/tools/knowledge/embedding-jobs` is the OpenClaw embedding boundary.
   Embeddings contain exactly 768 values and a document becomes `ready` only
-  after every chunk is supplied atomically.
+  after every chunk is supplied atomically. Approved `pending` documents remain
+  available to the FTS fallback while embeddings are processed.
 - `POST /api/v1/ask` performs village-scoped FTS/vector retrieval and returns
   evidence blocks and source IDs. Gemini response generation remains in
   OpenClaw.

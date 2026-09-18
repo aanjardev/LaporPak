@@ -1,11 +1,23 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const MEDIA_TTL_MS = 30 * 60 * 1000;
+const recentMediaBySender = new Map();
 
 const parameters = {
   type: "object",
   additionalProperties: false,
   required: [
-    "report_draft_id",
     "category",
     "description",
     "location",
@@ -13,11 +25,6 @@ const parameters = {
     "confidence",
   ],
   properties: {
-    report_draft_id: {
-      type: "string",
-      format: "uuid",
-      description: "Stable UUID for this report draft. Reuse it for retries.",
-    },
     category: {
       type: "string",
       enum: [
@@ -51,12 +58,95 @@ const parameters = {
   },
 };
 
-function reportEndpoint(value) {
-  const url = new URL("/api/v1/reports", `${value.replace(/\/+$/, "")}/`);
+function senderKey(value) {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+function uuidFromFingerprint(value) {
+  const bytes = createHash("sha256").update(value).digest().subarray(0, 16);
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(",")}]`;
+  }
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+async function trustedAttachments(context) {
+  const media = recentMediaBySender.get(senderKey(context.requesterSenderId)) ?? [];
+  const freshMedia = media.filter(
+    (item) => Date.now() - item.receivedAt <= MEDIA_TTL_MS,
+  );
+  const attachments = [];
+  for (const [index, item] of freshMedia.slice(0, 3).entries()) {
+    const data = await readFile(item.path);
+    if (data.length > MAX_ATTACHMENT_BYTES) {
+      throw new Error("Photo attachment exceeds 5 MB");
+    }
+    attachments.push({
+      data_base64: data.toString("base64"),
+      mime_type: item.mimeType,
+      filename: `whatsapp-image-${index + 1}.${basename(item.path).split(".").pop() ?? "bin"}`,
+      size: data.length,
+      sourceId: item.messageId ?? item.path,
+    });
+  }
+  return attachments;
+}
+
+function apiEndpoint(value, path) {
+  const url = new URL(path, `${value.replace(/\/+$/, "")}/`);
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error("LAPORPAK_API_URL must use http or https");
   }
   return url;
+}
+
+function requireWhatsappContext(context, toolName) {
+  if (context.messageChannel !== "whatsapp" || !context.requesterSenderId) {
+    throw new Error(`${toolName} requires an authenticated WhatsApp sender`);
+  }
+}
+
+function backendConfig(env) {
+  const apiUrl = env.LAPORPAK_API_URL?.trim();
+  const apiKey = env.LAPORPAK_API_KEY?.trim();
+  const channelAccountId = env.LAPORPAK_CHANNEL_ACCOUNT_ID?.trim();
+  if (!apiUrl || !apiKey || !channelAccountId) {
+    throw new Error("LaporPak API environment is not configured");
+  }
+  return { apiUrl, apiKey, channelAccountId };
+}
+
+async function callBackend(fetchImpl, env, path, body) {
+  const { apiUrl, apiKey, channelAccountId } = backendConfig(env);
+  const response = await fetchImpl(apiEndpoint(apiUrl, path), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-OpenClaw-API-Key": apiKey,
+      "X-Channel-Account-ID": channelAccountId,
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const result = await responseJson(response);
+  if (!response.ok) {
+    const code = result?.error?.code ?? "REQUEST_FAILED";
+    throw new Error(`LaporPak API rejected the request (${response.status} ${code})`);
+  }
+  return { response, result };
 }
 
 async function responseJson(response) {
@@ -71,29 +161,17 @@ export function buildCreateReportTool(
   context,
   fetchImpl = globalThis.fetch,
   env = process.env,
+  attachmentProvider = trustedAttachments,
 ) {
   return {
     name: "laporpak_create_report",
     label: "Create LaporPak report",
     description:
-      "Create one confirmed WhatsApp REPORT. Call only after category, description, and location are complete and the citizen confirms submission.",
+      "Create one confirmed WhatsApp REPORT. Call only after category, description, location, and a photo received from WhatsApp are complete and the citizen confirms submission. Media and idempotency are supplied by the trusted plugin runtime.",
     parameters,
     async execute(_toolCallId, input) {
-      if (context.messageChannel !== "whatsapp") {
-        throw new Error("laporpak_create_report requires an authenticated WhatsApp sender");
-      }
-      if (!context.requesterSenderId) {
-        throw new Error("Authenticated WhatsApp sender identity is unavailable");
-      }
-      if (!UUID_PATTERN.test(input.report_draft_id)) {
-        throw new Error("report_draft_id must be a UUID");
-      }
-
-      const apiUrl = env.LAPORPAK_API_URL?.trim();
-      const apiKey = env.LAPORPAK_API_KEY?.trim();
-      if (!apiUrl || !apiKey) {
-        throw new Error("LaporPak API environment is not configured");
-      }
+      requireWhatsappContext(context, "laporpak_create_report");
+      const { apiUrl, apiKey, channelAccountId } = backendConfig(env);
 
       const locationComplete =
         (typeof input.location.text === "string" && input.location.text.trim()) ||
@@ -101,6 +179,16 @@ export function buildCreateReportTool(
       if (!locationComplete) {
         throw new Error("Report location is incomplete");
       }
+
+      const attachments = await attachmentProvider(context);
+      if (attachments.length === 0) {
+        throw new Error("No trusted WhatsApp photo is available; ask the citizen to send it again");
+      }
+      const reportDraftId = uuidFromFingerprint(stableJson({
+        sender: senderKey(context.requesterSenderId),
+        sessionId: context.sessionId ?? null,
+        media: attachments.map((attachment) => attachment.sourceId),
+      }));
 
       const body = {
         sender_phone_number: context.requesterSenderId,
@@ -114,26 +202,30 @@ export function buildCreateReportTool(
           confidence: input.confidence,
           summary: input.summary ?? null,
         },
+        attachments: attachments.map(({ sourceId: _sourceId, ...attachment }) => attachment),
       };
       if (context.sessionId && UUID_PATTERN.test(context.sessionId)) {
         body.conversation_id = context.sessionId;
       }
 
-      const response = await fetchImpl(reportEndpoint(apiUrl), {
+      const response = await fetchImpl(apiEndpoint(apiUrl, "/api/v1/reports"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": input.report_draft_id,
+          "Idempotency-Key": reportDraftId,
           "X-OpenClaw-API-Key": apiKey,
+          "X-Channel-Account-ID": channelAccountId,
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(60_000),
       });
       const result = await responseJson(response);
       if (!response.ok) {
         const code = result?.error?.code ?? "REQUEST_FAILED";
         throw new Error(`LaporPak API rejected the report (${response.status} ${code})`);
       }
+
+      recentMediaBySender.delete(senderKey(context.requesterSenderId));
 
       const details = {
         id: result.id,
@@ -150,13 +242,219 @@ export function buildCreateReportTool(
   };
 }
 
+export function buildAskTool(context, fetchImpl = globalThis.fetch, env = process.env) {
+  return {
+    name: "laporpak_ask",
+    label: "Ask approved village knowledge",
+    description:
+      "Retrieve approved village-service answer blocks and their sources. Use these blocks as the only factual basis for an ASK response.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["question"],
+      properties: {
+        question: { type: "string", minLength: 1 },
+        service_key: { type: ["string", "null"], pattern: "^[a-z0-9_-]+$" },
+      },
+    },
+    async execute(_toolCallId, input) {
+      requireWhatsappContext(context, "laporpak_ask");
+      const { result } = await callBackend(fetchImpl, env, "/api/v1/ask", {
+        question: input.question,
+        service_key: input.service_key ?? null,
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        details: result,
+      };
+    },
+  };
+}
+
+export function buildTrackTool(context, fetchImpl = globalThis.fetch, env = process.env) {
+  return {
+    name: "laporpak_track_report",
+    label: "Track citizen reports",
+    description:
+      "Read the authenticated WhatsApp sender's official report status. Includes SLA deadline and urgency info.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        ticket_number: {
+          type: ["string", "null"],
+          pattern: "^LP-[0-9]{4}-[0-9]{4,}$",
+        },
+      },
+    },
+    async execute(_toolCallId, input) {
+      requireWhatsappContext(context, "laporpak_track_report");
+      const { result } = await callBackend(fetchImpl, env, "/api/v1/track", {
+        sender_phone_number: context.requesterSenderId,
+        ticket_number: input.ticket_number ?? null,
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        details: result,
+      };
+    },
+  };
+}
+
+export function buildDetectEmergencyTool(context, fetchImpl = globalThis.fetch, env = process.env) {
+  return {
+    name: "laporpak_detect_emergency",
+    label: "Detect emergency keywords",
+    description:
+      "Check if citizen message contains emergency keywords. Use this at the start of any conversation.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["text"],
+      properties: {
+        text: { type: "string", minLength: 1 },
+      },
+    },
+    async execute(_toolCallId, input) {
+      requireWhatsappContext(context, "laporpak_detect_emergency");
+      const { result } = await callBackend(fetchImpl, env, "/api/v1/detect-emergency", {
+        text: input.text,
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        details: result,
+      };
+    },
+  };
+}
+
+export function buildSimilarReportsTool(context, fetchImpl = globalThis.fetch, env = process.env) {
+  return {
+    name: "laporpak_check_similar",
+    label: "Check similar reports",
+    description:
+      "Check for existing similar reports before creating a new one. Reduces duplicates and informs citizens.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["category"],
+      properties: {
+        category: {
+          type: "string",
+          enum: [
+            "infrastructure",
+            "public_facility",
+            "cleanliness",
+            "security",
+            "social",
+            "administration",
+            "other",
+          ],
+        },
+        location_text: { type: ["string", "null"] },
+        latitude: { type: ["number", "null"] },
+        longitude: { type: ["number", "null"] },
+      },
+    },
+    async execute(_toolCallId, input) {
+      requireWhatsappContext(context, "laporpak_check_similar");
+      const { result } = await callBackend(fetchImpl, env, "/api/v1/check-similar", {
+        category: input.category,
+        location_text: input.location_text ?? null,
+        latitude: input.latitude ?? null,
+        longitude: input.longitude ?? null,
+      });
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        details: result,
+      };
+    },
+  };
+}
+
+export function buildConfirmResolutionTool(context, fetchImpl = globalThis.fetch, env = process.env) {
+  return {
+    name: "laporpak_confirm_resolution",
+    label: "Confirm report resolution",
+    description:
+      "Record citizen's confirmation that a resolved report is actually fixed. Use when status is resolved.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["ticket_number", "confirmed"],
+      properties: {
+        ticket_number: {
+          type: "string",
+          pattern: "^LP-[0-9]{4}-[0-9]{4,}$",
+        },
+        confirmed: { type: "boolean" },
+        feedback: { type: ["string", "null"] },
+      },
+    },
+    async execute(_toolCallId, input) {
+      requireWhatsappContext(context, "laporpak_confirm_resolution");
+      const { result } = await callBackend(
+        fetchImpl,
+        env,
+        `/api/v1/confirm-resolution/${input.ticket_number}`,
+        {
+          confirmed: input.confirmed,
+          feedback: input.feedback ?? null,
+          sender_phone_number: context.requesterSenderId,
+        }
+      );
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        details: result,
+      };
+    },
+  };
+}
+
 export default {
   id: "laporpak-tools",
   name: "LaporPak Tools",
-  description: "Create confirmed LaporPak reports through the FastAPI boundary.",
+  description: "ASK, REPORT, TRACK, and citizen support tools through the FastAPI boundary.",
   register(api) {
+    api.on("message_received", (event) => {
+      const key = senderKey(event.senderId ?? event.from);
+      const media = (event.media ?? [])
+        .filter(
+          (item) =>
+            item.path && ALLOWED_ATTACHMENT_MIME_TYPES.has(item.contentType),
+        )
+        .map((item) => ({
+          path: item.path,
+          mimeType: item.contentType,
+          messageId: item.messageId ?? event.messageId,
+          receivedAt: Date.now(),
+        }));
+      if (key && media.length > 0) {
+        recentMediaBySender.set(key, media);
+      }
+    });
     api.registerTool((context) => buildCreateReportTool(context), {
       name: "laporpak_create_report",
+      optional: true,
+    });
+    api.registerTool((context) => buildAskTool(context), {
+      name: "laporpak_ask",
+      optional: true,
+    });
+    api.registerTool((context) => buildTrackTool(context), {
+      name: "laporpak_track_report",
+      optional: true,
+    });
+    api.registerTool((context) => buildDetectEmergencyTool(context), {
+      name: "laporpak_detect_emergency",
+      optional: true,
+    });
+    api.registerTool((context) => buildSimilarReportsTool(context), {
+      name: "laporpak_check_similar",
+      optional: true,
+    });
+    api.registerTool((context) => buildConfirmResolutionTool(context), {
+      name: "laporpak_confirm_resolution",
       optional: true,
     });
   },

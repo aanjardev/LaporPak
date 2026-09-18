@@ -34,6 +34,14 @@ def valid_report_payload() -> dict:
             "confidence": 0.94,
             "summary": "Kerusakan jalan di RT 03 dekat masjid.",
         },
+        "attachments": [
+            {
+                "data_base64": "/9j/AA==",
+                "mime_type": "image/jpeg",
+                "filename": "jalan.jpg",
+                "size": 4,
+            }
+        ],
     }
 
 

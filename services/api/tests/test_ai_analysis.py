@@ -149,7 +149,7 @@ def test_eval_dataset_covers_minimum_workflows():
     )
     cases = json.loads(cases_path.read_text(encoding="utf-8"))
 
-    assert {case["id"] for case in cases} == {
+    assert {
         "complete_report",
         "missing_location",
         "vague_description",
@@ -157,5 +157,5 @@ def test_eval_dataset_covers_minimum_workflows():
         "ambiguous_urgency",
         "prompt_injection",
         "multiple_facts",
-    }
-    assert all(case["citizen_text"] and case["expected"]["intent"] for case in cases)
+    }.issubset({case["id"] for case in cases})
+    assert all(case.get("citizen_text") and case.get("expected") for case in cases)

@@ -31,10 +31,21 @@ class KnowledgeDocumentList(StrictSchema):
     items: list[KnowledgeDocument]
 
 
+class KnowledgeDocumentDetail(KnowledgeDocument):
+    content: str
+    service_key: str | None
+
+
 class KnowledgeUpdate(StrictSchema):
     title: str | None = Field(default=None, min_length=1, max_length=300)
     category: str | None = Field(default=None, max_length=100)
     is_active: bool | None = None
+    is_mandatory: bool | None = None
+    content: str | None = Field(default=None, min_length=1)
+    service_key: str | None = Field(
+        default=None,
+        pattern=r"^[a-z0-9_-]+$",
+    )
 
 
 class EmbeddingChunk(StrictSchema):

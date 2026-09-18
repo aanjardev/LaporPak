@@ -1,0 +1,421 @@
+[
+  {
+    "id": "ask_office_hours_01",
+    "scenario_family": "ASK_administration_office",
+    "citizen_text": "Besok kantor buka?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "office_hours"
+    }
+  },
+  {
+    "id": "ask_office_hours_02",
+    "scenario_family": "ASK_administration_office",
+    "citizen_text": "Jam pelayanan sampai jam berapa?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "office_hours"
+    }
+  },
+  {
+    "id": "ask_office_hours_03",
+    "scenario_family": "ASK_administration_office",
+    "citizen_text": "Kantor buka jam 9 belum?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "office_hours"
+    }
+  },
+  {
+    "id": "ask_office_hours_04",
+    "scenario_family": "ASK_administration_office",
+    "citizen_text": "Hari Sabtu bisa ngurus surat gak?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "office_hours",
+      "clarification_needed": true
+    }
+  },
+  {
+    "id": "ask_office_hours_05",
+    "scenario_family": "ASK_administration_office",
+    "citizen_text": "Jam istirahat kantor jam berapa?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "office_hours"
+    }
+  },
+  {
+    "id": "ask_ktp_new_01",
+    "scenario_family": "ASK_administration_ktp",
+    "citizen_text": "Mau bikin KTP baru, mulai dari mana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "ktp_new"
+    }
+  },
+  {
+    "id": "ask_ktp_new_02",
+    "scenario_family": "ASK_administration_ktp",
+    "citizen_text": "Syarat bikin KTP apa aja?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "ktp_new"
+    }
+  },
+  {
+    "id": "ask_ktp_new_03",
+    "scenario_family": "ASK_administration_ktp",
+    "citizen_text": "Saya penduduk baru, bisa buat KTP di desa ini?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "ktp_new"
+    }
+  },
+  {
+    "id": "ask_ktp_lost_01",
+    "scenario_family": "ASK_administration_ktp",
+    "citizen_text": "KTP saya hilang, harus ngurus apa aja?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "ktp_replacement"
+    }
+  },
+  {
+    "id": "ask_ktp_lost_02",
+    "scenario_family": "ASK_administration_ktp",
+    "citizen_text": "Surat keterangan hilang dari mana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "ktp_replacement"
+    }
+  },
+  {
+    "id": "ask_ktp_lost_03",
+    "scenario_family": "ASK_administration_ktp",
+    "citizen_text": "KTP rusak, gimana caro拿到新的?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "ktp_replacement"
+    }
+  },
+  {
+    "id": "ask_ktp_change_01",
+    "scenario_family": "ASK_administration_ktp",
+    "citizen_text": "Nama di dokumen beda sama akta lahir, gimana cara perbaikinya?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "ktp_change"
+    }
+  },
+  {
+    "id": "ask_ktp_change_02",
+    "scenario_family": "ASK_administration_ktp",
+    "citizen_text": "Alamat KTP saya salah, mau diubah gimana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "ktp_change"
+    }
+  },
+  {
+    "id": "ask_ktp_change_03",
+    "scenario_family": "ASK_administration_ktp",
+    "citizen_text": "Status perkawinan di KTP masih salah, harus ke mana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "ktp_change"
+    }
+  },
+  {
+    "id": "ask_surat_pengantar_01",
+    "scenario_family": "ASK_administration_surat",
+    "citizen_text": "Mau minta surat pengantar RT butuh apa aja?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "surat_pengantar"
+    }
+  },
+  {
+    "id": "ask_surat_pengantar_02",
+    "scenario_family": "ASK_administration_surat",
+    "citizen_text": "Surat pengantar untuk bikin.passport where to get?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "surat_pengantar"
+    }
+  },
+  {
+    "id": "ask_surat_pengantar_03",
+    "scenario_family": "ASK_administration_surat",
+    "citizen_text": "Berapa lama surat pengantar selesai?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "surat_pengantar"
+    }
+  },
+  {
+    "id": "ask_kk_01",
+    "scenario_family": "ASK_administration_kk",
+    "citizen_text": "Bayi baru lahir, bikin KK baru gimana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "kk"
+    }
+  },
+  {
+    "id": "ask_kk_02",
+    "scenario_family": "ASK_administration_kk",
+    "citizen_text": "KK saya penuh, mau minta yang baru",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "kk"
+    }
+  },
+  {
+    "id": "ask_bukan_desa_01",
+    "scenario_family": "ASK_administration_bukan_desa",
+    "citizen_text": "Saya mau cek bansos saya",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "bukan_desa",
+      "denied_service_key": "bansos"
+    }
+  },
+  {
+    "id": "ask_bukan_desa_02",
+    "scenario_family": "ASK_administration_bukan_desa",
+    "citizen_text": "Mau bikin passport harus ke mana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "bukan_desa"
+    }
+  },
+  {
+    "id": "ask_bukan_desa_03",
+    "scenario_family": "ASK_administration_bukan_desa",
+    "citizen_text": "Urusan tanah ke mana ya?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "bukan_desa"
+    }
+  },
+  {
+    "id": "ask_bukan_desa_04",
+    "scenario_family": "ASK_administration_bukan_desa",
+    "citizen_text": "Bikin SIM harus melalui desa gak?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "bukan_desa"
+    }
+  },
+  {
+    "id": "ask_road_01",
+    "scenario_family": "ASK_environment_road",
+    "citizen_text": "Kalau jalan rusak harus laporkan ke mana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "road_report"
+    }
+  },
+  {
+    "id": "ask_road_02",
+    "scenario_family": "ASK_environment_road",
+    "citizen_text": "Cara bikin laporan jalan rusak gimana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "road_report"
+    }
+  },
+  {
+    "id": "ask_road_03",
+    "scenario_family": "ASK_environment_road",
+    "citizen_text": "Jalan kabupaten rusak, ini juga tanggung jawab desa?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "batas_wewenang"
+    }
+  },
+  {
+    "id": "ask_waste_01",
+    "scenario_family": "ASK_environment_waste",
+    "citizen_text": "Tempat sampah di depan rumah penuh, harus ngadu ke siapa?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "waste_report"
+    }
+  },
+  {
+    "id": "ask_waste_02",
+    "scenario_family": "ASK_environment_waste",
+    "citizen_text": "Jadwal pengambilan sampah hari apa?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "waste_report"
+    }
+  },
+  {
+    "id": "ask_drainage_01",
+    "scenario_family": "ASK_environment_drainage",
+    "citizen_text": "Selokan mampet harus laporkan ke mana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "drainage_report"
+    }
+  },
+  {
+    "id": "ask_drainage_02",
+    "scenario_family": "ASK_environment_drainage",
+    "citizen_text": "Got di depan rumah bau, kemana harus melapor?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "drainage_report"
+    }
+  },
+  {
+    "id": "ask_streetlight_01",
+    "scenario_family": "ASK_environment_streetlight",
+    "citizen_text": "Lampu jalan di depan rumah mati, siapa yang tanggung jawab?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "streetlight_report"
+    }
+  },
+  {
+    "id": "ask_streetlight_02",
+    "scenario_family": "ASK_environment_streetlight",
+    "citizen_text": "Cara laporan lampu jalan mati gimana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "streetlight_report"
+    }
+  },
+  {
+    "id": "ask_facility_01",
+    "scenario_family": "ASK_environment_facility",
+    "citizen_text": "Taman di balai desa rusak, harus ngadu ke mana?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "facility_report"
+    }
+  },
+  {
+    "id": "ask_glossary_01",
+    "scenario_family": "ASK_glossary",
+    "citizen_text": "Apa itu TPS?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "istilah_sampah"
+    }
+  },
+  {
+    "id": "ask_glossary_02",
+    "scenario_family": "ASK_glossary",
+    "citizen_text": "Perbedaan RT dan RW apa?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "istilah_wilayah"
+    }
+  },
+  {
+    "id": "ask_glossary_03",
+    "scenario_family": "ASK_glossary",
+    "citizen_text": "Apa itu got?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "istilah_drainase"
+    }
+  },
+  {
+    "id": "ask_glossary_04",
+    "scenario_family": "ASK_glossary",
+    "citizen_text": "FC itu apa sih?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "istilah_admin"
+    }
+  },
+  {
+    "id": "ask_status_01",
+    "scenario_family": "ASK_status",
+    "citizen_text": "Arti status 'dalam penanganan' itu apa?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "status_info"
+    }
+  },
+  {
+    "id": "ask_status_02",
+    "scenario_family": "ASK_status",
+    "citizen_text": "Apa bedanya diteruskan dan selesai?",
+    "expected": {
+      "intent": ["ASK"],
+      "has_answer": true,
+      "source_service_key": "status_info"
+    }
+  },
+  {
+    "id": "ask_unknown_01",
+    "scenario_family": "ASK_unknown",
+    "citizen_text": "Cuaca hari ini gimana?",
+    "expected": {
+      "intent": ["UNKNOWN"],
+      "has_answer": false
+    }
+  },
+  {
+    "id": "ask_unknown_02",
+    "scenario_family": "ASK_unknown",
+    "citizen_text": "Apakah benar bumi itu datar?",
+    "expected": {
+      "intent": ["UNKNOWN"],
+      "has_answer": false
+    }
+  },
+  {
+    "id": "ask_unknown_03",
+    "scenario_family": "ASK_unknown",
+    "citizen_text": " resepi rendang yang paling enak gimana?",
+    "expected": {
+      "intent": ["UNKNOWN"],
+      "has_answer": false
+    }
+  }
+]
