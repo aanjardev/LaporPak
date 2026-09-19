@@ -37,11 +37,11 @@
 - [x] Detail UUID yang tidak ada menampilkan halaman laporan tidak ditemukan.
   Detail serta galeri tidak memiliki overflow horizontal pada viewport 390 px
   dan 1280 px, dan tidak ada error/warning pada console browser.
-- [ ] TRACK pada FastAPI nyata masih gagal `503 DATABASE_UNAVAILABLE`.
-  Diagnosis read-only menemukan PostgreSQL `AmbiguousParameter: could not
-  determine data type of parameter $3` pada kondisi nullable `:ticket is null`
-  di `CitizenRepository.track_reports()`. Anjar perlu memperbaiki query dan
-  menambahkan regression test sebelum REPORT ditutup.
+- [ ] Bug TRACK `AmbiguousParameter` telah diperbaiki pada backend dengan cast
+  eksplisit untuk parameter tiket di `track_reports()` dan `track_requests()`,
+  serta regression test pemilik/lintas pengirim sudah lulus. Uji ulang FastAPI
+  nyata dan WhatsApp pemilik `LP-2026-0010` masih diperlukan sebelum REPORT
+  ditutup.
 - [ ] `403` akun terautentikasi tanpa izin dan scoped `404` lintas desa masih
   memerlukan akun/unit uji kedua pada lingkungan bersama. Coverage otomatis
   sudah lulus, tetapi belum menggantikan uji runtime ini.

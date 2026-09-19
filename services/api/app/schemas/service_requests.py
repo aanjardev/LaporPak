@@ -33,7 +33,7 @@ class ServiceRequestCreate(StrictSchema):
         return value
 
 
-class ServiceRequestItem(StrictSchema):
+class ServiceRequestCreated(StrictSchema):
     id: UUID
     ticket_number: str
     request_type: str
@@ -47,8 +47,33 @@ class ServiceRequestItem(StrictSchema):
     updated_at: datetime
 
 
+class ServiceRequestSummary(StrictSchema):
+    id: UUID
+    ticket_number: str
+    request_type: str
+    applicant_name: str
+    status: ServiceRequestStatus
+    administrative_unit_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class ServiceRequestHistory(StrictSchema):
+    old_status: ServiceRequestStatus | None
+    new_status: ServiceRequestStatus
+    actor_type: str
+    actor_display_name: str | None
+    reason: str | None
+    created_at: datetime
+
+
+class ServiceRequestDetail(ServiceRequestCreated):
+    allowed_transitions: list[ServiceRequestStatus]
+    status_history: list[ServiceRequestHistory]
+
+
 class ServiceRequestList(StrictSchema):
-    items: list[ServiceRequestItem]
+    items: list[ServiceRequestSummary]
     page: int
     page_size: int
     total: int
@@ -65,3 +90,10 @@ class ServiceRequestStatusUpdate(StrictSchema):
         if not value:
             raise ValueError("reason must not be blank")
         return value
+
+
+class ServiceRequestStatusUpdateResponse(StrictSchema):
+    id: UUID
+    ticket_number: str
+    status: ServiceRequestStatus
+    updated_at: datetime

@@ -8,7 +8,6 @@ import {
   type ServiceRequest,
   type ServiceRequestDecision,
   type ServiceRequestDecisionStatus,
-  type ServiceRequestStatus,
 } from "@/lib/service-request-types";
 import { saveRequestDecision } from "./actions";
 
@@ -29,24 +28,17 @@ const decisionErrors: Record<number, string> = {
   503: "Layanan pengajuan sedang bermasalah. Alasan tetap tersimpan agar dapat dicoba lagi.",
 };
 
-const availableDecisions: Partial<
-  Record<
-    ServiceRequestStatus,
-    Array<{ value: ServiceRequestDecisionStatus; label: string }>
-  >
-> = {
-  pending_review: [
-    { value: "approved", label: "Setujui" },
-    { value: "rejected", label: "Tolak" },
-  ],
-  approved: [{ value: "completed", label: "Tandai selesai" }],
+const decisionLabels: Record<ServiceRequestDecisionStatus, string> = {
+  approved: "Setujui",
+  rejected: "Tolak",
+  completed: "Tandai selesai",
 };
 
 export function RequestDetailView({ initialRequest }: { initialRequest: ServiceRequest }) {
   const router = useRouter();
-  const [request, setRequest] = useState(initialRequest);
+  const request = initialRequest;
   const [decision, setDecision] = useState<ServiceRequestDecision["status"]>(
-    availableDecisions[initialRequest.status]?.[0]?.value ?? "approved",
+    initialRequest.allowed_transitions[0] ?? "approved",
   );
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState(false);
@@ -73,8 +65,6 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
         reason: normalized,
       });
       if (result.ok) {
-        setRequest(result.item);
-        setDecision(availableDecisions[result.item.status]?.[0]?.value ?? decision);
         setReason("");
         setMessage({
           kind: "success",
@@ -102,7 +92,10 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
     ["Tujuan permohonan", request.purpose],
     ["ID unit administratif", request.administrative_unit_id],
   ];
-  const decisions = availableDecisions[request.status] ?? [];
+  const decisions = request.allowed_transitions.map((value) => ({
+    value,
+    label: decisionLabels[value],
+  }));
 
   return (
     <div className="space-y-6">
@@ -136,9 +129,21 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <h2 className="text-lg font-semibold">Riwayat keputusan</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">
-          Riwayat keputusan sudah disimpan oleh backend, tetapi belum tersedia pada respons detail API saat ini.
-        </p>
+        {request.status_history.length === 0 ? (
+          <p className="mt-2 text-sm leading-6 text-slate-600">Belum ada riwayat keputusan.</p>
+        ) : (
+          <ol className="mt-4 space-y-4 border-l-2 border-slate-200 pl-5">
+            {request.status_history.map((entry, index) => (
+              <li key={`${entry.created_at}-${index}`}>
+                <p className="font-semibold">{requestStatusLabels[entry.new_status]}</p>
+                <p className="text-xs text-slate-500">
+                  {dateLabel(entry.created_at)} · {entry.actor_display_name ?? (entry.actor_type === "system" ? "Sistem" : "Petugas desa")}
+                </p>
+                {entry.reason && <p className="mt-1 text-sm text-slate-700">{entry.reason}</p>}
+              </li>
+            ))}
+          </ol>
+        )}
       </section>
 
       {decisions.length > 0 && (

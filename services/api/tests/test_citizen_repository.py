@@ -35,3 +35,18 @@ def test_knowledge_queries_cast_optional_service_key_to_text():
         "d.metadata->>'approval_status'='approved'"
     ) == 2
     assert "coalesce(d.metadata->>'approval_status'" not in session.statements[0]
+
+
+def test_track_queries_cast_optional_ticket_parameter_to_text():
+    session = CapturingSession()
+    repository = CitizenRepository(session)
+    unit_id = UUID("00000000-0000-4000-8000-000000000002")
+
+    repository.track_reports("+6281200000000", None, unit_id)
+    repository.track_requests("+6281200000000", "REQ-2026-0001", unit_id)
+
+    for statement in session.statements:
+        normalized = " ".join(statement.split())
+        assert "cast(:ticket as text) is null" in normalized
+        assert "ticket_number = cast(:ticket as text)" in normalized
+        assert ":ticket is null" not in normalized

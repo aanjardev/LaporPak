@@ -9,9 +9,13 @@ from sqlalchemy.orm import Session
 from app.db.service_request_repositories import ServiceRequestRepository
 from app.schemas.service_requests import (
     ServiceRequestCreate,
-    ServiceRequestItem,
+    ServiceRequestCreated,
+    ServiceRequestDetail,
+    ServiceRequestHistory,
     ServiceRequestList,
     ServiceRequestStatus,
+    ServiceRequestStatusUpdateResponse,
+    ServiceRequestSummary,
 )
 from app.services.exceptions import (
     DuplicateOperationError,
@@ -23,19 +27,19 @@ from app.services.exceptions import (
 from app.services.reports import advisory_lock_key, normalize_phone_number
 
 TRANSITIONS = {
-    ServiceRequestStatus.PENDING_REVIEW: {
+    ServiceRequestStatus.PENDING_REVIEW: (
         ServiceRequestStatus.APPROVED,
         ServiceRequestStatus.REJECTED,
-    },
-    ServiceRequestStatus.APPROVED: {ServiceRequestStatus.COMPLETED},
-    ServiceRequestStatus.REJECTED: set(),
-    ServiceRequestStatus.COMPLETED: set(),
+    ),
+    ServiceRequestStatus.APPROVED: (ServiceRequestStatus.COMPLETED,),
+    ServiceRequestStatus.REJECTED: (),
+    ServiceRequestStatus.COMPLETED: (),
 }
 
 
 @dataclass(frozen=True)
 class RequestResult:
-    item: ServiceRequestItem
+    item: ServiceRequestCreated
     replayed: bool
 
 
@@ -47,9 +51,15 @@ class ServiceRequestService:
         self.repository = repository or ServiceRequestRepository(session)
 
     @staticmethod
-    def item(row) -> ServiceRequestItem:
-        return ServiceRequestItem.model_validate(
-            {field: row[field] for field in ServiceRequestItem.model_fields}
+    def created(row) -> ServiceRequestCreated:
+        return ServiceRequestCreated.model_validate(
+            {field: row[field] for field in ServiceRequestCreated.model_fields}
+        )
+
+    @staticmethod
+    def summary(row) -> ServiceRequestSummary:
+        return ServiceRequestSummary.model_validate(
+            {field: row[field] for field in ServiceRequestSummary.model_fields}
         )
 
     def create(
@@ -69,7 +79,7 @@ class ServiceRequestService:
                     if existing["idempotency_payload_hash"] != digest:
                         raise DuplicateOperationError
                     row = self.repository.detail(existing["id"], None)
-                    return RequestResult(self.item(row), True)
+                    return RequestResult(self.created(row), True)
                 citizen = self.repository.citizen(phone)
                 request_type = self.repository.request_type(payload.request_type)
                 if request_type is None:
@@ -97,7 +107,7 @@ class ServiceRequestService:
                 )
                 detail = dict(row)
                 detail["request_type"] = payload.request_type
-                return RequestResult(self.item(detail), False)
+                return RequestResult(self.created(detail), False)
         except DuplicateOperationError, ReportNotFoundError, InvalidSenderIdentityError:
             raise
         except SQLAlchemyError as exc:
@@ -111,7 +121,7 @@ class ServiceRequestService:
                 (page - 1) * page_size, page_size, unit_ids
             )
             return ServiceRequestList(
-                items=[self.item(row) for row in rows],
+                items=[self.summary(row) for row in rows],
                 page=page,
                 page_size=page_size,
                 total=total,
@@ -120,13 +130,27 @@ class ServiceRequestService:
             raise ReportPersistenceError("service request list") from exc
 
     def detail(
-        self, request_id: UUID, unit_ids: tuple[UUID, ...] | None
-    ) -> ServiceRequestItem:
+        self,
+        request_id: UUID,
+        unit_ids: tuple[UUID, ...] | None,
+        *,
+        can_transition: bool,
+    ) -> ServiceRequestDetail:
         try:
             row = self.repository.detail(request_id, unit_ids)
             if row is None:
                 raise ReportNotFoundError(request_id)
-            return self.item(row)
+            status = ServiceRequestStatus(row["status"])
+            history = self.repository.list_history(request_id)
+            return ServiceRequestDetail(
+                **self.created(row).model_dump(),
+                allowed_transitions=list(TRANSITIONS[status])
+                if can_transition
+                else [],
+                status_history=[
+                    ServiceRequestHistory.model_validate(item) for item in history
+                ],
+            )
         except ReportNotFoundError:
             raise
         except SQLAlchemyError as exc:
@@ -139,7 +163,7 @@ class ServiceRequestService:
         reason: str,
         actor: str,
         unit_ids: tuple[UUID, ...] | None,
-    ) -> ServiceRequestItem:
+    ) -> ServiceRequestStatusUpdateResponse:
         try:
             with self.session.begin():
                 current = self.repository.detail(request_id, unit_ids, lock=True)
@@ -148,7 +172,7 @@ class ServiceRequestService:
                 old = ServiceRequestStatus(current["status"])
                 if status not in TRANSITIONS[old]:
                     raise InvalidStatusTransitionError(old.value, status.value)
-                self.repository.update(request_id, status.value)
+                updated = self.repository.update(request_id, status.value)
                 self.repository.history(
                     {
                         "service_request_id": request_id,
@@ -159,7 +183,12 @@ class ServiceRequestService:
                         "notes": reason,
                     }
                 )
-                return self.detail(request_id, unit_ids)
+                return ServiceRequestStatusUpdateResponse.model_validate(
+                    {
+                        field: updated[field]
+                        for field in ServiceRequestStatusUpdateResponse.model_fields
+                    }
+                )
         except ReportNotFoundError, InvalidStatusTransitionError:
             raise
         except SQLAlchemyError as exc:

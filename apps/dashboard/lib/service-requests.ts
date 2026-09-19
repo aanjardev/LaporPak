@@ -1,7 +1,8 @@
 import type {
-  ServiceRequestItem,
+  ServiceRequest,
   ServiceRequestList,
   ServiceRequestStatus,
+  ServiceRequestStatusUpdateResponse,
 } from "./service-request-types";
 
 export class ServiceRequestApiError extends Error {
@@ -43,7 +44,7 @@ export function listServiceRequests(page: number, accessToken?: string) {
 }
 
 export function getServiceRequest(id: string, accessToken?: string) {
-  return request<ServiceRequestItem>(
+  return request<ServiceRequest>(
     `/api/v1/service-requests/${encodeURIComponent(id)}`, undefined, accessToken,
   );
 }
@@ -54,7 +55,7 @@ export function updateServiceRequest(
   reason: string,
   accessToken?: string,
 ) {
-  return request<ServiceRequestItem>(
+  return request<ServiceRequestStatusUpdateResponse>(
     `/api/v1/service-requests/${encodeURIComponent(id)}/status`,
     { method: "PATCH", body: JSON.stringify({ status, reason }) }, accessToken,
   );

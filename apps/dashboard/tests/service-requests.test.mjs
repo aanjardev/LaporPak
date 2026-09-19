@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -8,16 +9,23 @@ import {
 } from "../lib/service-requests.ts";
 
 test("REQUEST API uses admin token and contract paths", async () => {
-  const previousUrl = process.env.NEXT_PUBLIC_API_URL;
   process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
   const calls = [];
   const previous = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
     calls.push({ url: String(url), init });
-    return Response.json(
-      calls.length === 1
-        ? { items: [], page: 2, page_size: 20, total: 0 }
-        : {
+    return Response.json(calls.length === 1
+      ? { items: [{
+          id: "11111111-1111-4111-8111-111111111111",
+          ticket_number: "REQ-2026-0001",
+          request_type: "residency_letter",
+          applicant_name: "Warga Uji",
+          status: "pending_review",
+          administrative_unit_id: "22222222-2222-4222-8222-222222222222",
+          created_at: "2026-09-19T00:00:00Z",
+          updated_at: "2026-09-19T00:00:00Z",
+        }], page: 2, page_size: 20, total: 1 }
+      : calls.length === 2 ? {
             id: "11111111-1111-4111-8111-111111111111",
             ticket_number: "REQ-2026-0001",
             request_type: "residency_letter",
@@ -29,17 +37,33 @@ test("REQUEST API uses admin token and contract paths", async () => {
             administrative_unit_id: "22222222-2222-4222-8222-222222222222",
             created_at: "2026-09-19T00:00:00Z",
             updated_at: "2026-09-19T00:00:00Z",
-          },
-    );
+            allowed_transitions: ["approved", "rejected"],
+            status_history: [{
+              old_status: null,
+              new_status: "pending_review",
+              actor_type: "system",
+              actor_display_name: null,
+              reason: "Request created",
+              created_at: "2026-09-19T00:00:00Z",
+            }],
+          } : {
+            id: "11111111-1111-4111-8111-111111111111",
+            ticket_number: "REQ-2026-0001",
+            status: "approved",
+            updated_at: "2026-09-19T01:00:00Z",
+          });
   };
   try {
-    await listServiceRequests(2, "admin-token");
-    await getServiceRequest("request-id", "admin-token");
-    await updateServiceRequest("request-id", "approved", "Lengkap", "admin-token");
+    const list = await listServiceRequests(2, "admin-token");
+    const detail = await getServiceRequest("request-id", "admin-token");
+    const updated = await updateServiceRequest("request-id", "approved", "Lengkap", "admin-token");
+    assert.equal("purpose" in list.items[0], false);
+    assert.deepEqual(detail.allowed_transitions, ["approved", "rejected"]);
+    assert.equal(detail.status_history[0].actor_display_name, null);
+    assert.equal(JSON.stringify(detail).includes("supabase:"), false);
+    assert.deepEqual(Object.keys(updated).sort(), ["id", "status", "ticket_number", "updated_at"]);
   } finally {
     globalThis.fetch = previous;
-    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
-    else process.env.NEXT_PUBLIC_API_URL = previousUrl;
   }
 
   assert.match(calls[0].url, /service-requests\?page=2&page_size=20$/);
@@ -53,22 +77,20 @@ test("REQUEST API uses admin token and contract paths", async () => {
   });
 });
 
-test("REQUEST API preserves controlled failure status", async () => {
-  const previousUrl = process.env.NEXT_PUBLIC_API_URL;
-  const previous = globalThis.fetch;
-  process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
-  globalThis.fetch = async () => Response.json(
-    { error: { code: "INVALID_STATUS_TRANSITION" } },
-    { status: 409 },
+test("REQUEST detail UI uses transitions supplied by backend", async () => {
+  const source = await readFile(
+    new URL("../app/reports/requests/[id]/decision-form.tsx", import.meta.url),
+    "utf8",
   );
-  try {
-    await assert.rejects(
-      updateServiceRequest("request-id", "rejected", "Sudah berubah", "admin-token"),
-      { status: 409 },
-    );
-  } finally {
-    globalThis.fetch = previous;
-    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
-    else process.env.NEXT_PUBLIC_API_URL = previousUrl;
-  }
+  assert.match(source, /request\.allowed_transitions/);
+  assert.doesNotMatch(source, /availableDecisions/);
+  assert.match(source, /status_history/);
+});
+
+test("REQUEST list does not render detail-only purpose", async () => {
+  const source = await readFile(
+    new URL("../app/reports/requests/page.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /item\.purpose/);
 });

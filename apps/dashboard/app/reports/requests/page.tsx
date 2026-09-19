@@ -54,7 +54,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Sea
               <article key={item.id} className="grid min-w-0 gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0 space-y-1">
                   <Link href={`/reports/requests/${item.id}`} className="break-all font-semibold text-sky-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">{item.ticket_number}</Link>
-                  <p className="break-words text-sm text-slate-900">{item.applicant_name} · {item.purpose}</p>
+                  <p className="break-words text-sm text-slate-900">{item.applicant_name}</p>
                   <p className="text-xs text-slate-600">Diajukan {new Date(item.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" })}</p>
                 </div>
                 <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{requestStatusLabels[item.status]}</span>

@@ -21,7 +21,8 @@ class CitizenRepository:
             join public.citizens c on c.id = r.citizen_id
             left join public.report_status_history h on h.report_id = r.id
             where c.phone_number = :phone and r.administrative_unit_id = :unit
-              and (:ticket is null or r.ticket_number = :ticket)
+              and (cast(:ticket as text) is null or
+                   r.ticket_number = cast(:ticket as text))
             group by r.id order by r.created_at desc limit 5
         """),
                 {"phone": phone, "ticket": ticket, "unit": unit_id},
@@ -43,7 +44,8 @@ class CitizenRepository:
             join public.citizens c on c.id = r.citizen_id
             left join public.service_request_status_history h on h.service_request_id = r.id
             where c.phone_number = :phone and r.administrative_unit_id = :unit
-              and (:ticket is null or r.ticket_number = :ticket)
+              and (cast(:ticket as text) is null or
+                   r.ticket_number = cast(:ticket as text))
             group by r.id order by r.created_at desc limit 5
         """),
                 {"phone": phone, "ticket": ticket, "unit": unit_id},

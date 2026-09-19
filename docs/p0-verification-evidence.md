@@ -1,5 +1,23 @@
 # P0 REPORT Verification Evidence
 
+## Demo-readiness attachment recheck — 2026-09-19
+
+Baseline `main`: `81417b0`. GitHub Actions run `35424935073` completed
+successfully for that SHA.
+
+Against the development Supabase project, an in-process FastAPI request created
+synthetic ticket `LP-2026-0011` with one PNG. The object was read back through
+the scoped report service with `image/png`; detail serialization exposed only
+`id`, `file_name`, `mime_type`, `file_size`, and `created_at`. The dashboard now
+uses a same-origin server proxy carrying the admin session to FastAPI and never
+constructs a Supabase object URL.
+
+Local checks on `feat/demo-readiness`: backend 119 passed and Ruff passed;
+dashboard 15 passed, lint passed, and build passed; OpenClaw plugin 7 passed.
+Actual browser authorization with two Supabase admin accounts and the
+WhatsApp/Gemini flow remain manual integration gates documented in
+`demo-runbook.md`.
+
 > Date: 2026-09-17  
 > Environment: Supabase development + FastAPI local process  
 > Branch: `feat/db-foundation`
@@ -67,13 +85,14 @@ Observed against the development Supabase project:
   `AmbiguousParameter` error; retrieval now requires explicit approved metadata;
 - REQUEST gained a trusted OpenClaw submit tool, dashboard list/detail/human
   decision pages, and automated village-scope query coverage;
-- a GitHub Actions workflow was added to run backend, dashboard, and OpenClaw
-  plugin checks; its first hosted run remains to be observed after push.
+- a GitHub Actions workflow runs backend, dashboard, and OpenClaw plugin checks;
+  hosted run `35424935073` succeeded on merged `main` SHA `81417b0`.
 
 Limitations: knowledge remains demo-only rather than approved village SOP;
 REQUEST has not completed a live WhatsApp-to-human-decision run; the two-unit
 scope test is automated rather than a live two-village environment; and the
-private attachment reader still lacks a real stored-object integration check.
+private attachment still needs an HTTP authorization check with two real admin
+sessions even though real object storage creation and service read now pass.
 
 ## End-to-end backend demonstration
 
