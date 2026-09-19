@@ -8,6 +8,7 @@ import {
 } from "../lib/service-requests.ts";
 
 test("REQUEST API uses admin token and contract paths", async () => {
+  const previousUrl = process.env.NEXT_PUBLIC_API_URL;
   process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
   const calls = [];
   const previous = globalThis.fetch;
@@ -37,6 +38,8 @@ test("REQUEST API uses admin token and contract paths", async () => {
     await updateServiceRequest("request-id", "approved", "Lengkap", "admin-token");
   } finally {
     globalThis.fetch = previous;
+    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = previousUrl;
   }
 
   assert.match(calls[0].url, /service-requests\?page=2&page_size=20$/);
@@ -48,4 +51,24 @@ test("REQUEST API uses admin token and contract paths", async () => {
     status: "approved",
     reason: "Lengkap",
   });
+});
+
+test("REQUEST API preserves controlled failure status", async () => {
+  const previousUrl = process.env.NEXT_PUBLIC_API_URL;
+  const previous = globalThis.fetch;
+  process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
+  globalThis.fetch = async () => Response.json(
+    { error: { code: "INVALID_STATUS_TRANSITION" } },
+    { status: 409 },
+  );
+  try {
+    await assert.rejects(
+      updateServiceRequest("request-id", "rejected", "Sudah berubah", "admin-token"),
+      { status: 409 },
+    );
+  } finally {
+    globalThis.fetch = previous;
+    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = previousUrl;
+  }
 });

@@ -1,6 +1,8 @@
 # Rencana ASK, TRACK, dan AI Lokal LaporPak
 
-Status: baseline ASK/TRACK/REPORT telah diimplementasikan pada branch aktif.
+Status: baseline ASK/TRACK/REPORT telah diimplementasikan. REQUEST
+`residency_letter` juga memiliki API, tool OpenClaw, dan workflow admin
+dashboard; SOP serta pengujian end-to-end bersama masih terbuka.
 Dasar: document.md yang diberikan pengguna, PRD V3, inspeksi kode lokal pada
 17 September 2026, dan rujukan di akhir dokumen. Kontrak runtime terkini tetap
 berada di `docs/api-contract.md`; dokumen ini menyimpan keputusan desain dan tahap
@@ -21,7 +23,9 @@ Asumsi awal karena desa, SOP, dan jadwal pilot belum diberikan:
   drainase. Persyaratan dan kewenangan nyata harus mengikuti SOP yang disetujui.
 - TRACK hanya laporan LaporPak milik pengirim yang terautentikasi. Bukan pelacakan
   aplikasi Dukcapil, bansos, atau instansi lain tanpa integrasi resmi.
-- REQUEST baru sebatas penjelasan persiapan melalui ASK; belum membuat pengajuan.
+- REQUEST memiliki API create/admin dan tool OpenClaw sebagai baseline teknis,
+  tetapi belum boleh diaktifkan dengan data warga nyata sebelum SOP, data
+  minimum, pejabat pemberi keputusan, dan flow lengkap disahkan serta diuji.
 - Data simulasi diberi label pada setiap jawaban dan tidak diaktifkan di produksi.
 - Tidak ada fine-tuning model, voice, prediksi ETA, pengiriman notifikasi otomatis,
   atau multi-desa produksi pada rilis pertama.
@@ -37,6 +41,12 @@ Kondisi kode saat inspeksi 17 September 2026 (historis):
   attachment_waived. Ini harus diselaraskan sebelum rilis berikutnya.
 - Pemeriksaan ini tidak membuktikan bahwa WhatsApp sudah terhubung atau seluruh
   perubahan lokal sudah lulus tes. Verifikasi runtime tetap diperlukan.
+
+Temuan historis di atas sudah ditindaklanjuti: route admin REPORT, ASK, TRACK,
+validasi foto wajib, dan penghapusan `attachment_waived` tersedia pada baseline
+saat ini. Bagian tersebut dipertahankan hanya sebagai jejak alasan penyusunan
+rencana; gunakan status pada pembuka dokumen dan
+[rencana delivery MVP](mvp-delivery-plan.md) untuk progress terbaru.
 
 ## 2. Brainstorming yang diprioritaskan
 
@@ -115,19 +125,20 @@ Tetap WhatsApp → OpenClaw/Gemini → tool terotorisasi → FastAPI → Supabas
 OpenClaw menjadi satu-satunya pemanggil model. Tidak menambahkan model caller di
 FastAPI, SQL tool, Redis, workflow engine, atau service AI terpisah.
 
-Tambahkan contract minor berikutnya untuk ASK/TRACK dan penghapusan waiver foto.
-Schema REPORT lama dipertahankan untuk analisis REPORT; tambahkan schema routing
-terpisah untuk ASK/REPORT/TRACK/REQUEST/UNKNOWN agar ASK tidak wajib mengisi field
-laporan. REQUEST dikenali untuk memberi panduan, tetapi belum punya aksi submit.
+Kontrak ASK/TRACK dan kewajiban foto sudah masuk baseline. Schema REPORT tetap
+terpisah dari routing ASK/REPORT/TRACK/REQUEST/UNKNOWN agar ASK tidak wajib
+mengisi field laporan. Backend dan OpenClaw mempunyai aksi submit REQUEST;
+layanan belum boleh memakai data warga nyata sebelum SOP disahkan.
 
-Interface baru yang diusulkan:
+Interface aktif:
 
 | Interface | Input dan hasil | Otorisasi |
 |---|---|---|
-| POST /api/v1/ask | question, optional service_key → outcome, approved answer blocks, sources, clarification/options, next_actions | Internal OpenClaw |
-| POST /api/v1/track | trusted sender, optional ticket_number atau pencarian teks/tanggal → items, checked_at, has_more | Internal OpenClaw + kepemilikan laporan |
+| POST /api/v1/ask | question, optional service_key/query_embedding → outcome, answer_blocks, sources | Internal OpenClaw |
+| POST /api/v1/track | trusted sender, optional ticket_number → checked_at, items + timeline | Internal OpenClaw + kepemilikan REPORT/REQUEST |
 | laporpak_ask | question, optional service_key | Tool tanpa argumen identitas/desa dari model |
-| laporpak_track_report | optional ticket_number/search | Plugin menyuntik identitas dari runtime WhatsApp |
+| laporpak_track_report | optional ticket_number `LP-*` atau `REQ-*` | Plugin menyuntik identitas dari runtime WhatsApp |
+| laporpak_create_service_request | field `residency_letter` setelah konfirmasi warga | Plugin menyuntik identitas/desa dan idempotency key dari runtime tepercaya |
 
 Pertahankan X-OpenClaw-API-Key dan error envelope yang ada. Sender/session/account
 diisi adapter dari metadata kanal, bukan dipilih model. POST TRACK menghindari
@@ -275,23 +286,23 @@ dukungan sumber per klaim, kewajaran pertanyaan, dan istilah lokal; LLM judge ha
 membantu menemukan kandidat masalah. CSAT, completion rate, jumlah klarifikasi,
 dan waktu operator diukur saat pilot, belum dapat diklaim membaik dari unit test.
 
-## 6. Urutan pengerjaan pada prompt berikutnya
+## 6. Urutan delivery dan status
 
-1. **PR fondasi:** preservasi perubahan lokal, selaraskan kewajiban foto dan media,
+1. **Fondasi — tersedia, gerbang integrasi belum seluruhnya tutup:** kewajiban foto dan media,
    buktikan konfirmasi/idempotensi, serta dokumentasikan hasil smoke test. Jangan
    menganggap seluruh P0 selesai berdasarkan README atau test lama.
-2. **PR TRACK + admin:** selesaikan otorisasi admin/status history, endpoint/tool
+2. **TRACK + admin — baseline tersedia:** otorisasi admin/status history, endpoint/tool
    TRACK privat, dan rendering status deterministik. Demo: petugas mengubah status,
    pemilik melihat perubahan, pengirim lain tidak dapat melihatnya.
-3. **PR ASK:** kontrak, metadata sumber, import idempotent, FTS/alias, answer blocks,
+3. **ASK — baseline tersedia:** kontrak, metadata sumber, FTS/alias, answer blocks,
    tool ASK, fixture demo dan refusal saat sumber tidak layak. Demo tidak memerlukan
    menunggu SOP nyata; aktivasi untuk warga nyata memerlukan approval sumber.
-4. **PR skenario + evaluasi:** enam keluarga skenario, perpindahan ASK/REPORT/TRACK,
+4. **Skenario + evaluasi — tersedia, hasil E2E perlu dicatat:** enam keluarga skenario, perpindahan ASK/REPORT/TRACK,
    audit sumber, knowledge gaps, holdout, dan tutorial operator. Update contract,
    architecture, workflows, serta workspace policy dalam PR yang sesuai.
-5. **Pilot terbatas:** pairing WhatsApp akun uji, editor sumber dan operator nyata,
-   review hasil, lalu perbaiki kegagalan. Voice/photo understanding, push status,
-   REQUEST satu layanan, dan multi-desa menjadi tahap berikut berdasarkan bukti.
+5. **Tahap berikut:** validasi sumber ASK dan kepemilikan TRACK pada kanal nyata,
+   finalisasi SOP REQUEST, buat tool submit REQUEST, integrasikan UI petugas,
+   lalu uji isolasi dua desa.
 
 Gunakan migration baru dengan nomor berikutnya setelah memeriksa repository saat
 implementasi; jangan mengedit migration yang sudah dipakai. RLS dan privilege tabel
@@ -310,13 +321,9 @@ menguasai stack, termasuk stabilisasi fondasi dan pengujian, setelah akses dan b
 tersedia. Ini estimasi bersyarat, bukan janji; SOP belum siap dan integrasi media
 yang belum terbukti dapat memperpanjang pilot.
 
-Prompt lanjutan yang disarankan:
-
-> Implementasikan docs/ask-track-ai-plan.md berurutan mulai PR fondasi, lalu TRACK,
-> ASK, dan skenario/evaluasi. Gunakan asumsi desa simulasi sampai SOP nyata disetujui.
-> Pertahankan perubahan lokal yang ada, ikuti kewajiban foto terbaru, jangan memberi
-> AI akses database atau mutation status, dan laporkan hasil tes per tahap. Jangan
-> aktifkan fitur untuk warga nyata sebelum gerbang sumber dan otorisasi lulus.
+Gunakan asumsi desa simulasi sampai SOP nyata disetujui. Jangan memberi AI akses
+database atau mutation status, dan jangan mengaktifkan fitur warga nyata sebelum
+gerbang sumber, kepemilikan, otorisasi, dan fallback lulus.
 
 ## 7. Rujukan dan penggunaannya
 

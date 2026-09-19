@@ -1,6 +1,6 @@
 # Dashboard LaporPak
 
-Dashboard menggunakan Next.js, TypeScript, Tailwind CSS, dan shadcn/ui. Login petugas memakai Supabase Auth. Daftar, detail, dan keputusan petugas dapat memakai data sintetis atau FastAPI sesuai [kontrak API](../../docs/api-contract.md).
+Dashboard menggunakan Next.js, TypeScript, Tailwind CSS, dan shadcn/ui. Login petugas memakai Supabase Auth. REPORT dapat memakai data sintetis atau FastAPI; sumber ASK dan REQUEST memakai FastAPI sesuai [kontrak API](../../docs/api-contract.md).
 
 ## Menjalankan lokal
 
@@ -42,12 +42,40 @@ meneruskan access token Supabase milik sesi petugas; dashboard tidak menyimpan
 secret backend dan tidak membaca tabel laporan langsung dari Supabase.
 `/access-denied` menyiapkan tampilan untuk respons `403`.
 
+## Pengelolaan sumber ASK
+
+Route `/reports/knowledge` menyediakan daftar, tambah, edit, dan penonaktifan
+sumber ASK melalui FastAPI. Request dijalankan dari server Next.js dengan token
+sesi petugas. Respons `401` mengarah ke login, `403` ke halaman akses ditolak,
+`404` detail ke halaman tidak ditemukan, dan kegagalan layanan menampilkan pesan
+umum tanpa membocorkan detail internal. Frontend tidak membaca bucket knowledge
+atau tabel Supabase secara langsung.
+
+Gunakan data sintetis saat menguji formulir. Sumber baru belum dapat disebut
+resmi sampai pemilik konten desa memeriksa isi, versi, cakupan unit, dan status
+aktifnya. ASK warga tetap berjalan melalui WhatsApp/OpenClaw.
+
+## REQUEST Surat Keterangan Domisili
+
+Route `/reports/requests` membaca antrean dan detail dari FastAPI. Petugas dapat
+menyetujui atau menolak pengajuan `pending_review`, lalu menandai pengajuan
+`approved` sebagai `completed`. Semua keputusan memerlukan alasan dan FastAPI
+tetap menentukan apakah transisi, peran, dan cakupan desa diizinkan.
+
+Dashboard mempertahankan alasan ketika penyimpanan gagal, mencegah kirim ganda,
+dan menampilkan respons `401`, `403`, `404`, `409`, `422`, serta kegagalan
+layanan secara aman. Riwayat keputusan sudah disimpan backend, tetapi belum
+ditampilkan karena respons detail belum memuatnya. SOP layanan dan kewenangan
+petugas tetap harus disahkan sebelum REQUEST digunakan dengan data warga nyata.
+
 ## Pemeriksaan
 
 ```powershell
 npm run lint
 npx tsc --noEmit
 npm run test:reports
+npm run test:knowledge
+npm run test:requests
 npm run test:auth
 npm run build
 ```

@@ -169,11 +169,13 @@ meneruskan access token sesi petugas:
 Authorization: Bearer <supabase_access_token>
 ```
 
-FastAPI memverifikasi token melalui Supabase Auth dan memakai UUID pengguna
-sebagai identitas audit. P0 bersifat invite-only dan satu desa; akun publik
-tidak dapat mendaftar sendiri. `DASHBOARD_ADMIN_UNIT_ID` menjadi cakupan demo.
-Tabel role/cakupan admin per pengguna adalah target hardening sebelum
-deployment multi-desa atau pendaftaran pengguna yang lebih luas.
+FastAPI memverifikasi token melalui Supabase Auth, memetakan UUID pengguna ke
+`admin_accounts`, menolak akun nonaktif, dan memakai UUID tersebut sebagai
+identitas audit. `system_admin` memiliki cakupan global; `village_admin`
+dibatasi oleh `admin_unit_memberships`. Pendaftaran admin publik tidak tersedia.
+Fallback `DASHBOARD_ADMIN_UNIT_ID` hanya untuk development legacy ketika
+`ALLOW_LEGACY_ADMIN_FALLBACK=true`; default-nya nonaktif dan tidak boleh dipakai
+sebagai mekanisme izin production.
 
 | Kondisi | HTTP / code | Perilaku dashboard |
 |---|---|---|
@@ -767,6 +769,38 @@ channel integration; model-generated payloads cannot select a village.
 Admin tokens are accepted only when the Supabase Auth UUID maps to an active
 `admin_accounts` row. `system_admin` is global; `village_admin` is limited by
 `admin_unit_memberships`. Out-of-scope detail/mutation returns `404`.
+
+### Kontrak teknis admin REQUEST
+
+Backend dan dashboard menyediakan `residency_letter` melalui endpoint berikut.
+Kontrak teknis ini dipakai pada environment development dengan data sintetis;
+kontrak ini **bukan** persetujuan SOP layanan atau izin memakai data warga nyata.
+
+- `GET /api/v1/service-requests?page=1&page_size=20` mengembalikan
+  `{ items, page, page_size, total }`; `page >= 1`, `1 <= page_size <= 100`.
+- `GET /api/v1/service-requests/{request_id}` mengembalikan satu item atau
+  `404 NOT_FOUND`, termasuk bila pengajuan di luar cakupan desa admin.
+- `PATCH /api/v1/service-requests/{request_id}/status` menerima
+  `{ "status": "approved" | "rejected" | "completed", "reason": "..." }`
+  dan mengembalikan item terbaru; alasan wajib dengan panjang 1–1000 karakter.
+  Backend saat ini menerima `pending_review → approved/rejected` dan
+  `approved → completed`; transisi lain menghasilkan `409 INVALID_STATUS_TRANSITION`.
+
+Item saat ini berisi `id` (UUID), `ticket_number`, `request_type`
+(`residency_letter`), `applicant_name`, `domicile_address`,
+`domicile_duration`, `purpose`, `status` (`pending_review`, `approved`,
+`rejected`, `completed`), `administrative_unit_id` (UUID), `created_at`, dan
+`updated_at`. GET/PATCH admin memerlukan bearer token Supabase dan pemeriksaan
+akun aktif serta cakupan desa pada FastAPI. Kegagalan layanan memakai `503
+DATABASE_UNAVAILABLE`; input tidak valid memakai `422 VALIDATION_ERROR`.
+
+**Keputusan terbuka bersama pemilik SOP, Ferdi, Anjar, dan Farel:** dokumen SOP
+Surat Keterangan Domisili yang disetujui; field minimum yang boleh dikumpulkan
+dan ditampilkan; jabatan/peran yang berwenang memutuskan; kapan pengajuan resmi;
+serta bentuk riwayat status/aktor/alasan yang aman pada respons detail. Backend
+menyimpan riwayat, tetapi respons detail saat ini belum menyertakannya.
+Dashboard boleh memakai endpoint tersebut untuk pengujian sintetis. Aktivasi
+layanan bagi warga nyata menunggu keputusan SOP dan tinjauan lintas role.
 
 ---
 

@@ -16,11 +16,9 @@ export function ReportsNav({ showKnowledge }: { showKnowledge: boolean }) {
       <Link href="/reports" aria-current={!knowledgeActive && !requestsActive ? "page" : undefined} className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 ${!knowledgeActive && !requestsActive ? activeClass : idleClass}`}>
         <ClipboardList aria-hidden="true" size={18} /> Laporan warga
       </Link>
-      {showKnowledge && (
-        <Link href="/reports/requests" aria-current={requestsActive ? "page" : undefined} className={`mt-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 ${requestsActive ? activeClass : idleClass}`}>
-          <FileText aria-hidden="true" size={18} /> Pengajuan layanan
-        </Link>
-      )}
+      <Link href="/reports/requests" aria-current={requestsActive ? "page" : undefined} className={`mt-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 ${requestsActive ? activeClass : idleClass}`}>
+        <FileText aria-hidden="true" size={18} /> Pengajuan layanan
+      </Link>
       {showKnowledge && (
         <Link href="/reports/knowledge" aria-current={knowledgeActive ? "page" : undefined} className={`mt-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 ${knowledgeActive ? activeClass : idleClass}`}>
           <BookOpen aria-hidden="true" size={18} /> Sumber ASK

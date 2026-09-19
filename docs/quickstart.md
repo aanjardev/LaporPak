@@ -1,154 +1,140 @@
-# LaporPak Quick Start Guide
+# LaporPak Quick Start
 
-## Prerequisites
+Panduan ini menjalankan dashboard, FastAPI, dan pemeriksaan lokal tanpa
+menyimpan secret di Git. Baca `AGENTS.md` dan dokumen source of truth sebelum
+mengubah kontrak.
 
-- Python 3.14+
-- Node.js 24.15+
-- Supabase project
-- WhatsApp Business account (optional for testing)
+## Prasyarat
 
-## 1. Environment Setup
+- Node.js LTS; plugin OpenClaw saat ini mensyaratkan Node.js `>=24.15.0`.
+- Python `>=3.14` dan `uv`.
+- Proyek Supabase development.
+- OpenClaw dan WhatsApp hanya diperlukan untuk uji kanal nyata.
 
-Create `services/api/.env`:
+## 1. Konfigurasi environment
 
-```env
-# Database
-DATABASE_URL=
+Backend:
 
-# Supabase
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SECRET_KEY=your-secret-key
-
-# OpenClaw (for internal API calls)
-OPENCLAW_API_KEY=your-openclaw-key
-
-# App
-APP_ENV=development
-FRONTEND_URL=http://localhost:3000
+```powershell
+Copy-Item services/api/.env.example services/api/.env
 ```
 
-## 2. Apply Database Migrations
+Isi sekurangnya `DATABASE_URL`, konfigurasi Supabase, dan
+`OPENCLAW_API_KEY`. Untuk operasi warga melalui OpenClaw, siapkan pula channel
+aktif yang cocok dengan `X-Channel-Account-ID`. Jangan commit `.env`.
 
-Apply every file in `database/migrations/` in filename order. Never replace or
-skip an already-applied migration.
+Frontend:
 
-## 3. Seed Demo Data
-
-```bash
-cd database/seeds
-psql $DATABASE_URL -f 0001_report_categories.sql
-psql $DATABASE_URL -f 0002_demo_administrative_units.sql
-psql $DATABASE_URL -f 0003_production_access.sql
+```powershell
+Copy-Item apps/dashboard/.env.example apps/dashboard/.env.local
 ```
 
-## 4. Start Backend
+Isi `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`, dan anon key publik.
+Jangan memasukkan service role key ke frontend.
+
+## 2. Database
+
+Terapkan semua file `database/migrations/` menurut nomor file, lalu jalankan
+seed menurut urutan:
+
+```powershell
+psql $env:DATABASE_URL -f database/seeds/0001_report_categories.sql
+psql $env:DATABASE_URL -f database/seeds/0002_demo_administrative_units.sql
+psql $env:DATABASE_URL -f database/seeds/0003_production_access.sql
+```
+
+Migration yang sudah diterapkan tidak boleh diedit atau dilewati.
+`0003_production_access.sql` berisi UUID akun demo dan channel sementara;
+tinjau serta ganti nilainya untuk project Supabase lain sebelum menjalankannya.
+
+## 3. Jalankan aplikasi
+
+Terminal API:
 
 ```powershell
 cd services/api
+uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-Or, from the repository root, use the helper script:
-```powershell
-.\start-laporpak.ps1
-```
-
-## 5. Run Tests
+Terminal dashboard:
 
 ```powershell
-# Full test suite
-.\run-tests.ps1
-
-# Just smoke tests
-cd services/api
-python tests/smoke_test.py
-
-# FTS recall test
-cd integrations/openclaw/evals
-node fts-recall.js
+cd apps/dashboard
+npm ci
+npm run dev
 ```
 
-## 6. Test Endpoints
+Alamat lokal:
+
+```text
+Dashboard  http://localhost:3000
+API        http://localhost:8000
+Health     http://localhost:8000/health
+OpenAPI    http://localhost:8000/docs
+```
+
+`start-laporpak.ps1` dapat menjalankan OpenClaw Gateway dan FastAPI, tetapi
+dashboard tetap dijalankan pada terminal terpisah.
+
+## 4. Akun admin
+
+Gunakan akun Supabase Auth invite-only. UUID Auth harus memiliki baris aktif
+di `admin_accounts`. Untuk `village_admin`, tambahkan unit yang diizinkan ke
+`admin_unit_memberships`. Jangan mengaktifkan pendaftaran admin publik.
+
+Setelah login dashboard, uji endpoint admin melalui aplikasi atau:
 
 ```bash
-# Health check
-curl http://localhost:8000/health
+curl http://localhost:8000/api/v1/reports \
+  -H "Authorization: Bearer <supabase-access-token>"
+```
 
-# ASK (with OpenClaw key)
+Jangan menaruh token pada dokumentasi, Git, atau chat.
+
+## 5. Endpoint warga
+
+ASK dan TRACK hanya boleh dipanggil oleh OpenClaw tepercaya. Keduanya memerlukan
+`X-OpenClaw-API-Key` dan `X-Channel-Account-ID`; TRACK juga memakai nomor
+pengirim dari metadata WhatsApp, bukan teks model.
+
+```bash
 curl -X POST http://localhost:8000/api/v1/ask \
-  -H "X-OpenClaw-API-Key: your-openclaw-key" \
-  -H "X-Channel-Account-ID: your-whatsapp-account-id" \
+  -H "X-OpenClaw-API-Key: <key>" \
+  -H "X-Channel-Account-ID: <channel-account-id>" \
   -H "Content-Type: application/json" \
-  -d '{"question": "Kapan kantor buka?"}'
-
-# TRACK
-curl -X POST http://localhost:8000/api/v1/track \
-  -H "X-OpenClaw-API-Key: your-openclaw-key" \
-  -H "X-Channel-Account-ID: your-whatsapp-account-id" \
-  -H "Content-Type: application/json" \
-  -d '{"sender_phone_number": "081234567890"}'
+  -d '{"question":"Kapan kantor buka?"}'
 ```
 
-## 7. Verify FTS Retrieval
+Gunakan data sintetis. ASK baru dianggap siap jika sumbernya telah disetujui.
 
-```bash
-cd integrations/openclaw/evals
-node fts-recall.js
-```
+## 6. REQUEST development
 
-Expected output:
-```
-🔍 FTS Recall Test
+Setelah migration, API, dan akun admin tersedia, buka `/reports/requests` untuk
+menguji antrean, detail, serta keputusan melalui FastAPI. Tool OpenClaw
+`laporpak_create_service_request` dapat membuat pengajuan sintetis yang sudah
+dikonfirmasi warga uji. Jangan memakai data warga nyata sebelum SOP, field
+minimum, dan kewenangan petugas disahkan.
 
-Testing 35 query patterns...
+## 7. Pemeriksaan
 
-📊 Summary
+Lihat [testing.md](testing.md) untuk semua perintah. Minimum sebelum PR:
 
-Total: 35
-Passed: 33 (94.3%)
-❌ BELOW TARGET: 94.3% (need 0.0% more)
+```powershell
+cd services/api
+uv run pytest
+uv run ruff check .
 
-🎯 Target: recall@5 ≥90%
-
-✅ PASSED: 94.3% meets target
-```
-
-## 8. Create Admin Account
-
-1. Create user in Supabase Auth
-2. Run SQL:
-```sql
-INSERT INTO public.admin_accounts (auth_user_id, role, is_active, display_name)
-VALUES ('your-auth-uuid', 'system_admin', true, 'Test Admin');
-```
-
-3. Get Bearer token from Supabase
-4. Test admin endpoint:
-```bash
-curl http://localhost:8000/api/v1/admin/reports \
-  -H "Authorization: Bearer your-token"
+cd ../../apps/dashboard
+npm run lint
+npx tsc --noEmit
+npm run build
 ```
 
 ## Troubleshooting
 
-### "Connection refused"
-- Make sure FastAPI is running on port 8000
-
-### "401 Unauthorized"
-- Check `OPENCLAW_API_KEY` matches in .env and OpenClaw config
-
-### "503 Supabase not configured"
-- Verify `SUPABASE_URL` and `SUPABASE_ANON_KEY` are set
-
-### "404 REPORT_NOT_FOUND"
-- This is expected if no reports exist
-- Create one via WhatsApp or check demo data
-
-## Next Steps
-
-1. ✅ Run all tests
-2. ✅ Verify FTS recall ≥90%
-3. ⬜ Setup WhatsApp integration
-4. ⬜ Create real admin accounts
-5. ⬜ Deploy to pilot
+- `401 UNAUTHORIZED`: periksa kredensial pemanggil dan sesi/token.
+- `403 FORBIDDEN`: akun terautentikasi tetapi tidak memiliki peran yang sesuai.
+- `404`: detail dapat tidak ada atau berada di luar cakupan desa.
+- `503 DATABASE_UNAVAILABLE`: periksa `DATABASE_URL`, migration, dan koneksi
+  Supabase; jangan mengubah kegagalan menjadi respons sukses.
