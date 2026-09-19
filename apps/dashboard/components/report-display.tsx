@@ -28,7 +28,7 @@ export const urgencyLabels: Record<ReportUrgency, string> = {
 
 const statusStyles: Record<ReportStatus, string> = {
   pending_verification: "bg-amber-50 text-amber-900 ring-amber-200",
-  verified: "bg-sky-50 text-sky-900 ring-sky-200",
+  verified: "bg-muted text-brand ring-border",
   in_progress: "bg-indigo-50 text-indigo-900 ring-indigo-200",
   forwarded: "bg-violet-50 text-violet-900 ring-violet-200",
   resolved: "bg-emerald-50 text-emerald-900 ring-emerald-200",
@@ -37,7 +37,7 @@ const statusStyles: Record<ReportStatus, string> = {
 
 export function StatusBadge({ status }: { status: ReportStatus }) {
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${statusStyles[status]}`}>
+    <span className={`ui-badge ${statusStyles[status]}`}>
       {statusLabels[status]}
     </span>
   );

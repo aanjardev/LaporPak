@@ -36,35 +36,35 @@ export function KnowledgeForm({ action, initialValues, mode }: Props) {
   const [values, setValues] = useState(initialValues);
 
   return (
-    <form action={formAction} onSubmit={(event) => { if (pending) event.preventDefault(); }} className={mode === "create" ? "mt-5 grid min-w-0 gap-4" : "grid min-w-0 gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"}>
+    <form action={formAction} onSubmit={(event) => { if (pending) event.preventDefault(); }} className={mode === "create" ? "mt-5 grid min-w-0 gap-4" : "grid min-w-0 gap-4 ui-panel p-5 "}>
       <label className="grid min-w-0 gap-1.5 text-sm font-medium">Judul
-        <input required maxLength={300} name="title" value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 font-normal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" />
+        <input required maxLength={300} name="title" value={values.title} onChange={(event) => setValues({ ...values, title: event.target.value })} className="ui-control px-3 font-normal" />
       </label>
       <div className="grid min-w-0 gap-4 sm:grid-cols-2">
         <label className="grid min-w-0 gap-1.5 text-sm font-medium">Kategori
-          <select name="category" value={values.category} onChange={(event) => setValues({ ...values, category: event.target.value })} className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 font-normal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">
+          <select name="category" value={values.category} onChange={(event) => setValues({ ...values, category: event.target.value })} className="ui-control px-3 font-normal">
             {categoryOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
         <label className="grid min-w-0 gap-1.5 text-sm font-medium">Kunci layanan
-          <input name="service_key" pattern="[a-z0-9_-]+" required={mode === "edit" && Boolean(initialValues.serviceKey)} value={values.serviceKey} onChange={(event) => setValues({ ...values, serviceKey: event.target.value })} placeholder="contoh: office_hours" className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 font-normal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" />
+          <input name="service_key" pattern="[a-z0-9_-]+" required={mode === "edit" && Boolean(initialValues.serviceKey)} value={values.serviceKey} onChange={(event) => setValues({ ...values, serviceKey: event.target.value })} placeholder="contoh: office_hours" className="ui-control px-3 font-normal" />
         </label>
       </div>
-      {mode === "edit" && initialValues.serviceKey && <p className="text-xs leading-5 text-slate-600">Kunci layanan yang sudah ada dapat diubah, tetapi belum dapat dikosongkan.</p>}
+      {mode === "edit" && initialValues.serviceKey && <p className="text-xs leading-5 text-muted-foreground">Kunci layanan yang sudah ada dapat diubah, tetapi belum dapat dikosongkan.</p>}
       {mode === "create" && (
-        <label className="grid min-w-0 gap-1.5 text-sm font-medium">ID unit administratif <span className="font-normal text-slate-500">Hanya wajib untuk admin sistem</span>
-          <input name="administrative_unit_id" value={values.unitId ?? ""} onChange={(event) => setValues({ ...values, unitId: event.target.value })} placeholder="UUID desa" className="min-h-11 w-full min-w-0 rounded-lg border border-slate-300 px-3 font-normal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" />
+        <label className="grid min-w-0 gap-1.5 text-sm font-medium">ID unit administratif <span className="font-normal text-muted-foreground">Hanya wajib untuk admin sistem</span>
+          <input name="administrative_unit_id" value={values.unitId ?? ""} onChange={(event) => setValues({ ...values, unitId: event.target.value })} placeholder="UUID desa" className="ui-control px-3 font-normal" />
         </label>
       )}
       <label className="grid min-w-0 gap-1.5 text-sm font-medium">Isi Markdown
-        <textarea required name="content" value={values.content} onChange={(event) => setValues({ ...values, content: event.target.value })} rows={mode === "create" ? 10 : 16} className="w-full min-w-0 rounded-lg border border-slate-300 p-3 font-mono text-sm font-normal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" />
+        <textarea required name="content" value={values.content} onChange={(event) => setValues({ ...values, content: event.target.value })} rows={mode === "create" ? 10 : 16} className="ui-control p-3 font-mono font-normal" />
       </label>
       <label className="flex min-h-11 items-center gap-2 text-sm">
-        <input name="is_mandatory" type="checkbox" checked={values.isMandatory} onChange={(event) => setValues({ ...values, isMandatory: event.target.checked })} className="size-4 accent-sky-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" /> Sumber wajib untuk desa
+        <input name="is_mandatory" type="checkbox" checked={values.isMandatory} onChange={(event) => setValues({ ...values, isMandatory: event.target.checked })} className="size-4 accent-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" /> Sumber wajib untuk desa
       </label>
-      {!pending && state.message && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-900">{state.message}</p>}
-      {pending && <p role="status" className="text-sm text-slate-600">{mode === "create" ? "Menyimpan sumber…" : "Menyimpan perubahan…"}</p>}
-      <button type="submit" disabled={pending} className="min-h-11 justify-self-start rounded-lg bg-sky-800 px-5 text-sm font-semibold text-white hover:bg-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:cursor-wait disabled:opacity-60">
+      {!pending && state.message && <p role="alert" className="ui-alert-error p-3 text-sm leading-6 text-rose-900">{state.message}</p>}
+      {pending && <p role="status" className="text-sm text-muted-foreground">{mode === "create" ? "Menyimpan sumber…" : "Menyimpan perubahan…"}</p>}
+      <button type="submit" disabled={pending} className="ui-primary justify-self-start">
         {pending ? "Menyimpan…" : mode === "create" ? "Simpan sumber" : "Simpan perubahan"}
       </button>
     </form>
@@ -73,7 +73,7 @@ export function KnowledgeForm({ action, initialValues, mode }: Props) {
 
 export function DeactivateKnowledgeForm({ id }: { id: string }) {
   return (
-    <form action={deactivateKnowledgeAction}>
+    <form action={deactivateKnowledgeAction} className="relative z-20">
       <input type="hidden" name="id" value={id} />
       <DeactivateButton />
     </form>
@@ -102,11 +102,11 @@ export function KnowledgeReviewForm({
   );
   if (options.length === 0) return null;
   return (
-    <form action={action} className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="font-semibold text-slate-950">Keputusan review</h2>
+    <form action={action} className="grid gap-4 ui-panel p-5">
+      <h2 className="font-semibold text-foreground">Keputusan review</h2>
       <label className="grid gap-1.5 text-sm font-medium">
         Status
-        <select name="status" required className="min-h-11 rounded-lg border border-slate-300 px-3 font-normal">
+        <select name="status" required className="ui-control px-3 font-normal">
           {options.map((status) => (
             <option key={status} value={status}>{status === "approved" ? "Setujui" : "Tolak / cabut persetujuan"}</option>
           ))}
@@ -114,10 +114,10 @@ export function KnowledgeReviewForm({
       </label>
       <label className="grid gap-1.5 text-sm font-medium">
         Alasan
-        <textarea name="reason" required minLength={1} maxLength={1000} rows={4} className="rounded-lg border border-slate-300 p-3 font-normal" />
+        <textarea name="reason" required minLength={1} maxLength={1000} rows={4} className="ui-control p-3 font-normal" />
       </label>
-      {state.message && <p role="alert" className="text-sm text-red-800">{state.message}</p>}
-      <button disabled={pending} className="min-h-11 justify-self-start rounded-lg bg-sky-800 px-5 text-sm font-semibold text-white disabled:opacity-60">
+      {state.message && <p role="alert" className="ui-alert-error p-3 text-sm text-rose-900">{state.message}</p>}
+      <button disabled={pending} className="ui-primary justify-self-start">
         {pending ? "Menyimpan…" : "Simpan keputusan"}
       </button>
     </form>

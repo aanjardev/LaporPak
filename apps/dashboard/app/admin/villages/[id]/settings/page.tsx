@@ -49,11 +49,12 @@ export default function VillageSettingsPage({ params }: SettingsPageProps) {
 
   useEffect(() => {
     if (!villageId) return;
+    const id = villageId;
 
     async function fetchVillage() {
       try {
         setLoading(true);
-        const data = await getVillage(villageId);
+        const data = await getVillage(id);
         setVillage(data);
 
         setFormData({
@@ -74,7 +75,7 @@ export default function VillageSettingsPage({ params }: SettingsPageProps) {
   }, [villageId]);
 
   const handleSave = async () => {
-    if (!villageId) return;
+    if (!villageId || !village) return;
 
     try {
       setSaving(true);
@@ -84,7 +85,7 @@ export default function VillageSettingsPage({ params }: SettingsPageProps) {
       await updateVillage(villageId, {
         name: formData.name,
         metadata: {
-          ...village?.metadata,
+          ...village.metadata,
           contact_phone: formData.contactPhone || undefined,
           contact_email: formData.contactEmail || undefined,
           address: formData.address || undefined,

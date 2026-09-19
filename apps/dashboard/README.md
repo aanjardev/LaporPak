@@ -83,3 +83,22 @@ npm run build
 ```
 
 Build saat ini memerlukan akses untuk mengambil font Geist melalui `next/font/google`. Jika jaringan memblokir Google Fonts, build dapat gagal meskipun pemeriksaan TypeScript berhasil.
+
+
+## Sistem desain dashboard
+
+Panduan visual ada di [docs/design-system.md](../../docs/design-system.md).
+Auth, REPORT, REQUEST, dan ASK memakai Plus Jakarta Sans, sidebar navy,
+aksen kuning, token semantik Tailwind, dan kontrol minimal 44 px.
+Navigasi di bawah 1024 px memakai dialog Base UI (Escape, focus trap, dan
+pengembalian fokus ditangani komponen). Halaman awal tetap `/reports`.
+
+Logo berasal dari aset tim; turunan lokal ada di `public/brand/` dan
+`app/icon.png`/`app/favicon.ico`. Wordmark memakai `next/image`; foto laporan
+tetap melalui proxy privat yang sudah ada. Jangan mengirim foto privat ke
+optimizer publik atau mengganti proxy dengan URL Storage langsung.
+
+Audit UI 19 September 2026: pengguna mengonfirmasi tampilan 390/768/1280 px,
+menu ponsel/Escape, navigasi, dan tidak adanya overflow aman. Koneksi browser
+agent mengalami timeout CDP; hasil manual ini tidak menggantikan pengujian
+ulang login, logout, penyimpanan aksi, atau izin backend pada environment nyata.

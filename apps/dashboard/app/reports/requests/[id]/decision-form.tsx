@@ -99,47 +99,47 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <section className="ui-panel p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-600">Nomor pengajuan</p>
+            <p className="text-sm font-medium text-muted-foreground">Nomor pengajuan</p>
             <h2 className="break-all text-2xl font-bold tracking-tight">{request.ticket_number}</h2>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800">
+          <span className="ui-badge bg-muted text-foreground ring-border">
             {requestStatusLabels[request.status]}
           </span>
         </div>
         <dl className="mt-6 grid min-w-0 gap-5 sm:grid-cols-2">
           {fields.map(([label, value]) => (
-            <div key={label} className="min-w-0 border-t border-slate-100 pt-3">
-              <dt className="text-sm font-medium text-slate-600">{label}</dt>
-              <dd className="mt-1 break-words text-sm leading-6 text-slate-950">{value}</dd>
+            <div key={label} className="min-w-0 border-t border-border pt-3">
+              <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
+              <dd className="mt-1 break-words text-sm leading-6 text-foreground">{value}</dd>
             </div>
           ))}
-          <div className="border-t border-slate-100 pt-3">
-            <dt className="text-sm font-medium text-slate-600">Diajukan</dt>
+          <div className="border-t border-border pt-3">
+            <dt className="text-sm font-medium text-muted-foreground">Diajukan</dt>
             <dd className="mt-1 text-sm">{dateLabel(request.created_at)}</dd>
           </div>
-          <div className="border-t border-slate-100 pt-3">
-            <dt className="text-sm font-medium text-slate-600">Diperbarui</dt>
+          <div className="border-t border-border pt-3">
+            <dt className="text-sm font-medium text-muted-foreground">Diperbarui</dt>
             <dd className="mt-1 text-sm">{dateLabel(request.updated_at)}</dd>
           </div>
         </dl>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      <section className="ui-panel p-5 sm:p-6">
         <h2 className="text-lg font-semibold">Riwayat keputusan</h2>
         {request.status_history.length === 0 ? (
-          <p className="mt-2 text-sm leading-6 text-slate-600">Belum ada riwayat keputusan.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">Belum ada riwayat keputusan.</p>
         ) : (
-          <ol className="mt-4 space-y-4 border-l-2 border-slate-200 pl-5">
+          <ol className="mt-4 space-y-4 border-l-2 border-border pl-5">
             {request.status_history.map((entry, index) => (
               <li key={`${entry.created_at}-${index}`}>
                 <p className="font-semibold">{requestStatusLabels[entry.new_status]}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   {dateLabel(entry.created_at)} · {entry.actor_display_name ?? (entry.actor_type === "system" ? "Sistem" : "Petugas desa")}
                 </p>
-                {entry.reason && <p className="mt-1 text-sm text-slate-700">{entry.reason}</p>}
+                {entry.reason && <p className="mt-1 text-sm text-foreground">{entry.reason}</p>}
               </li>
             ))}
           </ol>
@@ -147,9 +147,9 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
       </section>
 
       {decisions.length > 0 && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <section className="ui-panel p-5 sm:p-6">
           <h2 className="text-lg font-semibold">Keputusan petugas</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Keputusan akan disimpan sebagai status resmi beserta alasan petugas.
           </p>
           <form onSubmit={submit} className="mt-5 space-y-5">
@@ -164,7 +164,7 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
                       value={option.value}
                       checked={decision === option.value}
                       onChange={() => setDecision(option.value)}
-                      className="size-4 accent-sky-800"
+                      className="size-4 accent-brand"
                     />
                     {option.label}
                   </label>
@@ -183,19 +183,19 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 disabled={pending}
-                className="mt-2 w-full min-w-0 rounded-lg border border-slate-300 p-3 text-sm leading-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"
+                className="ui-control mt-2 p-3 leading-6"
               />
             </div>
             {message?.kind === "error" && (
-              <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900">
+              <p role="alert" className="ui-alert-error p-3 text-sm text-rose-900">
                 {message.text}
               </p>
             )}
-            {pending && <p role="status" className="text-sm text-slate-600">Menyimpan keputusan…</p>}
+            {pending && <p role="status" className="text-sm text-muted-foreground">Menyimpan keputusan…</p>}
             <button
               type="submit"
               disabled={pending}
-              className="min-h-11 rounded-lg bg-sky-800 px-5 text-sm font-semibold text-white hover:bg-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:cursor-wait disabled:opacity-60"
+              className="ui-primary"
             >
               {pending ? "Menyimpan…" : "Simpan keputusan"}
             </button>
@@ -203,7 +203,7 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
         </section>
       )}
       {message?.kind === "success" && (
-        <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-900">
+        <p role="status" className="ui-alert-success p-4 text-sm font-medium text-emerald-900">
           {message.text}
         </p>
       )}
