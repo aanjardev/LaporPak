@@ -113,5 +113,5 @@ when a `memory/` folder exists.
 
 ## Related
 
-- [Agent workspace](/concepts/agent-workspace)
-- [Bootstrapping](/start/bootstrapping) - the first-run ritual this template drives, and when the file is removed
+- [Agent workspace](https://docs.openclaw.ai/agent-workspace)
+- [Bootstrapping](https://docs.openclaw.ai/start/bootstrapping) - the first-run ritual this template drives, and when the file is removed

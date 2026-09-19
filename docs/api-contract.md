@@ -169,11 +169,13 @@ meneruskan access token sesi petugas:
 Authorization: Bearer <supabase_access_token>
 ```
 
-FastAPI memverifikasi token melalui Supabase Auth dan memakai UUID pengguna
-sebagai identitas audit. P0 bersifat invite-only dan satu desa; akun publik
-tidak dapat mendaftar sendiri. `DASHBOARD_ADMIN_UNIT_ID` menjadi cakupan demo.
-Tabel role/cakupan admin per pengguna adalah target hardening sebelum
-deployment multi-desa atau pendaftaran pengguna yang lebih luas.
+FastAPI memverifikasi token melalui Supabase Auth, memetakan UUID pengguna ke
+`admin_accounts`, menolak akun nonaktif, dan memakai UUID tersebut sebagai
+identitas audit. `system_admin` memiliki cakupan global; `village_admin`
+dibatasi oleh `admin_unit_memberships`. Pendaftaran admin publik tidak tersedia.
+Fallback `DASHBOARD_ADMIN_UNIT_ID` hanya untuk development legacy ketika
+`ALLOW_LEGACY_ADMIN_FALLBACK=true`; default-nya nonaktif dan tidak boleh dipakai
+sebagai mekanisme izin production.
 
 | Kondisi | HTTP / code | Perilaku dashboard |
 |---|---|---|
@@ -426,7 +428,15 @@ Response `200`:
   "status": "pending_verification",
   "responsible_unit": null,
   "ai_recommendation": {},
-  "attachments": [],
+  "attachments": [
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "file_name": "whatsapp-image-1.jpg",
+      "mime_type": "image/jpeg",
+      "file_size": 245760,
+      "created_at": "2026-09-16T14:00:00Z"
+    }
+  ],
   "status_history": [
     {
       "old_status": null,
@@ -446,6 +456,8 @@ Response `200`:
 
 `responsible_unit` bernilai `null` bila belum ditetapkan. Jika tersedia,
 backend mengirim objek `{ "id": "<uuid>", "name": "<nama unit>" }`.
+Metadata attachment tidak pernah memuat `storage_bucket`, `storage_path`, URL
+bucket, atau metadata internal.
 
 Jika tidak ada:
 
@@ -453,29 +465,23 @@ Jika tidak ada:
 404 REPORT_NOT_FOUND
 ```
 
-### Usulan akses foto laporan (belum aktif; menunggu persetujuan dan implementasi backend)
-
-Frontend memerlukan endpoint berikut agar foto dari bucket privat dapat dibaca
-oleh petugas tanpa mengekspos URL atau path Storage ke browser:
+### Read private report attachment
 
 ```http
 GET /api/v1/reports/{report_id}/attachments/{attachment_id}
-Authorization: Bearer <supabase_access_token>
+Authorization: Bearer <supabase-admin-access-token>
 ```
 
-Respons `200` berisi bytes gambar dengan `Content-Type` `image/jpeg`,
-`image/png`, atau `image/webp` dan `Cache-Control: private, no-store`.
-FastAPI harus memeriksa akun admin, cakupan desa laporan, dan hubungan lampiran
-dengan laporan pada **setiap** permintaan. Gunakan `401 UNAUTHORIZED` untuk
-sesi tidak sah, `403 FORBIDDEN` untuk akun yang tidak berhak memakai dashboard,
-`404 REPORT_NOT_FOUND` untuk laporan/lampiran yang tidak ada atau di luar
-cakupan, dan respons `503` dengan error envelope umum bila layanan gagal.
+Endpoint memeriksa bahwa attachment adalah milik laporan dan bahwa admin sistem
+atau admin desa memiliki akses ke desa pemilik laporan pada setiap request.
+Respons `200` berisi bytes gambar privat, `Content-Type` sesuai metadata yang
+tersimpan, dan `Content-Disposition: inline`. Backend tidak memberikan signed
+URL atau path bucket kepada client.
 
-Saat disepakati, setiap item `attachments` pada detail hanya perlu mengirim
-`id` (UUID), `file_name` (string atau `null`), dan `mime_type` (string atau
-`null`). Jangan kirim `storage_bucket`, `storage_path`, atau URL Storage.
-Frontend saat ini hanya memakai metadata tersebut dan meneruskan token lewat
-route Next.js; foto nyata belum tersedia sampai endpoint FastAPI di atas ada.
+Laporan yang tidak ada/di luar cakupan, attachment yang tidak ada, dan
+attachment milik laporan lain semuanya menghasilkan `404 REPORT_NOT_FOUND`.
+Kegagalan membaca private storage menghasilkan `503 ATTACHMENT_UNAVAILABLE`
+tanpa membocorkan detail storage.
 
 ---
 
@@ -763,6 +769,38 @@ channel integration; model-generated payloads cannot select a village.
 Admin tokens are accepted only when the Supabase Auth UUID maps to an active
 `admin_accounts` row. `system_admin` is global; `village_admin` is limited by
 `admin_unit_memberships`. Out-of-scope detail/mutation returns `404`.
+
+### Kontrak teknis admin REQUEST
+
+Backend dan dashboard menyediakan `residency_letter` melalui endpoint berikut.
+Kontrak teknis ini dipakai pada environment development dengan data sintetis;
+kontrak ini **bukan** persetujuan SOP layanan atau izin memakai data warga nyata.
+
+- `GET /api/v1/service-requests?page=1&page_size=20` mengembalikan
+  `{ items, page, page_size, total }`; `page >= 1`, `1 <= page_size <= 100`.
+- `GET /api/v1/service-requests/{request_id}` mengembalikan satu item atau
+  `404 NOT_FOUND`, termasuk bila pengajuan di luar cakupan desa admin.
+- `PATCH /api/v1/service-requests/{request_id}/status` menerima
+  `{ "status": "approved" | "rejected" | "completed", "reason": "..." }`
+  dan mengembalikan item terbaru; alasan wajib dengan panjang 1–1000 karakter.
+  Backend saat ini menerima `pending_review → approved/rejected` dan
+  `approved → completed`; transisi lain menghasilkan `409 INVALID_STATUS_TRANSITION`.
+
+Item saat ini berisi `id` (UUID), `ticket_number`, `request_type`
+(`residency_letter`), `applicant_name`, `domicile_address`,
+`domicile_duration`, `purpose`, `status` (`pending_review`, `approved`,
+`rejected`, `completed`), `administrative_unit_id` (UUID), `created_at`, dan
+`updated_at`. GET/PATCH admin memerlukan bearer token Supabase dan pemeriksaan
+akun aktif serta cakupan desa pada FastAPI. Kegagalan layanan memakai `503
+DATABASE_UNAVAILABLE`; input tidak valid memakai `422 VALIDATION_ERROR`.
+
+**Keputusan terbuka bersama pemilik SOP, Ferdi, Anjar, dan Farel:** dokumen SOP
+Surat Keterangan Domisili yang disetujui; field minimum yang boleh dikumpulkan
+dan ditampilkan; jabatan/peran yang berwenang memutuskan; kapan pengajuan resmi;
+serta bentuk riwayat status/aktor/alasan yang aman pada respons detail. Backend
+menyimpan riwayat, tetapi respons detail saat ini belum menyertakannya.
+Dashboard boleh memakai endpoint tersebut untuk pengujian sintetis. Aktivasi
+layanan bagi warga nyata menunggu keputusan SOP dan tinjauan lintas role.
 
 ---
 

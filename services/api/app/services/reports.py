@@ -13,9 +13,11 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.repositories import ReportRepository
 from app.schemas.enums import ReportCategory, ReportStatus, ReportUrgency
 from app.schemas.reports import (
+    ReportAttachment,
     ReportCitizen,
     ReportCreate,
     ReportDetail,
@@ -26,6 +28,7 @@ from app.schemas.reports import (
     ReportStatusUpdateResponse,
 )
 from app.services.exceptions import (
+    AttachmentUnavailableError,
     CategoryNotFoundError,
     DuplicateOperationError,
     InvalidAttachmentError,
@@ -289,7 +292,8 @@ class ReportPersistenceService:
                 raise ReportNotFoundError(report_id)
 
             attachments = [
-                dict(row) for row in self.repository.list_attachments(report_id)
+                self._to_attachment(row)
+                for row in self.repository.list_attachments(report_id)
             ]
             history = [
                 ReportStatusHistory.model_validate(
@@ -324,6 +328,50 @@ class ReportPersistenceService:
             verified_at=report["verified_at"],
             resolved_at=report["resolved_at"],
             updated_at=report["updated_at"],
+        )
+
+    def get_report_attachment(
+        self,
+        report_id: UUID,
+        attachment_id: UUID,
+        unit_ids: tuple[UUID, ...] | None = None,
+    ) -> tuple[bytes, str]:
+        try:
+            attachment = self.repository.get_scoped_attachment(
+                report_id, attachment_id, unit_ids
+            )
+        except SQLAlchemyError as exc:
+            raise ReportPersistenceError("report attachment lookup") from exc
+        if attachment is None:
+            raise ReportNotFoundError(report_id)
+
+        server_key = settings.supabase_secret_key or settings.supabase_service_role_key
+        if not settings.supabase_url or not server_key:
+            raise AttachmentUnavailableError()
+        try:
+            response = httpx.get(
+                f"{settings.supabase_url.rstrip('/')}/storage/v1/object/"
+                f"{attachment['storage_bucket']}/{attachment['storage_path']}",
+                headers={
+                    "Authorization": f"Bearer {server_key}",
+                    "apikey": server_key,
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise AttachmentUnavailableError() from exc
+        return response.content, attachment["mime_type"]
+
+    @staticmethod
+    def _to_attachment(row: Mapping[str, Any]) -> ReportAttachment:
+        metadata = row["metadata"] or {}
+        return ReportAttachment(
+            id=row["id"],
+            file_name=row["file_name"],
+            mime_type=row["mime_type"],
+            file_size=metadata.get("file_size", 0),
+            created_at=row["created_at"],
         )
 
     @staticmethod

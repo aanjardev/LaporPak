@@ -7,7 +7,10 @@ from pydantic import ValidationError
 
 from app.core.security import resolve_channel_unit
 from app.schemas.citizen import AskRequest
-from app.schemas.service_requests import ServiceRequestCreate
+from app.schemas.service_requests import (
+    ServiceRequestCreate,
+    ServiceRequestStatusUpdate,
+)
 from app.services.knowledge import chunk_content, extract_content
 
 
@@ -37,6 +40,8 @@ def test_residency_request_rejects_blank_fields():
             domicile_duration="2 tahun",
             purpose="Administrasi",
         )
+    with pytest.raises(ValidationError):
+        ServiceRequestStatusUpdate(status="approved", reason="   ")
 
 
 def test_production_migration_uses_public_ownership_uuid():

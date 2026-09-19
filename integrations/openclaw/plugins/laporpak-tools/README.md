@@ -19,8 +19,16 @@ do not re-generate facts from model.
 
 ### `laporpak_track_report`
 
-Reads the authenticated sender's own REPORT or REQUEST status. Ownership and
-village scope are enforced server-side.
+Reads the authenticated sender's own REPORT status. Ownership and village scope
+are enforced server-side. FastAPI already recognizes `REQ-*`, but this tool's
+current input schema accepts only `LP-*`; expand it only after REQUEST is
+approved for citizen use.
+
+### `laporpak_create_service_request`
+
+Submits a citizen-confirmed `residency_letter` REQUEST with a stable
+idempotency key. Sender identity and village come from authenticated WhatsApp
+runtime metadata; approval and rejection remain human admin actions.
 
 ## Enhanced Tools
 

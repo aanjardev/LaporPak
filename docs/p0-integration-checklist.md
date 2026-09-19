@@ -1,9 +1,26 @@
 # Checklist integrasi P0 REPORT
 
-> Status: daftar kerja tim per 2026-09-18. Checklist yang belum dicentang berarti
+> Status: daftar kerja tim diperbarui 2026-09-19. Checklist yang belum dicentang berarti
 > perlu diverifikasi dalam putaran integrasi berikutnya, bukan berarti fiturnya
 > belum dibuat. Gunakan data dan akun uji; jangan tulis secret, token, nomor
 > WhatsApp pribadi, atau isi laporan warga nyata di dokumen ini.
+
+## Pembaruan terverifikasi 2026-09-19
+
+- [x] Schema, constraint, index, RLS, extension, seed akses, dan bucket private
+  development diaudit read-only; konfigurasi bucket `report-attachments`
+  diperbaiki sesuai migration `0013`.
+- [x] Lima dokumen `DATA UJI` Desa Sukamaju diimpor idempotent; eksekusi ulang
+  menghasilkan `Imported: 0; skipped: 5`.
+- [x] ASK FTS nyata melalui FastAPI dan Supabase menghasilkan `200 answered`
+  dengan source document/chunk; retrieval kini hanya menerima
+  `approval_status=approved` secara eksplisit.
+- [x] Unit/contract test membuktikan query admin REQUEST membawa filter unit
+  desa dan detail di luar scope diperlakukan tidak ditemukan.
+- [ ] REQUEST belum dibuktikan melalui WhatsApp/OpenClaw host nyata dan dua
+  desa belum dibuat pada environment bersama; test otomatis tidak menggantikan
+  gerbang integrasi tersebut.
+- [ ] Endpoint foto privat belum diuji dengan object Supabase Storage nyata.
 
 Dokumen ini mengatur pelaksanaan dan bukti uji. Kebutuhan P0 ada di
 [project-context.md](project-context.md), bentuk data dan respons di
@@ -52,9 +69,10 @@ harus dibuat di dokumen sumber tersebut, bukan di checklist ini.
 Pemeriksaan parsial 2026-09-18 ada di
 [p0-verification-evidence.md](p0-verification-evidence.md#frontend-integration-recheck--2026-09-18):
 dashboard terhubung ke dua laporan FastAPI nyata, sedangkan halaman kedua dan
-respons gagal sudah disiapkan serta diuji pada API simulasi. Semua kotak di atas
-tetap terbuka sampai pemeriksaan UI dan keputusan pada laporan
-`pending_verification` benar-benar selesai.
+respons gagal sudah disiapkan serta diuji pada API simulasi. Bukti berikutnya
+mencatat verifikasi, penolakan, dan progres status yang tersimpan. Semua kotak
+tetap terbuka sampai ketiga role mengulang skenario pada commit dan lingkungan
+yang sama serta mencatat hasil `401`/`403`/scoped `404` nyata.
 
 ### Anjar — backend dan database (`services/api/`, `database/`)
 

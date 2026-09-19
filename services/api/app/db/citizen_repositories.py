@@ -79,9 +79,9 @@ class CitizenRepository:
                 where d.administrative_unit_id=:unit
                   and d.is_active
                   and d.processing_status in ('pending', 'processing', 'ready')
-                  and coalesce(d.metadata->>'approval_status', 'approved')='approved'
-                  and (:service_key is null or
-                       coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=:service_key)
+                  and d.metadata->>'approval_status'='approved'
+                  and (cast(:service_key as text) is null or
+                       coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text))
                   and c.search_vector @@ websearch_to_tsquery('simple', :question)
                 order by ts_rank_cd(
                     c.search_vector,
@@ -107,16 +107,16 @@ class CitizenRepository:
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
               where d.administrative_unit_id=:unit and d.is_active
                 and d.processing_status in ('pending', 'processing', 'ready')
-                and coalesce(d.metadata->>'approval_status', 'approved')='approved'
-                and (:service_key is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=:service_key)
+                and d.metadata->>'approval_status'='approved'
+                and (cast(:service_key as text) is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text))
                 and c.search_vector @@ websearch_to_tsquery('simple', :question) limit 20
             ), semantic as (
               select c.id, row_number() over(order by c.embedding <=> cast(:embedding as vector)) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
               where d.administrative_unit_id=:unit and d.is_active and d.processing_status='ready'
-                and coalesce(d.metadata->>'approval_status', 'approved')='approved'
+                and d.metadata->>'approval_status'='approved'
                 and c.embedding is not null
-                and (:service_key is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=:service_key) limit 20
+                and (cast(:service_key as text) is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text)) limit 20
             ), ranked as (
               select coalesce(f.id,s.id) id, coalesce(1.0/(60+f.rank),0)+coalesce(1.0/(60+s.rank),0) score
               from fts f full join semantic s on s.id=f.id

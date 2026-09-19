@@ -4,6 +4,34 @@
 > Environment: Supabase development + FastAPI local process  
 > Branch: `feat/db-foundation`
 
+## Backend/knowledge/request recheck — 2026-09-19
+
+Baseline `main`: `1030aa4`. Work continued on
+`feat/request-ci-scope-hardening`; record its final merge SHA after review.
+
+Observed against the development Supabase project:
+
+- all critical REPORT, knowledge, admin-scope, channel, and REQUEST tables,
+  columns, constraints, indexes, RLS flags, and functions are present;
+- `vector`, `postgis`, and `pgcrypto` are active;
+- `knowledge-files` and `report-attachments` are private; attachment storage is
+  limited to 5 MB JPEG/PNG/WebP after applying migration `0013`;
+- five clearly labelled `DATA UJI` documents were imported for Desa Sukamaju,
+  one chunk each, and an idempotent rerun skipped all five;
+- real FastAPI `POST /api/v1/ask` returned `200 answered` with the expected
+  document and chunk from Supabase FTS;
+- optional `service_key` typing was fixed after PostgreSQL exposed an
+  `AmbiguousParameter` error; retrieval now requires explicit approved metadata;
+- REQUEST gained a trusted OpenClaw submit tool, dashboard list/detail/human
+  decision pages, and automated village-scope query coverage;
+- a GitHub Actions workflow was added to run backend, dashboard, and OpenClaw
+  plugin checks; its first hosted run remains to be observed after push.
+
+Limitations: knowledge remains demo-only rather than approved village SOP;
+REQUEST has not completed a live WhatsApp-to-human-decision run; the two-unit
+scope test is automated rather than a live two-village environment; and the
+private attachment reader still lacks a real stored-object integration check.
+
 ## End-to-end backend demonstration
 
 The demonstration used the versioned OpenClaw request contract and a temporary
@@ -172,4 +200,33 @@ The failures are in `tests/test_create_report_api.py`: its older POST fixture
 does not supply a channel account ID or fallback village ID, so the route
 returns `422` before the mocked create service is called. This test-fixture
 issue is separate from the dashboard PATCH result and remains for Anjar to
-resolve.
+resolve at that point. The current automated recheck below confirms that the
+backend suite no longer has those failures.
+
+## Team runtime report — 2026-09-19
+
+The team later reported that a real WhatsApp test covering text plus photo,
+citizen confirmation, ticket visibility in the dashboard, ASK, and TRACK
+completed successfully after the AI integration merge (`5da486d`). This is
+useful runtime evidence, but the report did not include one shared commit SHA
+for every service, exact test identifiers, or the complete authorization and
+failure matrix. The corresponding checklist items therefore remain open until
+those details are recorded and repeated on the demo environment.
+
+## Automated repository recheck — 2026-09-19
+
+Base commit: `fb106b6` on `feat/frontend-request-residency-letter`, with
+documentation-only working-tree updates. Local results:
+
+```text
+Backend pytest:             103 passed, 2 dependency deprecation warnings
+OpenClaw plugin tests:       6 passed
+Dashboard auth tests:        1 passed
+Dashboard REPORT tests:      8 passed
+Dashboard knowledge tests:   4 passed
+Dashboard REQUEST tests:     4 passed
+```
+
+These checks confirm the current unit and data-layer baselines. They do not
+replace the shared-environment WhatsApp flow, authorization matrix, two-village
+isolation, approved ASK source review, or real REQUEST integration gates.

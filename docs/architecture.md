@@ -75,11 +75,15 @@ Docker bukan dependency Day 1.
 Responsibility:
 
 - Government Dashboard;
-- report list;
-- report detail;
-- operator actions;
+- sesi admin Supabase Auth invite-only;
+- daftar, detail, dan aksi status REPORT;
+- pengelolaan sumber ASK melalui FastAPI;
+- antrean, detail, dan keputusan REQUEST melalui FastAPI;
 - loading/error/empty state;
 - HTTP API client.
+
+REQUEST sudah terhubung secara teknis. Penggunaan data warga nyata tetap
+menunggu SOP, field minimum, dan kewenangan petugas disahkan.
 
 Frontend tidak melakukan direct write ke Supabase PostgreSQL.
 
@@ -118,6 +122,9 @@ Responsibility:
 - history;
 - error handling;
 - approved tools untuk OpenClaw.
+- ASK retrieval dan TRACK berbasis kepemilikan warga;
+- pengelolaan knowledge;
+- REQUEST `residency_letter` dan approval gate petugas.
 
 OpenClaw adalah pemanggil Gemini untuk MVP. FastAPI menerima output terstruktur sebagai data tidak tepercaya, memvalidasinya, lalu menerapkan aturan bisnis. Jangan membuat jalur panggilan Gemini kedua di FastAPI tanpa keputusan arsitektur baru.
 
@@ -221,6 +228,16 @@ conversation_messages
 routing_rules
 knowledge_documents
 knowledge_chunks
+admin_accounts
+admin_unit_memberships
+channel_integrations
+service_request_types
+service_requests
+service_request_status_history
+village_profiles
+knowledge_templates
+knowledge_analytics
+resolution_confirmations
 ```
 
 ### Main relationships
@@ -238,7 +255,8 @@ REPORTS     CONVERSATION_SESSIONS
    ├──────────────┘
    │
    ├── REPORT_ATTACHMENTS
-   └── REPORT_STATUS_HISTORY
+   ├── REPORT_STATUS_HISTORY
+   └── RESOLUTION_CONFIRMATIONS
 
 REPORT_CATEGORIES
    │
@@ -251,6 +269,16 @@ REPORT_CATEGORIES
 KNOWLEDGE_DOCUMENTS
    ↓
 KNOWLEDGE_CHUNKS
+
+ADMIN_ACCOUNTS
+   ↓
+ADMIN_UNIT_MEMBERSHIPS ──→ ADMINISTRATIVE_UNITS
+
+CHANNEL_INTEGRATIONS ──→ ADMINISTRATIVE_UNITS
+
+CITIZENS ──→ SERVICE_REQUESTS ──→ SERVICE_REQUEST_STATUS_HISTORY
+                    ↑
+          SERVICE_REQUEST_TYPES
 ```
 
 `reports.ticket_number` adalah public identifier. `reports.id` tetap UUID internal.
@@ -304,6 +332,7 @@ ticket_number
 citizen_id
 category_id
 responsible_unit_id
+administrative_unit_id
 source
 status
 urgency
@@ -317,6 +346,9 @@ ai_extraction
 ai_recommendation
 idempotency_key
 idempotency_payload_hash
+sla_deadline
+is_emergency
+location_hash
 verified_at
 resolved_at
 created_at
@@ -406,6 +438,16 @@ source_url
 version
 metadata
 is_active
+administrative_unit_id
+category
+content
+source_type
+storage_bucket
+storage_path
+is_mandatory
+processing_status
+checksum
+failure_message
 created_at
 updated_at
 ```
@@ -418,23 +460,89 @@ document_id
 chunk_index
 content
 metadata
+checksum
+embedding
+search_vector
 created_at
 ```
 
-Embedding column ditambahkan saat RAG benar-benar masuk scope.
+`administrative_unit_id` adalah scope canonical yang dipakai route knowledge.
+Kolom `village_id` juga ada dari migration 0008, tetapi tidak digunakan oleh
+schema runtime saat ini. Hindari logika scope ganda sebelum ada migrasi
+konsolidasi dan perubahan kontrak resmi.
+
+### `admin_accounts` dan `admin_unit_memberships`
+
+```text
+admin_accounts: id, auth_user_id, role, display_name, is_active, created_at, updated_at
+admin_unit_memberships: admin_account_id, administrative_unit_id, created_at
+```
+
+Role canonical adalah `system_admin` dan `village_admin`. FastAPI memakai
+membership untuk membatasi baca dan mutation per desa.
+
+### `channel_integrations`
+
+```text
+id
+channel
+external_account_id
+administrative_unit_id
+is_active
+created_at
+updated_at
+```
+
+Header channel dari OpenClaw dipetakan ke unit administratif melalui tabel ini.
+Payload buatan model tidak boleh memilih desa.
+
+### `service_request_types`, `service_requests`, dan riwayat
+
+```text
+service_request_types: id, code, name, is_active, created_at, updated_at
+service_requests: id, ticket_number, request_type_id, citizen_id,
+  administrative_unit_id, status, applicant_name, domicile_address,
+  domicile_duration, purpose, idempotency_key, idempotency_payload_hash,
+  created_at, updated_at
+service_request_status_history: id, service_request_id, old_status, new_status,
+  actor_type, actor_identifier, notes, created_at
+```
+
+Baseline teknis saat ini memakai tipe `residency_letter`. SOP, data yang boleh
+ditampilkan, dan pejabat pemberi keputusan masih memerlukan persetujuan tim.
+
+Migration knowledge juga membuat `village_profiles`, `knowledge_templates`,
+dan `knowledge_analytics`. Ketiganya bukan authority baru untuk scope atau SOP.
+Template berisi fakta contoh yang belum disetujui telah dihapus oleh migration
+hardening; konten resmi tetap memerlukan review manusia.
+
+### `resolution_confirmations`
+
+```text
+id
+report_id
+confirmed
+feedback
+created_at
+```
+
+Konfirmasi warga adalah evidence tambahan. Konfirmasi tidak mengubah status
+resmi REPORT secara langsung.
 
 ---
 
 ## 7. Extensions
 
-Ekstensi yang direncanakan jika dibutuhkan:
+Ekstensi database:
 
 ```text
-pgvector
-PostGIS
+pgvector  -> diminta oleh migration 0005 untuk embedding knowledge 768 dimensi
+PostGIS   -> belum menjadi baseline migration
 ```
 
-Keduanya belum terverifikasi aktif di database proyek dan bukan syarat P0 REPORT. Aktifkan melalui migration serta verifikasi di Supabase saat fitur terkait mulai dikerjakan. Day 1 tidak mengharuskan:
+Keberhasilan migration dan extension tetap harus diverifikasi pada Supabase
+lingkungan yang dipakai tim. ASK memiliki fallback FTS ketika embedding belum
+tersedia. PostGIS bukan syarat REPORT atau REQUEST saat ini. Day 1 tidak mengharuskan:
 
 - embedding vectors sudah diisi;
 - spatial polygon matching sudah lengkap.
@@ -676,17 +784,18 @@ OpenClaw API key       -> POST report dari kanal WhatsApp
 Supabase access token  -> GET report dan PATCH status
 ```
 
-FastAPI memetakan token ke caller/principal dan menegakkan izin endpoint.
-Untuk demo satu desa, dashboard principal membawa administrative unit dari
-konfigurasi backend. Tabel role/cakupan admin per pengguna tetap menjadi target
-hardening sebelum deployment publik multi-desa.
+FastAPI memetakan UUID token ke `admin_accounts`, menolak akun nonaktif, dan
+memakai `admin_unit_memberships` untuk cakupan `village_admin`.
+`system_admin` memiliki cakupan global. Fallback unit dari konfigurasi backend
+hanya boleh dipakai untuk development eksplisit melalui
+`ALLOW_LEGACY_ADMIN_FALLBACK`; nilai default-nya nonaktif.
 
 Namun sebelum dashboard/API dibuka ke deployment publik:
 
 ```text
-GET /api/v1/reports
-GET /api/v1/reports/{id}
-PATCH /api/v1/reports/{id}/status
+GET/PATCH /api/v1/reports/...
+GET/PATCH /api/v1/service-requests/...
+GET/POST/PATCH/DELETE /api/v1/knowledge/...
 ```
 
 harus dilindungi authenticated admin sistem atau admin desa. Pada tahap satu desa, admin desa hanya melihat data desa tersebut. Saat multi-desa masuk MVP, backend wajib menegakkan cakupan desa untuk setiap read dan mutation; frontend tidak boleh menjadi satu-satunya penjaga akses.

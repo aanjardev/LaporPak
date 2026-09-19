@@ -15,7 +15,7 @@ Open PowerShell and verify Node.js, OpenClaw, and FastAPI:
 node --version
 openclaw --version
 
-cd D:\Dev\LaporPak\services\api
+cd <path-to-LaporPak>\services\api
 uv sync
 uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -36,6 +36,7 @@ The local OpenClaw environment must contain these values:
 GEMINI_API_KEY=
 LAPORPAK_API_URL=http://localhost:8000
 LAPORPAK_API_KEY=
+LAPORPAK_CHANNEL_ACCOUNT_ID=
 ```
 
 Store them in `%USERPROFILE%\.openclaw\.env`. Never put their real values in
@@ -49,8 +50,11 @@ openclaw plugins inspect whatsapp --runtime --json
 openclaw config validate
 ```
 
-The LaporPak plugin must list `laporpak_create_report`. The WhatsApp plugin
-must show `enabled: true`.
+The LaporPak plugin must list `laporpak_create_report`, `laporpak_ask`, and
+`laporpak_track_report`. The WhatsApp plugin must show `enabled: true`.
+`LAPORPAK_CHANNEL_ACCOUNT_ID` must match an active backend
+`channel_integrations.external_account_id`; do not ask the model or citizen to
+choose this value.
 
 ## 3. Link the WhatsApp account
 
@@ -117,7 +121,14 @@ Expected flow:
 Confirm that only one report exists even if `Ya` is sent twice. The same report
 draft UUID must be reused for retries.
 
-## 6. Troubleshooting
+## 6. Run ASK and TRACK tests
+
+After REPORT works, test ASK with an approved synthetic knowledge source and
+TRACK with the ticket created by the same WhatsApp sender. The current TRACK
+tool accepts `LP-*`; backend support for `REQ-*` is not exposed through the
+plugin yet. REQUEST submission is also not an OpenClaw tool at this stage.
+
+## 7. Troubleshooting
 
 If OpenClaw says WhatsApp is not linked:
 

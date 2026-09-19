@@ -4,12 +4,15 @@ from datetime import UTC, datetime
 from threading import Barrier, Lock
 from uuid import UUID
 
+import httpx
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.core.config import settings
 from app.schemas.enums import ReportCategory, ReportStatus, ReportUrgency
 from app.schemas.reports import ReportCreate
 from app.services.exceptions import (
+    AttachmentUnavailableError,
     CategoryNotFoundError,
     DuplicateOperationError,
     InvalidSenderIdentityError,
@@ -144,7 +147,23 @@ class FakeRepository:
         return self.report
 
     def list_attachments(self, report_id):
-        return [{"id": "attachment-id"}]
+        return [
+            {
+                "id": UUID("33333333-3333-4333-8333-333333333333"),
+                "file_name": "photo.jpg",
+                "mime_type": "image/jpeg",
+                "metadata": {"file_size": 1234},
+                "created_at": datetime(2026, 9, 16, 14, tzinfo=UTC),
+            }
+        ]
+
+    def get_scoped_attachment(self, report_id, attachment_id, unit_ids=None):
+        self.attachment_scope = (report_id, attachment_id, unit_ids)
+        return {
+            "storage_bucket": "report-attachments",
+            "storage_path": f"{report_id}/photo.jpg",
+            "mime_type": "image/jpeg",
+        }
 
     def list_status_history(self, report_id):
         return [
@@ -573,9 +592,62 @@ def test_detail_aggregates_attachments_and_ordered_history():
 
     detail = service.get_report_detail(report_id)
 
-    assert detail.attachments == [{"id": "attachment-id"}]
+    assert detail.attachments[0].file_name == "photo.jpg"
+    assert detail.attachments[0].file_size == 1234
+    dumped = detail.attachments[0].model_dump()
+    assert "storage_path" not in dumped
+    assert "storage_bucket" not in dumped
     assert detail.status_history[0].new_status.value == "pending_verification"
     assert detail.citizen.display_name == "Warga"
+
+
+def test_private_attachment_download_uses_scoped_record_and_backend_key(monkeypatch):
+    repository = FakeRepository()
+    service = ReportPersistenceService(TransactionSession(), repository)
+    report_id = UUID("72af1a52-7016-48c7-aacc-6c35417be819")
+    attachment_id = UUID("33333333-3333-4333-8333-333333333333")
+    unit_ids = (UUID("22222222-2222-4222-8222-222222222222"),)
+    monkeypatch.setattr(settings, "supabase_url", "https://storage.example")
+    monkeypatch.setattr(settings, "supabase_secret_key", "server-secret")
+
+    class StorageResponse:
+        content = b"private-image"
+
+        def raise_for_status(self):
+            return None
+
+    calls = []
+
+    def get(url, **kwargs):
+        calls.append((url, kwargs))
+        return StorageResponse()
+
+    monkeypatch.setattr(httpx, "get", get)
+
+    content, mime_type = service.get_report_attachment(
+        report_id, attachment_id, unit_ids
+    )
+
+    assert content == b"private-image"
+    assert mime_type == "image/jpeg"
+    assert repository.attachment_scope == (report_id, attachment_id, unit_ids)
+    assert calls[0][1]["headers"]["Authorization"] == "Bearer server-secret"
+
+
+def test_private_attachment_storage_failure_is_controlled(monkeypatch):
+    service = ReportPersistenceService(TransactionSession(), FakeRepository())
+    monkeypatch.setattr(settings, "supabase_url", "https://storage.example")
+    monkeypatch.setattr(settings, "supabase_secret_key", "server-secret")
+
+    def fail(*_args, **_kwargs):
+        raise httpx.ConnectError("offline")
+
+    monkeypatch.setattr(httpx, "get", fail)
+    with pytest.raises(AttachmentUnavailableError):
+        service.get_report_attachment(
+            UUID("72af1a52-7016-48c7-aacc-6c35417be819"),
+            UUID("33333333-3333-4333-8333-333333333333"),
+        )
 
 
 def test_list_maps_filters_pagination_and_response_shape():
