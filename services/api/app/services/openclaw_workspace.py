@@ -5,12 +5,8 @@ enabling AI personality customization and memory isolation.
 """
 
 import json
-import os
 from pathlib import Path
-from typing import Optional
 from uuid import UUID
-
-import yaml
 
 from app.core.config import settings
 
@@ -18,7 +14,7 @@ from app.core.config import settings
 class OpenClawWorkspaceService:
     """Service for managing OpenClaw workspaces per village."""
 
-    def __init__(self, base_path: Optional[str] = None):
+    def __init__(self, base_path: str | None = None):
         """Initialize the service.
 
         Args:
@@ -91,7 +87,7 @@ This isn't just metadata. It's the start of figuring out who you are.
         village_id: UUID,
         tone: str = "santai dan familiar seperti tetangga",
         welcome_message: str = "Selamat datang! Saya siap membantu Anda.",
-        custom_greetings: Optional[list[str]] = None,
+        custom_greetings: list[str] | None = None,
     ) -> Path:
         """Create or update the SOUL.md file for a village.
 
@@ -155,8 +151,8 @@ If you change this file, tell the user — it's your soul, and they should know.
     def create_openclaw_config(
         self,
         village_id: UUID,
-        api_url: Optional[str] = None,
-        api_key: Optional[str] = None,
+        api_url: str | None = None,
+        api_key: str | None = None,
     ) -> Path:
         """Create or update the openclaw.json config file for a village.
 
@@ -247,7 +243,7 @@ If you change this file, tell the user — it's your soul, and they should know.
 
         return created
 
-    def get_workspace_config(self, village_id: UUID) -> Optional[dict]:
+    def get_workspace_config(self, village_id: UUID) -> dict | None:
         """Get the OpenClaw configuration for a village.
 
         Args:
@@ -262,7 +258,7 @@ If you change this file, tell the user — it's your soul, and they should know.
 
         return json.loads(config_path.read_text(encoding="utf-8"))
 
-    def get_identity_content(self, village_id: UUID) -> Optional[str]:
+    def get_identity_content(self, village_id: UUID) -> str | None:
         """Get the IDENTITY.md content for a village.
 
         Args:
@@ -277,7 +273,7 @@ If you change this file, tell the user — it's your soul, and they should know.
 
         return identity_path.read_text(encoding="utf-8")
 
-    def get_soul_content(self, village_id: UUID) -> Optional[str]:
+    def get_soul_content(self, village_id: UUID) -> str | None:
         """Get the SOUL.md content for a village.
 
         Args:
@@ -353,7 +349,7 @@ If you change this file, tell the user — it's your soul, and they should know.
 
 
 # Singleton instance
-_openclaw_workspace_service: Optional[OpenClawWorkspaceService] = None
+_openclaw_workspace_service: OpenClawWorkspaceService | None = None
 
 
 def get_openclaw_workspace_service() -> OpenClawWorkspaceService:

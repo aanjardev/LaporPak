@@ -1,7 +1,7 @@
 """Admin invitation and management API routes for multi-desa support."""
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -22,12 +22,10 @@ from app.schemas.admin import (
     AdminAccountListResponse,
     AdminAccountResponse,
     AdminAccountUpdate,
-    AdminInvitationAccept,
     AdminInvitationCreate,
     AdminInvitationListResponse,
     AdminInvitationResponse,
     VillageAdminAssignment,
-    VillageAdminRemoval,
 )
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin Management"])
@@ -102,7 +100,7 @@ def create_invitation(
             admin_invitations.c.role == payload.role.value,
             admin_invitations.c.village_id == payload.village_id,
             admin_invitations.c.status == "pending",
-            admin_invitations.c.expires_at > datetime.utcnow(),
+            admin_invitations.c.expires_at > datetime.now(UTC),
         )
     ).mappings().one_or_none()
 
@@ -116,7 +114,7 @@ def create_invitation(
     # Create invitation
     invitation_id = UUID(secrets.token_hex(16))
     token = generate_invitation_token()
-    expires_at = datetime.utcnow() + timedelta(days=7)
+    expires_at = datetime.now(UTC) + timedelta(days=7)
 
     session.execute(
         admin_invitations.insert().values(
@@ -127,7 +125,7 @@ def create_invitation(
             token=token,
             status="pending",
             invited_by=caller.identifier,
-            invited_at=datetime.utcnow(),
+            invited_at=datetime.now(UTC),
             expires_at=expires_at,
         )
     )
@@ -141,7 +139,7 @@ def create_invitation(
         village_name=village_name,
         status="pending",
         invited_by=caller.identifier,
-        invited_at=datetime.utcnow(),
+        invited_at=datetime.now(UTC),
         expires_at=expires_at,
         accepted_at=None,
     )
@@ -180,7 +178,7 @@ def list_invitations(
 
     # Get village names
     village_names = {}
-    village_ids = set(row["village_id"] for row in rows if row["village_id"])
+    village_ids = {row["village_id"] for row in rows if row["village_id"]}
     if village_ids:
         villages = session.execute(
             select(administrative_units.c.id, administrative_units.c.name).where(
@@ -270,7 +268,7 @@ def resend_invitation(
 
     # Generate new token
     new_token = generate_invitation_token()
-    expires_at = datetime.utcnow() + timedelta(days=7)
+    expires_at = datetime.now(UTC) + timedelta(days=7)
 
     session.execute(
         admin_invitations.update()
@@ -404,7 +402,7 @@ def update_admin_account(
         update_values["role"] = payload.role.value
 
     if update_values:
-        update_values["updated_at"] = datetime.utcnow()
+        update_values["updated_at"] = datetime.now(UTC)
         session.execute(
             admin_accounts.update()
             .where(admin_accounts.c.id == account_id)
@@ -496,7 +494,7 @@ def assign_admin_to_village(
         admin_unit_memberships.insert().values(
             admin_account_id=payload.admin_id,
             administrative_unit_id=village_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         )
     )
     session.commit()

@@ -17,7 +17,6 @@ from app.db.tables import (
     reports,
     service_requests,
 )
-from app.schemas.admin import AdminRole
 from app.schemas.village import (
     VillageAIPersonalityResponse,
     VillageChannelResponse,
@@ -147,8 +146,8 @@ def create_village(
         "address": payload.metadata.address,
     }
 
-    from uuid import uuid4
     import json
+    from uuid import uuid4
 
     now = func.now()
     new_id = uuid4()
@@ -261,13 +260,12 @@ def get_village(
     """Get village details including statistics."""
 
     # Check access for village admins
-    if caller.role == AdminRole.VILLAGE_ADMIN:
-        if village_id not in caller.unit_ids:
-            raise APIError(
-                status_code=403,
-                code="FORBIDDEN",
-                message="You don't have access to this village",
-            )
+    if caller.role == AdminRole.VILLAGE_ADMIN and village_id not in caller.unit_ids:
+        raise APIError(
+            status_code=403,
+            code="FORBIDDEN",
+            message="You don't have access to this village",
+        )
 
     row = get_village_or_404(session, village_id)
 
@@ -430,13 +428,12 @@ def get_village_channels(
     """Get channel information for a village."""
 
     # Check access
-    if caller.role == AdminRole.VILLAGE_ADMIN:
-        if village_id not in caller.unit_ids:
-            raise APIError(
-                status_code=403,
-                code="FORBIDDEN",
-                message="You don't have access to this village",
-            )
+    if caller.role == AdminRole.VILLAGE_ADMIN and village_id not in caller.unit_ids:
+        raise APIError(
+            status_code=403,
+            code="FORBIDDEN",
+            message="You don't have access to this village",
+        )
 
     get_village_or_404(session, village_id)
 
@@ -475,17 +472,16 @@ def list_village_admins(
     """List all admins for a village."""
 
     # Check access
-    if caller.role == AdminRole.VILLAGE_ADMIN:
-        if village_id not in caller.unit_ids:
-            raise APIError(
-                status_code=403,
-                code="FORBIDDEN",
-                message="You don't have access to this village",
-            )
+    if caller.role == AdminRole.VILLAGE_ADMIN and village_id not in caller.unit_ids:
+        raise APIError(
+            status_code=403,
+            code="FORBIDDEN",
+            message="You don't have access to this village",
+        )
 
     get_village_or_404(session, village_id)
 
-    from app.db.tables import admin_unit_memberships, admin_accounts
+    from app.db.tables import admin_accounts, admin_unit_memberships
 
     query = (
         select(admin_accounts, admin_unit_memberships.c.created_at.label("assigned_at"))

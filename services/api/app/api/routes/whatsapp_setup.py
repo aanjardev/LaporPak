@@ -1,17 +1,17 @@
 """WhatsApp setup API routes for multi-desa support."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import APIError
 from app.core.security import AdminCaller, AdminRole
 from app.db.session import get_db_session
-from app.db.tables import channel_integrations, administrative_units
+from app.db.tables import administrative_units, channel_integrations
 from app.schemas.village import WhatsAppChannelInfo
 
 router = APIRouter(prefix="/api/v1/villages", tags=["WhatsApp Setup"])
@@ -22,13 +22,12 @@ SessionDep = Annotated[Session, Depends(get_db_session)]
 
 def require_admin_access(caller: AdminCaller, village_id: UUID) -> AdminCaller:
     """Require admin access to village."""
-    if caller.role == AdminRole.VILLAGE_ADMIN:
-        if village_id not in caller.unit_ids:
-            raise APIError(
-                status_code=403,
-                code="FORBIDDEN",
-                message="You don't have access to this village",
-            )
+    if caller.role == AdminRole.VILLAGE_ADMIN and village_id not in caller.unit_ids:
+        raise APIError(
+            status_code=403,
+            code="FORBIDDEN",
+            message="You don't have access to this village",
+        )
     return caller
 
 
@@ -151,7 +150,7 @@ def init_whatsapp_connection(
             .where(channel_integrations.c.id == existing["id"])
             .values(
                 is_active=True,
-                updated_at=datetime.utcnow(),
+                updated_at=datetime.now(UTC),
             )
         )
         session.commit()
@@ -172,8 +171,8 @@ def init_whatsapp_connection(
             external_account_id=connection_token,  # Placeholder until actual phone is linked
             administrative_unit_id=village_id,
             is_active=True,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
     )
     session.commit()
@@ -243,7 +242,7 @@ def link_whatsapp_phone(
             .values(
                 external_account_id=phone_number,
                 is_active=True,
-                updated_at=datetime.utcnow(),
+                updated_at=datetime.now(UTC),
             )
         )
     else:
@@ -256,8 +255,8 @@ def link_whatsapp_phone(
                 external_account_id=phone_number,
                 administrative_unit_id=village_id,
                 is_active=True,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
         )
 
@@ -294,7 +293,7 @@ def disconnect_whatsapp(
         )
         .values(
             is_active=False,
-            updated_at=datetime.utcnow(),
+            updated_at=datetime.now(UTC),
         )
     )
     session.commit()
@@ -319,7 +318,6 @@ def whatsapp_webhook(
     """
 
     # Verify webhook token
-    from fastapi import Header, Request
     # Note: In production, verify X-Hub-Signature-256 from Meta
 
     get_village_or_404(session, village_id)
