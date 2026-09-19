@@ -38,7 +38,6 @@ export default async function RequestsPage({ searchParams }: { searchParams: Sea
       <header className="ui-page-header">
         <p className="text-sm font-semibold text-brand">Layanan warga / REQUEST</p>
         <h1 className="text-3xl font-bold tracking-tight sm:text-3xl">Pengajuan Surat Keterangan Domisili</h1>
-        <p className="max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">Tinjau pengajuan warga dan tetapkan keputusan administratif sesuai kewenangan petugas.</p>
       </header>
 
       <section aria-label="Antrean pengajuan" className="overflow-hidden ui-panel">

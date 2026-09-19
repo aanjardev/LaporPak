@@ -75,9 +75,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
       <header className="ui-page-header">
         <p className="text-sm font-semibold text-brand">Layanan warga / REPORT</p>
         <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-3xl">Laporan warga</h1>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Pantau laporan yang masuk dan buka detailnya untuk melihat informasi serta riwayat penanganan.
-        </p>
       </header>
 
       <section aria-label="Pencarian dan filter laporan" className="ui-panel p-4 sm:p-5">
@@ -136,22 +133,24 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
           <>
             <div className="divide-y divide-border md:hidden">
               {result.items.map((report) => (
-                <article key={report.id} className="space-y-3 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <Link href={`/reports/${report.id}`} className="text-sm font-bold text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">{report.ticket_number}</Link>
-                    <StatusBadge status={report.status} />
-                  </div>
-                  <p className="break-words text-sm font-medium leading-6 text-foreground">{report.description}</p>
-                  <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                    <div><dt className="text-muted-foreground">Kategori</dt><dd className="mt-0.5 font-medium">{categoryLabels[report.category]}</dd></div>
-                    <div><dt className="text-muted-foreground">Urgensi</dt><dd className="mt-0.5 font-medium">{urgencyLabels[report.urgency]}</dd></div>
-                    <div className="col-span-2"><dt className="text-muted-foreground">Lokasi</dt><dd className="mt-0.5 break-words font-medium">{formatLocation(report.location)}</dd></div>
-                  </dl>
-                  <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
-                    <time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time>
-                    <Link href={`/reports/${report.id}`} className="inline-flex min-h-11 items-center gap-1 font-semibold text-brand focus-visible:outline-2 focus-visible:outline-ring">Detail <ArrowRight aria-hidden="true" size={15} /></Link>
-                  </div>
-                </article>
+                <Link key={report.id} href={`/reports/${report.id}`} aria-label={`Buka detail laporan ${report.ticket_number}`} className="group block p-4 transition-colors hover:bg-background focus-visible:bg-background focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring">
+                  <article className="space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <span className="text-sm font-bold text-brand group-hover:underline">{report.ticket_number}</span>
+                      <StatusBadge status={report.status} />
+                    </div>
+                    <p className="break-words text-sm font-medium leading-6 text-foreground">{report.description}</p>
+                    <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                      <div><dt className="text-muted-foreground">Kategori</dt><dd className="mt-0.5 font-medium">{categoryLabels[report.category]}</dd></div>
+                      <div><dt className="text-muted-foreground">Urgensi</dt><dd className="mt-0.5 font-medium">{urgencyLabels[report.urgency]}</dd></div>
+                      <div className="col-span-2"><dt className="text-muted-foreground">Lokasi</dt><dd className="mt-0.5 break-words font-medium">{formatLocation(report.location)}</dd></div>
+                    </dl>
+                    <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
+                      <time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time>
+                      <span className="inline-flex min-h-11 items-center gap-1 font-semibold text-brand">Buka detail <ArrowRight aria-hidden="true" size={15} /></span>
+                    </div>
+                  </article>
+                </Link>
               ))}
             </div>
             <div className="hidden overflow-x-auto md:block">
@@ -167,9 +166,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
                 </thead>
                 <tbody className="divide-y divide-border">
                   {result.items.map((report) => (
-                    <tr key={report.id} className="align-top transition-colors hover:bg-background">
+                    <tr key={report.id} className="group relative cursor-pointer align-top transition-colors hover:bg-background focus-within:bg-background">
                       <td className="max-w-xs px-5 py-4">
-                        <Link href={`/reports/${report.id}`} className="font-semibold text-brand underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring">{report.ticket_number}</Link>
+                        <Link href={`/reports/${report.id}`} aria-label={`Buka detail laporan ${report.ticket_number}`} className="font-semibold text-brand underline-offset-4 after:absolute after:inset-0 after:z-10 after:content-[''] group-hover:underline focus-visible:outline-2 focus-visible:outline-ring">{report.ticket_number}</Link>
                         <p className="mt-1 line-clamp-2 leading-5 text-foreground">{report.description}</p>
                       </td>
                       <td className="px-4 py-4"><span className="font-medium">{categoryLabels[report.category]}</span><span className="mt-1 block text-xs text-muted-foreground">{formatLocation(report.location)}</span></td>

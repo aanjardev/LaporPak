@@ -44,7 +44,6 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Se
       <header className="ui-page-header">
         <p className="text-sm font-semibold text-brand">AI / ASK</p>
         <h1 className="text-3xl font-bold tracking-tight">Sumber pengetahuan</h1>
-        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">ASK hanya memakai sumber aktif dalam cakupan desa admin. Pencarian teks tersedia segera; embedding dapat diproses sesudahnya.</p>
       </header>
 
       {(params.saved === "1" || params.deleted === "1") && <p role="status" className="ui-alert-success p-3 text-sm text-emerald-900">{params.deleted === "1" ? "Sumber berhasil dinonaktifkan." : "Sumber berhasil disimpan."}</p>}
