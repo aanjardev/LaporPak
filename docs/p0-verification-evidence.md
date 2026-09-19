@@ -4,6 +4,34 @@
 > Environment: Supabase development + FastAPI local process  
 > Branch: `feat/db-foundation`
 
+## Backend/knowledge/request recheck — 2026-09-19
+
+Baseline `main`: `1030aa4`. Work continued on
+`feat/request-ci-scope-hardening`; record its final merge SHA after review.
+
+Observed against the development Supabase project:
+
+- all critical REPORT, knowledge, admin-scope, channel, and REQUEST tables,
+  columns, constraints, indexes, RLS flags, and functions are present;
+- `vector`, `postgis`, and `pgcrypto` are active;
+- `knowledge-files` and `report-attachments` are private; attachment storage is
+  limited to 5 MB JPEG/PNG/WebP after applying migration `0013`;
+- five clearly labelled `DATA UJI` documents were imported for Desa Sukamaju,
+  one chunk each, and an idempotent rerun skipped all five;
+- real FastAPI `POST /api/v1/ask` returned `200 answered` with the expected
+  document and chunk from Supabase FTS;
+- optional `service_key` typing was fixed after PostgreSQL exposed an
+  `AmbiguousParameter` error; retrieval now requires explicit approved metadata;
+- REQUEST gained a trusted OpenClaw submit tool, dashboard list/detail/human
+  decision pages, and automated village-scope query coverage;
+- a GitHub Actions workflow was added to run backend, dashboard, and OpenClaw
+  plugin checks; its first hosted run remains to be observed after push.
+
+Limitations: knowledge remains demo-only rather than approved village SOP;
+REQUEST has not completed a live WhatsApp-to-human-decision run; the two-unit
+scope test is automated rather than a live two-village environment; and the
+private attachment reader still lacks a real stored-object integration check.
+
 ## End-to-end backend demonstration
 
 The demonstration used the versioned OpenClaw request contract and a temporary

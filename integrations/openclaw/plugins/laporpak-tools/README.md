@@ -22,6 +22,12 @@ do not re-generate facts from model.
 Reads the authenticated sender's own REPORT or REQUEST status. Ownership and
 village scope are enforced server-side.
 
+### `laporpak_create_service_request`
+
+Submits a citizen-confirmed `residency_letter` REQUEST with a stable
+idempotency key. Sender identity and village come from authenticated WhatsApp
+runtime metadata; approval and rejection remain human admin actions.
+
 ## Enhanced Tools
 
 ### `laporpak_detect_emergency`

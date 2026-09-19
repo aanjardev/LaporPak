@@ -5,6 +5,23 @@
 > belum dibuat. Gunakan data dan akun uji; jangan tulis secret, token, nomor
 > WhatsApp pribadi, atau isi laporan warga nyata di dokumen ini.
 
+## Pembaruan terverifikasi 2026-09-19
+
+- [x] Schema, constraint, index, RLS, extension, seed akses, dan bucket private
+  development diaudit read-only; konfigurasi bucket `report-attachments`
+  diperbaiki sesuai migration `0013`.
+- [x] Lima dokumen `DATA UJI` Desa Sukamaju diimpor idempotent; eksekusi ulang
+  menghasilkan `Imported: 0; skipped: 5`.
+- [x] ASK FTS nyata melalui FastAPI dan Supabase menghasilkan `200 answered`
+  dengan source document/chunk; retrieval kini hanya menerima
+  `approval_status=approved` secara eksplisit.
+- [x] Unit/contract test membuktikan query admin REQUEST membawa filter unit
+  desa dan detail di luar scope diperlakukan tidak ditemukan.
+- [ ] REQUEST belum dibuktikan melalui WhatsApp/OpenClaw host nyata dan dua
+  desa belum dibuat pada environment bersama; test otomatis tidak menggantikan
+  gerbang integrasi tersebut.
+- [ ] Endpoint foto privat belum diuji dengan object Supabase Storage nyata.
+
 Dokumen ini mengatur pelaksanaan dan bukti uji. Kebutuhan P0 ada di
 [project-context.md](project-context.md), bentuk data dan respons di
 [api-contract.md](api-contract.md), alur dan fallback di

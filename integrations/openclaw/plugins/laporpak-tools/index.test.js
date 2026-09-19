@@ -5,6 +5,7 @@ import {
   buildAskTool,
   buildConfirmResolutionTool,
   buildCreateReportTool,
+  buildServiceRequestTool,
   buildTrackTool,
 } from "./index.js";
 
@@ -167,4 +168,49 @@ test("resolution confirmation injects trusted sender identity", async () => {
 
   assert.equal(body.sender_phone_number, "6281234567890");
   assert.equal(body.confirmed, true);
+});
+
+test("REQUEST injects trusted identity and uses a stable idempotency key", async () => {
+  const calls = [];
+  const tool = buildServiceRequestTool(
+    {
+      messageChannel: "whatsapp",
+      requesterSenderId: "6281234567890",
+      sessionId: "c5b17858-4046-4d4f-a718-6ea19c1da781",
+    },
+    async (url, options) => {
+      calls.push({ url: String(url), options });
+      return Response.json({
+        id: "72af1a52-7016-48c7-aacc-6c35417be819",
+        ticket_number: "REQ-2026-0001",
+        request_type: "residency_letter",
+        applicant_name: "Warga Uji",
+        domicile_address: "RT 03",
+        domicile_duration: "2 tahun",
+        purpose: "Keperluan uji",
+        status: "pending_review",
+        administrative_unit_id: "00000000-0000-4000-8000-000000000002",
+        created_at: "2026-09-19T00:00:00Z",
+        updated_at: "2026-09-19T00:00:00Z",
+      }, { status: calls.length === 1 ? 201 : 200 });
+    },
+    testEnv,
+  );
+  const input = {
+    applicant_name: "Warga Uji",
+    domicile_address: "RT 03",
+    domicile_duration: "2 tahun",
+    purpose: "Keperluan uji",
+  };
+
+  await tool.execute("request-1", input);
+  await tool.execute("request-1-retry", input);
+
+  assert.equal(calls[0].url, "http://localhost:8000/api/v1/service-requests");
+  assert.equal(JSON.parse(calls[0].options.body).sender_phone_number, "6281234567890");
+  assert.equal(
+    calls[0].options.headers["Idempotency-Key"],
+    calls[1].options.headers["Idempotency-Key"],
+  );
+  assert.equal(calls[0].options.headers["X-Channel-Account-ID"], "whatsapp-demo");
 });

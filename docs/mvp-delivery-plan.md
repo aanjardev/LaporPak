@@ -25,11 +25,11 @@
 
 **Status awal:** satu alur REPORT WhatsApp hingga verifikasi dashboard pernah
 berhasil didemokan, tetapi checklist integrasi terbaru belum seluruhnya lulus.
-Repository saat ini mempunyai halaman dashboard REPORT, route FastAPI REPORT,
-dan tool OpenClaw untuk membuat laporan. Belum ada route aplikasi untuk ASK,
-TRACK, atau REQUEST; path-nya baru dicadangkan dalam kontrak. Tabel
-`knowledge_documents` dan `knowledge_chunks` sudah ada sebagai fondasi ASK,
-belum sebagai bukti bahwa knowledge resmi telah disetujui atau alur ASK aktif.
+Repository saat ini mempunyai dashboard dan route FastAPI REPORT, ASK, TRACK,
+knowledge, serta REQUEST `residency_letter`. Tool OpenClaw mencakup REPORT,
+ASK, TRACK, dan submit REQUEST; dashboard mempunyai antrean/detail keputusan
+REPORT dan REQUEST. Knowledge demo sudah membuktikan retrieval FTS nyata,
+tetapi masih berlabel `DATA UJI` dan bukan bukti SOP resmi telah disetujui.
 
 ## 2. Urutan dan dependensi
 
