@@ -86,8 +86,8 @@ Python package      uv
 Frontend framework  Next.js + TypeScript
 Backend framework   FastAPI + Pydantic
 Database            Supabase PostgreSQL
-Vector extension    pgvector (bila ASK/RAG memerlukan; belum diverifikasi)
-Spatial extension   PostGIS (bila geospasial memerlukan; belum diverifikasi)
+Vector extension    pgvector (diminta migration ASK; verifikasi per environment)
+Spatial extension   PostGIS (belum menjadi baseline migration)
 Deployment FE       Vercel
 Deployment BE       Railway
 Container           Tidak diwajibkan untuk MVP
@@ -351,9 +351,22 @@ conversation_messages
 routing_rules
 knowledge_documents
 knowledge_chunks
+admin_accounts
+admin_unit_memberships
+channel_integrations
+service_request_types
+service_requests
+service_request_status_history
+village_profiles
+knowledge_templates
+knowledge_analytics
+resolution_confirmations
 ```
 
-Ketersediaan `pgvector` dan `PostGIS` belum diverifikasi. Aktifkan melalui migration saat ASK/RAG atau kebutuhan geospasial benar-benar memerlukannya; keduanya bukan prasyarat REPORT.
+Migration ASK meminta `pgvector`; pastikan extension benar-benar aktif pada
+setiap environment Supabase. `PostGIS` belum menjadi baseline migration dan
+baru ditambahkan bila kebutuhan geospasial disepakati. Keduanya bukan
+prasyarat REPORT.
 
 Jangan mengganti `reports` menjadi `tickets`. `ticket_number` adalah public identifier milik entity `reports`.
 

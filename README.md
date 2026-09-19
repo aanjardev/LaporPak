@@ -1,6 +1,6 @@
 # LaporPak
 
-LaporPak adalah platform layanan publik desa berbasis WhatsApp. Target MVP mencakup ASK (tanya layanan), REPORT (laporan warga), REQUEST (pengajuan layanan), TRACK (pantau status), dan dukungan multi-desa. Fokus pengembangan pertama adalah REPORT. Dashboard daftar/detail laporan mendukung data mock maupun FastAPI dan autentikasi admin menggunakan Supabase Auth invite-only.
+LaporPak adalah platform layanan publik desa berbasis WhatsApp. Target MVP mencakup ASK (tanya layanan), REPORT (laporan warga), REQUEST (pengajuan layanan), TRACK (pantau status), dan dukungan multi-desa. Fokus pengembangan pertama adalah REPORT. Dashboard memakai Supabase Auth invite-only dan kini mencakup pengelolaan REPORT, sumber ASK, serta pratinjau sintetis REQUEST.
 
 ## Dokumen acuan
 
@@ -10,6 +10,7 @@ LaporPak adalah platform layanan publik desa berbasis WhatsApp. Target MVP menca
 - [API contract](docs/api-contract.md) dan [workflows](docs/workflows.md) menjadi acuan implementasi lintas role.
 - [Development rules](docs/development-rules.md) memuat setup, Git, dan pemeriksaan sebelum PR.
 - [PRD V3](docs/prd/PRD_V3_AI_Village_Service_Agent.md) adalah acuan kebutuhan produk lengkap; P0 REPORT adalah tahap awal menuju MVP tersebut.
+- [MVP delivery plan](docs/mvp-delivery-plan.md) mencatat progress, dependensi, pemilik tugas, dan gerbang integrasi berikutnya.
 
 Git Bash dan PowerShell sama-sama dapat dipakai. Contoh perintah di bawah memakai PowerShell; padanan Git Bash ada di development rules.
 
@@ -61,3 +62,6 @@ API tersedia di `http://localhost:8000`; endpoint awalnya adalah `/health` dan d
 - Migration dan seed REPORT sudah diterapkan serta diverifikasi pada Supabase development.
 - Login admin memakai Supabase Auth invite-only; FastAPI memvalidasi access token untuk GET/PATCH.
 - Plugin OpenClaw dan kontrak tool REPORT tersedia; integrasi WhatsApp dasar sudah dapat menyimpan laporan dan masih dikembangkan lebih lanjut.
+- FastAPI dan plugin OpenClaw menyediakan baseline ASK serta TRACK; aktivasi nyata tetap memerlukan sumber resmi dan uji kepemilikan kanal.
+- FastAPI mempunyai baseline REQUEST `residency_letter`. UI petugas masih memakai data sintetis; SOP, riwayat detail, tool submit OpenClaw, dan integrasi nyata belum selesai.
+- Struktur cakupan admin, channel, knowledge, REPORT, dan REQUEST per unit sudah tersedia; isolasi dua desa belum dinyatakan lulus.

@@ -2,7 +2,7 @@
 
 _You're not a chatbot. You're becoming someone._
 
-Want a sharper version? See [SOUL.md personality guide](/concepts/soul).
+Want a sharper version? See [SOUL.md personality guide](https://docs.openclaw.ai/concepts/soul).
 
 ## Core Truths
 
@@ -41,4 +41,4 @@ Save this file at the workspace root as `SOUL.md`.
 
 ## Related
 
-- [SOUL.md personality guide](/concepts/soul)
+- [SOUL.md personality guide](https://docs.openclaw.ai/concepts/soul)

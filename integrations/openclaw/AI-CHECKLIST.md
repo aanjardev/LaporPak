@@ -101,8 +101,8 @@ node gap-tracker.js --stats
 ### Unit Tests
 | Test | Command | Target | Status |
 |------|---------|--------|--------|
-| Plugin tests | `npm test` | 100% | ⬜ |
-| Backend unit | `pytest tests/` | 80% | ⬜ |
+| Plugin tests | `npm test` | Lulus | ✅ 6 passed (2026-09-19) |
+| Backend unit | `uv run pytest` | Lulus | ✅ 103 passed (2026-09-19) |
 
 ### Integration Tests
 | Test | Command | Target | Status |
@@ -115,9 +115,10 @@ node gap-tracker.js --stats
 ### E2E Tests
 | Scenario | Status | Notes |
 |----------|--------|-------|
-| REPORT flow | ⬜ | Manual test |
-| ASK flow | ⬜ | Manual test |
-| TRACK flow | ⬜ | Manual test |
+| REPORT flow | ⚠️ | Pernah lulus manual; bukti matriks terbaru tetap di checklist P0 |
+| ASK flow | ⚠️ | Pernah lulus manual; sumber resmi dan bukti scope masih terbuka |
+| TRACK flow | ⚠️ | Pernah lulus manual untuk REPORT; ownership matrix dan `REQ-*` masih terbuka |
+| REQUEST flow | ⬜ | Tool submit OpenClaw dan SOP belum tersedia |
 | Multi-turn | ⬜ | Manual test |
 
 ### Security Tests
@@ -133,7 +134,7 @@ node gap-tracker.js --stats
 
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| FTS Recall@5 | ≥90% | 94% | ✅ Pass |
+| Simulated alias recall@5 | ≥90% | 35/35 | ✅ Pass |
 | Routing Macro-F1 | ≥0.90 | - | ⬜ |
 | Scenario Family | ≥90% | - | ⬜ |
 | Context Leak | 0 | - | ⬜ |
@@ -192,8 +193,8 @@ node gap-tracker.js --stats
 | Testing guide | `evals/README.md` | ✅ |
 | Prompt library | `prompts/README.md` | ✅ |
 | Tuning progress | `TUNING.md` | ✅ |
-| WhatsApp setup | `docs/whatsapp-setup.md` | ✅ |
-| Quick start | `docs/quickstart.md` | ✅ |
+| WhatsApp setup | `../../docs/whatsapp-setup.md` | ✅ |
+| Quick start | `../../docs/quickstart.md` | ✅ |
 
 ---
 

@@ -1,247 +1,131 @@
-# AI Tuning Progress Tracker
+# AI tuning progress tracker
 
-> Track tuning experiments and metrics per ask-track-ai-plan.md Section 5.
+> Diperbarui 2026-09-19. Catat hasil runtime bersama commit SHA, environment,
+> sumber data, dan batas simulasi. Angka evaluasi deterministik bukan ukuran
+> kualitas model atau bukti alur WhatsApp end-to-end.
 
-## Metrics Targets
+## Target evaluasi
 
-| Metric | Target | Current | Status |
-|--------|--------|---------|--------|
-| Citizen access others' ticket | 0 | - | Test ready |
-| AI status mutation | 0 | - | Test ready |
-| TRACK status vs DB | 100% | - | Test ready |
-| Ticket without persistence | 0 | - | ✅ Verified |
-| Ticket without photo | 0 | - | ✅ Verified |
-| ASK without valid source | 0 | - | Test ready |
-| Simulated alias recall@5 | ≥90% | **100%** | ✅ Pass |
-| Routing macro-F1 | ≥0.90 | - | Dataset ready |
-| Hybrid scenario success | ≥90% | **153/153** | ✅ Pass |
-| Context leak | 0 | - | Test ready |
-| Latency p95 | ≤10s | - | Runtime needed |
+| Metrik | Target | Bukti terakhir | Status |
+|---|---:|---:|---|
+| Akses tiket warga lain | 0 | Belum dicatat pada environment bersama | Terbuka |
+| Mutasi status oleh AI | 0 | Guardrail dan kontrak tersedia | Perlu uji runtime |
+| TRACK sama dengan database | 100% | Endpoint live pernah diuji | Perlu matriks ownership |
+| Tiket tanpa persistence | 0 | Service dan idempotensi tersedia | Perlu uji kegagalan bersama |
+| Tiket REPORT tanpa foto | 0 | Validasi backend tersedia | Perlu uji kanal |
+| ASK tanpa sumber valid | 0 | Retrieval menolak kecocokan lemah | Perlu sumber resmi |
+| Simulated alias recall@5 | >=90% | 35/35 | Lulus simulasi |
+| Hybrid scenario success | >=90% | 153/153 | Lulus deterministik |
+| Routing macro-F1 | >=0.90 | Belum diukur | Terbuka |
+| Context leak | 0 | Dataset tersedia | Perlu uji runtime |
+| Latency p95 | <=10 detik | Belum diukur | Terbuka |
 
-## Tuning Log
+## Riwayat eksperimen
 
-### Experiment 0: Baseline
-- **Date:** 2026-09-17
-- **Variable:** None (baseline)
-- **Description:** Initial setup with 6 knowledge chunks, 7 eval cases
-- **Result:** Foundation established
+### 2026-09-17 — baseline dan perluasan dataset
 
-### Experiment 1: Dataset Expansion
-- **Date:** 2026-09-17
-- **Variable:** Evaluation datasets
-- **Description:** Expanded datasets to 156 cases
-- **Result:** ASK (40), TRACK (30), REPORT (30), Error/Attack (55), E2E (1)
+- Menyiapkan prompt REPORT, ASK, TRACK, schema terstruktur, alias knowledge, dan
+  dataset evaluasi.
+- Dataset deterministik saat ini berisi 153 skenario keluarga REPORT, ASK,
+  TRACK, error/attack, dan satu flow gabungan.
+- Simulated alias recall mencapai 35/35 dan hybrid suite 153/153.
 
-### Experiment 2: Knowledge Expansion
-- **Date:** 2026-09-17
-- **Variable:** Knowledge chunks + aliases
-- **Description:** 26 chunks with comprehensive aliases
-- **Result:** FTS recall improved
+### 2026-09-18 — retrieval dan integrasi
 
-### Experiment 3: Backend Enhancement
-- **Date:** 2026-09-17
-- **Variable:** Admin endpoints, auth, smoke tests
-- **Description:** Added admin routes, Bearer auth, test scripts
-- **Result:** Full test suite ready
+- Menambahkan alias bahasa lokal, minimum rank, dan penolakan hasil lemah.
+- Menjalankan ASK dan TRACK melalui FastAPI.
+- Satu smoke test structured response OpenClaw/Gemini tercatat dengan
+  `google/gemini-3.1-flash-lite`.
+- Fixture REPORT, security, dan E2E pada runner tetap pemeriksaan deterministik;
+  hasil tersebut tidak boleh dilaporkan sebagai skor kualitas model.
 
-### Experiment 4: Retrieval and integration repair
-- **Date:** 2026-09-18
-- **Variable:** aliases, minimum rank, and live backend evaluation
-- **Description:** Added local-language aliases, rejected weak unscoped matches,
-  seeded 26 explicitly simulated chunks, and ran ASK/TRACK through FastAPI.
-- **Result:** Simulated alias recall 35/35; hybrid suite 153/153; live ASK and
-  TRACK endpoints operational; one real OpenClaw/Gemini structured-response
-  smoke test passed with `google/gemini-3.1-flash-lite`.
-- **Limitation:** REPORT, security, and E2E fixtures in `runner.js` remain
-  deterministic checks. They are not model-quality scores.
+### 2026-09-19 — sinkronisasi status repository
 
-## Knowledge Base Stats
+- Plugin menyediakan REPORT, ASK, TRACK REPORT, emergency detection, similar
+  report, dan resolution confirmation.
+- FastAPI dapat membaca tiket `LP-*` dan `REQ-*`, tetapi input tool OpenClaw
+  TRACK saat ini hanya menerima `LP-*`.
+- REQUEST `residency_letter` memiliki baseline API; tool submit OpenClaw belum
+  tersedia dan frontend masih memakai pratinjau sintetis.
+- Pengujian WhatsApp REPORT, ASK, dan TRACK pernah dilaporkan berhasil oleh tim.
+  Sign-off MVP tetap memerlukan bukti berisi SHA, environment, dan hasil matriks
+  keamanan pada dokumen delivery/checklist.
 
-| Document | Chunks | service_keys | Status |
-|----------|--------|--------------|--------|
-| demo-administrasi | 8 | office_hours, ktp_*, kontak_desa | ✅ Active |
-| demo-lingkungan | 6 | road, drainage, waste, streetlight | ✅ Active |
-| demo-glossary | 5 | istilah_wilayah, istilah_drainase | ✅ Active |
-| demo-status | 2 | track, status_info | ✅ Active |
-| demo-faq | 5 | faq_waktu, faq_anonim, dll | ✅ Active |
-| **Total** | **26** | **20+ service_keys** | ✅ |
+## Endpoint aktif
 
-## Dataset Coverage
+| Endpoint | Metode | Caller |
+|---|---|---|
+| `/health` | GET | Publik |
+| `/api/v1/reports` | POST | OpenClaw |
+| `/api/v1/reports` | GET | Admin |
+| `/api/v1/reports/{id}` | GET | Admin |
+| `/api/v1/reports/{id}/status` | PATCH | Admin |
+| `/api/v1/ask` | POST | OpenClaw |
+| `/api/v1/track` | POST | OpenClaw |
+| `/api/v1/knowledge/...` | GET/POST/PATCH/DELETE | Admin |
+| `/api/v1/tools/knowledge/...` | GET/POST | Internal tool |
+| `/api/v1/service-requests` | POST | OpenClaw |
+| `/api/v1/service-requests` | GET | Admin |
+| `/api/v1/service-requests/{id}` | GET | Admin |
+| `/api/v1/service-requests/{id}/status` | PATCH | Admin |
 
-| Dataset | File | Cases | Families |
-|---------|------|-------|----------|
-| report | report-p0.json | 29 | REPORT, security, multi_turn |
-| ask | ask-p0.json | 42 | 13 ASK families |
-| track | track-p0.json | 29 | TRACK, TRACK_security, TRACK_multi_turn |
-| error/attack | error-attack-p0.json | 52 | 21 behavior families |
-| e2e | e2e-flow.json | 1 | full flow |
-| **Total** | - | **153** | **36 families** |
+Endpoint REPORT admin memakai path yang sama dengan create REPORT. FastAPI
+membedakan caller berdasarkan metode dan dependency autentikasi; tidak ada
+route `/api/v1/admin/reports`.
 
-Target: 120 cases ✅ EXCEEDED (153)
+## Perintah verifikasi
 
-## API Endpoints
-
-| Endpoint | Method | Auth | Status |
-|----------|--------|------|--------|
-| `/health` | GET | None | ✅ |
-| `/api/v1/ask` | POST | OpenClaw | ✅ |
-| `/api/v1/track` | POST | OpenClaw | ✅ |
-| `/api/v1/reports` | POST | OpenClaw | ✅ |
-| `/api/v1/admin/reports` | GET | Bearer | ✅ |
-| `/api/v1/admin/reports/{id}` | GET | Bearer | ✅ |
-| `/api/v1/admin/reports/{id}/status` | PATCH | Bearer | ✅ |
-
-## Test Suite
-
-| Test | Command | Status |
-|------|---------|--------|
-| Plugin tests | `cd plugins/laporpak-tools && npm test` | ✅ Ready |
-| Unit tests | `cd services/api && python -m pytest tests/` | ✅ Ready |
-| Smoke tests | `cd services/api && python tests/smoke_test.py` | ✅ Ready |
-| FTS recall | `cd evals && node fts-recall.js` | ✅ Ready |
-| Eval runner | `cd evals && node runner.js` | ✅ Ready |
-| Gap tracker | `cd evals && node gap-tracker.js --analyze` | ✅ Ready |
-| Test suite | `cd evals && node test-suite.js` | ✅ NEW |
-| AI test runner | `.\ai-test-runner.ps1 -All` | ✅ NEW |
-| Full suite | `.\run-tests.ps1` | ✅ Ready |
-
-## Test Suite Tools
-
-| Tool | File | Purpose | Status |
-|------|------|---------|--------|
-| FTS Recall | `fts-recall.js` | Knowledge retrieval quality | ✅ |
-| Eval Runner | `runner.js` | Dataset evaluation | ✅ v2.0 |
-| Gap Tracker | `gap-tracker.js` | Unanswered question tracking | ✅ v2.0 |
-| Test Suite | `test-suite.js` | All AI tests in sequence | ✅ NEW |
-| Windows Runner | `ai-test-runner.ps1` | PowerShell test runner | ✅ NEW |
-| Test Docs | `evals/README.md` | Testing guide | ✅ NEW |
-
-## Tools
-
-| Tool | File | Purpose |
-|------|------|---------|
-| Test Runner | `run-tests.ps1` | Run all tests |
-| Smoke Test | `tests/smoke_test.py` | API endpoint tests |
-| FTS Recall | `evals/fts-recall.js` | Retrieval quality |
-| Gap Tracker | `evals/gap-tracker.js` | Track unanswered questions |
-| Eval Runner | `evals/runner.js` | Run eval datasets |
-
-## Database Migrations
-
-| File | Isi | Status |
-|------|-----|--------|
-| `0005_backend_production_readiness.sql` | Admin scope, REQUEST, pgvector, knowledge | ✅ Ready |
-| `0007_enhanced_features.sql` | Resolution confirmation and advisory fields | ✅ Ready |
-| `0008_village_knowledge.sql` | Village knowledge authoring metadata | ✅ Ready |
-| `0013_report_attachment_storage.sql` | Private REPORT photo bucket | ✅ Ready |
-
-## Known Issues
-
-- [x] `attachment_waived` removed from API contract
-- [x] Admin endpoints route conflict resolved (now `/api/v1/admin/reports`)
-- [x] httpx moved to module level import
-- [ ] WhatsApp integration needs runtime verification
-- [ ] Supabase credentials needed for admin auth
-- [ ] Database migrations need to be applied
-
-## Next Steps (Priority Order)
-
-### 1. Immediate (Testing)
 ```powershell
-# Start the system
-.\start-laporpak.ps1
+# Backend
+cd services/api
+uv run pytest
+uv run ruff check .
 
-# Run smoke tests
-cd services\api
-python tests/smoke_test.py
-```
+# Plugin
+cd ../../integrations/openclaw/plugins/laporpak-tools
+npm test
 
-### 2. Runtime Verification
-```bash
-# Run FTS recall test
-cd integrations/openclaw/evals
+# Evaluasi
+cd ../../evals
+node test-suite.js
 node fts-recall.js
-
-# Run eval runner
 node runner.js --verbose
 ```
 
-### 3. Admin Endpoint Testing
-1. Apply all migrations in filename order
-2. Apply the canonical seeds in filename order
-3. Create Supabase auth user
-4. Create admin_account record
-5. Test with Bearer token
+Tidak ada `services/api/tests/smoke_test.py`. Untuk pengujian API nyata,
+jalankan FastAPI dan ikuti [panduan testing](../../docs/testing.md) serta
+[checklist integrasi REPORT](../../docs/p0-integration-checklist.md).
 
-### 4. WhatsApp E2E Test
-1. Pair test WhatsApp number
-2. Send test message
-3. Verify flow: ASK → REPORT → CONFIRM → TICKET → TRACK
+## Baseline database terkait
 
-### 5. Pilot Preparation
-1. Verify all FTS recall ≥90%
-2. Test security scenarios
-3. Train operator on dashboard
-4. Deploy to pilot WhatsApp
+| Migration | Isi utama |
+|---|---|
+| `0005_backend_production_readiness.sql` | Admin scope, REQUEST, pgvector, knowledge |
+| `0007_enhanced_features.sql` | Resolution confirmation dan advisory fields |
+| `0008_village_knowledge.sql` | Metadata authoring knowledge |
+| `0009_harden_village_knowledge.sql` | Hardening konten knowledge |
+| `0013_report_attachment_storage.sql` | Bucket privat foto REPORT |
 
-## Tuning Principles
+Migration harus dijalankan berurutan dan diverifikasi pada environment target.
+Template atau seed sintetis tidak menjadi sumber resmi tanpa review manusia.
 
-1. **Tune data, retrieval, and behavior** — not model weights
-2. **Change one variable at a time** — prompt, then alias, then model
-3. **Log version, latency, and result** — use experiment template
-4. **Keep baseline** — until new approach proves better
-5. **Target recall@5 ≥90%** — before adding pgvector
+## Pekerjaan terbuka
 
-## AI Enhancement Features
+1. Rekam uji ownership TRACK untuk tiket sendiri, tiket orang lain, dan tiket
+   tidak ditemukan melalui metadata kanal nyata.
+2. Pilih serta setujui sumber ASK resmi, lalu uji jawaban, sitasi, sumber kosong,
+   dan scope desa.
+3. Tambahkan dukungan `REQ-*` pada tool TRACK setelah kontrak REQUEST disahkan.
+4. Jangan membuat tool submit REQUEST sebelum SOP, field minimum, konfirmasi
+   warga, dan kewenangan petugas disetujui.
+5. Ukur latency p95 dan routing macro-F1 pada host yang akan dipakai demo.
+6. Uji isolasi dua desa pada REPORT, ASK, TRACK, REQUEST, dan dashboard.
 
-### Implemented Enhancements
+## Prinsip tuning
 
-| Feature | File | Purpose |
-|---------|------|---------|
-| Context Recovery | `prompts/context-recovery.md` | Handle "yang tadi", "itu", "kemarin" |
-| Smart Clarification | `prompts/clarification.md` | Ask questions in optimal order |
-| Intent Chain | `prompts/intent-chain.md` | Detect ASK↔REPORT↔TRACK transitions |
-| Confidence Calibration | `prompts/confidence.md` | Know when AI is uncertain |
-| Cross-lingual Aliases | `seeds/0006_crosslingual_aliases.sql` | Indonesian + regional language |
-| Date/Time Extraction | `prompts/datetime-extraction.md` | Parse "kemarin", "besok", etc. |
-
-### High-Impact AI Features (NEW)
-
-| Feature | Status | Impact |
-|---------|--------|--------|
-| **SLA Tracking** | ✅ Implemented | Accountability - warga tahu deadline |
-| **Emergency Detection** | ✅ Implemented | Prioritas keyword emergency |
-| **Similar Reports** | ✅ Implemented | Kurangi duplicate |
-| **Resolution Confirmation** | ✅ Implemented | Quality assurance dari warga |
-
-### SLA Configuration
-
-| Urgency | SLA | Label |
-|---------|-----|-------|
-| critical | 24 jam | 1x24 jam |
-| high | 72 jam | 3x24 jam |
-| medium | 168 jam | 1 minggu |
-| low | 720 jam | 1 bulan |
-
-### Prompt Templates
-
-| Template | Purpose | Status |
-|----------|---------|--------|
-| report-analysis.md | REPORT extraction | ✅ |
-| ask-extraction.md | ASK classification | ✅ |
-| track-context.md | TRACK extraction | ✅ |
-| context-recovery.md | Multi-turn recovery | ✅ NEW |
-| clarification.md | Smart questioning | ✅ NEW |
-| intent-chain.md | Intent transitions | ✅ NEW |
-| confidence.md | Uncertainty handling | ✅ NEW |
-| datetime-extraction.md | Temporal parsing | ✅ NEW |
-
-### Cross-lingual Coverage
-
-| Language | Coverage |
-|----------|----------|
-| Indonesian (Bahasa) | ✅ Full |
-| Javanese | ✅ Common terms |
-| Sundanese | ✅ Basic |
-| English | ✅ Mixed phrases |
-| Chinese (loanwords) | ✅ Informal |
+1. Ubah prompt, retrieval, atau data satu per satu dan simpan baseline.
+2. Jangan melakukan fine-tuning model untuk MVP tanpa bukti kebutuhan.
+3. Semua keluaran model diperlakukan sebagai input tidak tepercaya.
+4. AI tidak menetapkan status operasional dan tidak mengakses database langsung.
+5. Jawaban ASK harus berasal dari source blocks FastAPI; ketika evidence tidak
+   cukup, minta klarifikasi atau lakukan handoff.

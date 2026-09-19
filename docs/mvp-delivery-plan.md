@@ -1,6 +1,6 @@
 # Rencana pengembangan MVP LaporPak
 
-> Status: rencana kerja tim, 2026-09-18. Dokumen ini mengatur urutan, pembagian
+> Status: rencana kerja tim, diperbarui 2026-09-19. Dokumen ini mengatur urutan, pembagian
 > tugas, dependensi, dan bukti selesai. Ini bukan kontrak API atau pengganti PRD.
 > Semua contoh dan pengujian memakai data serta akun uji; jangan mencatat
 > kredensial, token, nomor WhatsApp pribadi, atau isi laporan warga nyata.
@@ -23,13 +23,13 @@
   Perubahan lintas role harus masuk ke dokumen tersebut sebelum atau bersama
   implementasi, lalu disampaikan ke Ferdi, Anjar, dan Farel.
 
-**Status awal:** satu alur REPORT WhatsApp hingga verifikasi dashboard pernah
+**Status terkini:** satu alur REPORT WhatsApp hingga verifikasi dashboard pernah
 berhasil didemokan, tetapi checklist integrasi terbaru belum seluruhnya lulus.
-Repository saat ini mempunyai halaman dashboard REPORT, route FastAPI REPORT,
-dan tool OpenClaw untuk membuat laporan. Belum ada route aplikasi untuk ASK,
-TRACK, atau REQUEST; path-nya baru dicadangkan dalam kontrak. Tabel
-`knowledge_documents` dan `knowledge_chunks` sudah ada sebagai fondasi ASK,
-belum sebagai bukti bahwa knowledge resmi telah disetujui atau alur ASK aktif.
+Repository sudah memiliki API dan tool OpenClaw untuk ASK dan TRACK REPORT, pengelolaan
+sumber ASK di dashboard, serta API REQUEST `residency_letter`. Frontend REQUEST
+baru berupa pratinjau sintetis yang tidak memanggil API. OpenClaw belum memiliki
+tool submit REQUEST. Keberadaan route, tabel, tool, dan UI tidak membuktikan SOP
+resmi, isolasi dua desa, atau alur end-to-end telah lulus.
 
 ## 2. Urutan dan dependensi
 
@@ -48,10 +48,10 @@ beberapa desa memakai sistem, tahap 4 harus lulus. Pekerjaan pengamanan pada
 bagian 7 berjalan bersama semua tahap, bukan ditunda sampai akhir.
 
 **Langkah kerja terdekat:** Ferdi, Anjar, dan Farel menutup skenario nyata yang
-masih terbuka pada checklist REPORT; pada saat yang sama Anjar dan Farel dapat
-menyiapkan kontrak serta dataset evaluasi ASK, sedangkan Ferdi menuntaskan UI
-status REPORT sesuai kontrak. Tim menunjuk pemilik konten desa untuk memilih
-SOP/FAQ ASK sebelum menulis jawaban yang akan dianggap resmi.
+masih terbuka pada checklist REPORT. Setelah itu, tim memvalidasi ASK dan TRACK
+melalui kanal uji memakai sumber yang disetujui. Untuk REQUEST, tim meninjau
+kontrak teknis yang sudah ada, menetapkan SOP Surat Keterangan Domisili, data
+minimum, dan pejabat berwenang sebelum pratinjau frontend dihubungkan ke API.
 
 ## 3. Tahap 0 — penutupan REPORT
 
@@ -101,25 +101,22 @@ uji pada checklist serta bukti P0. Uji simulasi tidak membuktikan izin backend.
 Mulai dari beberapa pertanyaan layanan desa yang benar-benar mempunyai sumber
 resmi. Pemilik konten yang ditunjuk tim harus memeriksa akurasi, desa yang
 berlaku, versi, dan tanggal peninjauan sebelum materi disebut “disetujui”.
-Konten contoh buatan tim tetap diberi label data uji. Tidak perlu membuat
-halaman pengelolaan knowledge untuk versi pertama jika persetujuan dan versi
-konten dapat dikelola melalui file/seed yang ditinjau dalam PR.
+Konten contoh buatan tim tetap diberi label data uji. Dashboard sudah memiliki
+pengelolaan sumber; keberadaannya tidak menggantikan persetujuan pemilik konten.
 
 **Ferdi — frontend**
 
-- Kanal ASK tetap WhatsApp; tahap pertama tidak memerlukan halaman chatbot
-  warga atau editor knowledge baru di dashboard. Ferdi dapat menuntaskan UI
-  REPORT dan menyiapkan REQUEST secara paralel.
-- Jika persetujuan sumber nantinya memerlukan UI petugas, buat halaman baca/
-  tinjau dokumen dari FastAPI sesuai kontrak, dengan versi, status aktif,
-  loading, kosong, error, dan akses ditolak. Jangan membuka dokumen internal
-  langsung dari browser.
+- Kanal ASK warga tetap WhatsApp; tidak perlu halaman chatbot warga terpisah.
+- Dashboard sudah memiliki daftar, tambah, edit, dan nonaktifkan sumber ASK
+  melalui FastAPI, termasuk state sesi, akses ditolak, dan kegagalan layanan.
+  Uji kembali dengan sumber resmi dan cakupan desa nyata.
+- Jangan membuka file knowledge privat atau tabel Supabase langsung dari browser.
 
 **Anjar — backend dan database**
 
-- Tetapkan kontrak pencarian/ambil sumber ASK, cakupan desa, metadata sumber,
-  serta respons ketika tidak ada sumber yang layak. Buat ingestion/seed yang
-  dapat diulang untuk dokumen dan chunk yang disetujui.
+- Pertahankan kontrak pencarian ASK, cakupan desa, metadata sumber, serta
+  respons ketika tidak ada sumber yang layak. Route pengelolaan dan retrieval
+  sudah ada; buktikan ingestion dapat diulang untuk sumber yang disetujui.
 - Batasi retrieval ke sumber aktif yang disetujui; simpan referensi sumber dan
   versi yang dipakai agar jawaban dapat diaudit. Akses database tetap lewat
   FastAPI, bukan tool SQL langsung pada OpenClaw.
@@ -129,8 +126,8 @@ konten dapat dikelola melalui file/seed yang ditinjau dalam PR.
 
 **Farel — AI dan OpenClaw**
 
-- Tambahkan klasifikasi ASK, pemanggilan tool sumber yang diizinkan, jawaban
-  berdasarkan isi sumber, dan penyebutan sumber yang relevan pada respons.
+- Klasifikasi ASK dan tool `laporpak_ask` sudah tersedia. Uji pada host aktif
+  bahwa jawaban hanya memakai answer blocks dan sumber dari FastAPI.
 - Saat sumber kosong, kedaluwarsa, bertentangan, atau pertanyaan ambigu,
   minta klarifikasi atau tawarkan handoff. Jangan mengarang biaya, syarat,
   tenggat, atau kebijakan desa.
@@ -160,16 +157,16 @@ apakah tiket warga lain ada.
 
 **Anjar — backend dan database**
 
-- Sepakati kontrak endpoint TRACK dan error aman; ambil status/riwayat yang
-  boleh dibagikan dari system of record, bukan dari teks percakapan.
+- Endpoint TRACK dan pembatasan kepemilikan sudah tersedia. Tinjau kontrak
+  error aman dan buktikan status/riwayat berasal dari system of record.
 - Ikat pengirim WhatsApp ke citizen pemilik tiket, tegakkan cakupan desa, dan
   batasi field pribadi pada respons. Uji tiket milik sendiri, tiket orang
   lain, tiket tidak ada, dan layanan database gagal.
 
 **Farel — AI dan OpenClaw**
 
-- Kenali permintaan TRACK, minta nomor tiket bila belum ada, lalu panggil hanya
-  tool baca yang diizinkan dengan metadata pengirim kanal.
+- Prompt TRACK dan tool `laporpak_track_report` sudah tersedia. Uji nomor tiket
+  eksplisit dan daftar tiket terbaru dengan metadata pengirim kanal nyata.
 - Sampaikan status dan waktu yang dikembalikan backend apa adanya; jangan
   menyimpulkan progres atau menjanjikan tanggal selesai. Jika akses ditolak
   atau API gagal, berikan respons aman dan jalur handoff.
@@ -180,8 +177,9 @@ percakapan yang mencoba menyamar sebagai pemilik.
 
 ## 6. Tahap 3 — REQUEST untuk satu layanan
 
-Sebelum implementasi, Ferdi, Anjar, dan Farel bersama pemilik SOP desa memilih
-**tepat satu** layanan administrasi untuk prototipe. Catat syarat, data yang
+Prototipe teknis memilih `residency_letter` (Surat Keterangan Domisili), tetapi
+pilihan itu belum menjadi SOP layanan yang disahkan. Ferdi, Anjar, Farel, dan
+pemilik SOP desa harus mencatat syarat, data yang
 boleh diminta, pejabat yang menyetujui, hasil yang boleh dikirim, dan kapan
 pengajuan dianggap resmi. Jangan menebak SOP atau menerbitkan dokumen resmi
 dari AI. Entitas, status, dan nomor pengajuan REQUEST disepakati dalam kontrak
@@ -191,26 +189,26 @@ data minimum, dan hasil yang dapat didemokan tanpa penerbitan otomatis.
 
 **Ferdi — frontend**
 
-- Buat antrean dan detail pengajuan untuk petugas sesuai kontrak, termasuk
-  data yang diperlukan untuk keputusan, status/riwayat, dan alasan keputusan.
-- Sediakan aksi approve/reject atau minta perbaikan **hanya** bila telah
-  didefinisikan dalam workflow/backend. Tampilkan state menyimpan, berhasil,
-  gagal, konflik, dan akses ditolak; baca ulang hasil resmi setelah mutation.
+- Pratinjau antrean, detail, pagination, dan keputusan approve/reject sudah ada
+  dengan data sintetis dan hanya aktif melalui konfigurasi development.
+- Setelah kontrak disahkan, ganti simulasi dengan API, tampilkan riwayat resmi,
+  tangani `401`/`403`/`404`/`409`/`503`, dan baca ulang hasil setelah mutation.
 - Uji tampilan ponsel/desktop dan pembatasan sesi. Jangan mengirim approval
   otomatis berdasarkan rekomendasi AI.
 
 **Anjar — backend dan database**
 
-- Definisikan Pydantic schema, tabel/migrasi baru, endpoint, state transition,
-  izin petugas, idempotensi submit, dan audit keputusan untuk layanan terpilih.
+- Pydantic schema, tabel/migrasi, endpoint create/list/detail/status,
+  idempotensi, cakupan admin, dan audit keputusan sudah tersedia sebagai
+  baseline teknis. Tinjau bentuk detail/riwayat dan selaraskan dengan SOP final.
 - Pisahkan draf/persiapan dari submit resmi dan dari keputusan administratif;
   validasi field wajib serta otorisasi pada setiap langkah. Simpan keputusan
   dan riwayat secara atomik; hindari klaim sukses saat persistence gagal.
 
 **Farel — AI dan OpenClaw**
 
-- Bantu warga memahami syarat dari sumber resmi, kumpulkan hanya field wajib,
-  tampilkan ringkasan untuk konfirmasi, lalu panggil tool submit yang diizinkan.
+- Siapkan flow dan tool submit REQUEST setelah SOP serta kontrak disahkan.
+  Repository belum memiliki tool OpenClaw untuk membuat pengajuan layanan.
 - Jangan approve/reject, mengubah data resmi, atau mengarang hasil dokumen.
   Tangani data kurang, ketidakjelasan, pengiriman ulang, dan kegagalan API
   dengan klarifikasi/handoff.
@@ -276,10 +274,10 @@ masih berhasil.
 | Tahap | Status awal | Bukti/PR saat lulus |
 |---|---|---|
 | REPORT dan gerbang bersama | Berjalan; lihat checklist P0 | [Checklist](p0-integration-checklist.md) dan [bukti](p0-verification-evidence.md) |
-| ASK | Belum diuji end-to-end | Tautkan PR dan hasil evaluasi sumber di sini |
-| TRACK | Belum diuji end-to-end | Tautkan PR dan uji kepemilikan tiket di sini |
-| REQUEST satu layanan | Layanan/SOP belum dipilih | Tautkan keputusan layanan, PR, dan uji approval di sini |
-| Multi-desa | Belum diuji | Tautkan migrasi, PR, dan uji isolasi dua desa di sini |
+| ASK | API, tool, evaluasi, dan UI sumber tersedia; sumber resmi dan E2E belum disahkan | Tautkan PR dan hasil evaluasi sumber di sini |
+| TRACK | API mendukung REPORT/REQUEST; tool OpenClaw saat ini hanya menerima tiket `LP-*`; uji kepemilikan kanal nyata dan dukungan `REQ-*` masih terbuka | Tautkan PR dan uji kepemilikan tiket di sini |
+| REQUEST satu layanan | Baseline API `residency_letter` dan UI mock tersedia; SOP, riwayat detail, tool OpenClaw, dan integrasi nyata masih terbuka | Tautkan keputusan layanan, PR, dan uji approval di sini |
+| Multi-desa | Struktur scope admin/channel tersedia; isolasi dua desa belum dibuktikan | Tautkan migrasi, PR, dan uji isolasi dua desa di sini |
 
 **MVP demo siap** ketika REPORT, ASK, TRACK, REQUEST satu layanan, multi-desa,
 dan kontrol dasar Definition of Done lulus pada lingkungan bersama, termasuk

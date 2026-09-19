@@ -1,6 +1,6 @@
 # Checklist integrasi P0 REPORT
 
-> Status: daftar kerja tim per 2026-09-18. Checklist yang belum dicentang berarti
+> Status: daftar kerja tim diperbarui 2026-09-19. Checklist yang belum dicentang berarti
 > perlu diverifikasi dalam putaran integrasi berikutnya, bukan berarti fiturnya
 > belum dibuat. Gunakan data dan akun uji; jangan tulis secret, token, nomor
 > WhatsApp pribadi, atau isi laporan warga nyata di dokumen ini.
@@ -52,9 +52,10 @@ harus dibuat di dokumen sumber tersebut, bukan di checklist ini.
 Pemeriksaan parsial 2026-09-18 ada di
 [p0-verification-evidence.md](p0-verification-evidence.md#frontend-integration-recheck--2026-09-18):
 dashboard terhubung ke dua laporan FastAPI nyata, sedangkan halaman kedua dan
-respons gagal sudah disiapkan serta diuji pada API simulasi. Semua kotak di atas
-tetap terbuka sampai pemeriksaan UI dan keputusan pada laporan
-`pending_verification` benar-benar selesai.
+respons gagal sudah disiapkan serta diuji pada API simulasi. Bukti berikutnya
+mencatat verifikasi, penolakan, dan progres status yang tersimpan. Semua kotak
+tetap terbuka sampai ketiga role mengulang skenario pada commit dan lingkungan
+yang sama serta mencatat hasil `401`/`403`/scoped `404` nyata.
 
 ### Anjar — backend dan database (`services/api/`, `database/`)
 

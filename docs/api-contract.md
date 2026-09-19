@@ -169,11 +169,13 @@ meneruskan access token sesi petugas:
 Authorization: Bearer <supabase_access_token>
 ```
 
-FastAPI memverifikasi token melalui Supabase Auth dan memakai UUID pengguna
-sebagai identitas audit. P0 bersifat invite-only dan satu desa; akun publik
-tidak dapat mendaftar sendiri. `DASHBOARD_ADMIN_UNIT_ID` menjadi cakupan demo.
-Tabel role/cakupan admin per pengguna adalah target hardening sebelum
-deployment multi-desa atau pendaftaran pengguna yang lebih luas.
+FastAPI memverifikasi token melalui Supabase Auth, memetakan UUID pengguna ke
+`admin_accounts`, menolak akun nonaktif, dan memakai UUID tersebut sebagai
+identitas audit. `system_admin` memiliki cakupan global; `village_admin`
+dibatasi oleh `admin_unit_memberships`. Pendaftaran admin publik tidak tersedia.
+Fallback `DASHBOARD_ADMIN_UNIT_ID` hanya untuk development legacy ketika
+`ALLOW_LEGACY_ADMIN_FALLBACK=true`; default-nya nonaktif dan tidak boleh dipakai
+sebagai mekanisme izin production.
 
 | Kondisi | HTTP / code | Perilaku dashboard |
 |---|---|---|

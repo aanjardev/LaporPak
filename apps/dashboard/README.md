@@ -42,6 +42,19 @@ meneruskan access token Supabase milik sesi petugas; dashboard tidak menyimpan
 secret backend dan tidak membaca tabel laporan langsung dari Supabase.
 `/access-denied` menyiapkan tampilan untuk respons `403`.
 
+## Pengelolaan sumber ASK
+
+Route `/reports/knowledge` menyediakan daftar, tambah, edit, dan penonaktifan
+sumber ASK melalui FastAPI. Request dijalankan dari server Next.js dengan token
+sesi petugas. Respons `401` mengarah ke login, `403` ke halaman akses ditolak,
+`404` detail ke halaman tidak ditemukan, dan kegagalan layanan menampilkan pesan
+umum tanpa membocorkan detail internal. Frontend tidak membaca bucket knowledge
+atau tabel Supabase secara langsung.
+
+Gunakan data sintetis saat menguji formulir. Sumber baru belum dapat disebut
+resmi sampai pemilik konten desa memeriksa isi, versi, cakupan unit, dan status
+aktifnya. ASK warga tetap berjalan melalui WhatsApp/OpenClaw.
+
 ## Pratinjau REQUEST Surat Keterangan Domisili
 
 SOP resmi, data yang boleh ditampilkan, dan pejabat pemberi keputusan belum
@@ -66,6 +79,7 @@ kontrak bersama Anjar dan Farel.
 npm run lint
 npx tsc --noEmit
 npm run test:reports
+npm run test:knowledge
 npm run test:requests
 npm run test:auth
 npm run build

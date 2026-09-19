@@ -1,130 +1,86 @@
-# Test Runner
+# LaporPak Testing Guide
 
-Run all tests for LaporPak with a single command.
+Gunakan data, akun, nomor WhatsApp, dan channel khusus pengujian. Jangan menulis
+secret, token, atau data warga nyata ke fixture dan laporan hasil.
 
-## Prerequisites
-
-- Python 3.14+
-- Node.js (for OpenClaw tests)
-- pip install httpx pytest (for Python tests)
-
-## Quick Start
+## Persiapan
 
 ```powershell
-# Run all tests
-.\run-tests.ps1
+cd services/api
+uv sync
 
-# Or run individual components
-cd services\api
-python -m pytest tests/ -v
-python tests/smoke_test.py
+cd ../../apps/dashboard
+npm ci
 ```
 
-## Test Components
+Node.js LTS dan Python `>=3.14` wajib tersedia. Dependency Python dikelola
+melalui `uv`; jangan memakai `pip install` manual untuk project ini.
 
-### 1. OpenClaw Plugin Tests
-Location: `integrations/openclaw/plugins/laporpak-tools/`
-```bash
+## Pemeriksaan backend
+
+```powershell
+cd services/api
+uv run pytest
+uv run ruff check .
+```
+
+Untuk pengujian integrasi nyata, jalankan FastAPI dan gunakan environment
+development yang migrasinya sudah lengkap. Bedakan hasil unit/simulasi dari
+hasil API dan database nyata.
+
+## Pemeriksaan frontend
+
+```powershell
+cd apps/dashboard
+npm run lint
+npx tsc --noEmit
+npm run test:auth
+npm run test:reports
+npm run test:knowledge
+npm run test:requests
+npm run build
+```
+
+Tes REQUEST memastikan pratinjau tidak memakai jaringan atau database. Tes
+simulasi tidak membuktikan otorisasi FastAPI, scope desa, atau persistence.
+
+## OpenClaw dan evaluasi AI
+
+```powershell
+cd integrations/openclaw/plugins/laporpak-tools
 npm test
-```
 
-### 2. FastAPI Unit Tests
-Location: `services/api/tests/`
-```bash
-cd services/api
-python -m pytest tests/ -v
-```
-
-### 3. Smoke Tests
-Tests live API endpoints (requires running server)
-```bash
-cd services/api
-python tests/smoke_test.py
-```
-
-### 4. FTS Recall Tests
-Tests knowledge base retrieval quality
-```bash
-cd integrations/openclaw/evals
+cd ../../evals
+node test-suite.js
 node fts-recall.js
-```
-
-### 5. Evaluation Runner
-Runs full evaluation datasets
-```bash
-cd integrations/openclaw/evals
 node runner.js --verbose
 ```
 
-## Environment Variables
+Evaluasi dataset menguji kontrak dan perilaku terstruktur. E2E WhatsApp tetap
+memerlukan host OpenClaw, Gemini, channel aktif, FastAPI, dan Supabase yang sama.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LAPORPAK_API_URL` | `http://localhost:8000` | API base URL |
-| `LAPORPAK_API_KEY` | `test-secret` | OpenClaw API key |
+## Runner repository
 
-## Expected Output
-
-```
-========================================
-LaporPak Test Runner
-========================================
-
-Checking Node.js...
-  Node.js: v20.x.x
-
-========================================
-Running OpenClaw Plugin Tests
-========================================
-  ✓ validates URL normalization
-  ✓ validates phone number
-  ✓ validates MIME type
-  ✓ validates attachment URL
-  ✓ validates attachment structure
-  ✓ validates report creation parameters
-
-========================================
-Running FastAPI Tests
-========================================
-  ✓ test_ask_requires_internal_auth
-  ✓ test_ask_returns_grounded_blocks
-  ✓ test_track_filters_by_normalized_owner
-  ...
-
-========================================
-Running Smoke Tests
-========================================
-  ✓ GET /health
-  ✓ POST /api/v1/ask
-  ✓ POST /api/v1/track
-  ...
-
-========================================
-Running FTS Recall Test
-========================================
-  Testing 35 query patterns...
-  Total: 35
-  Passed: 33 (94.3%)
-  ✅ PASSED: 94.3% meets target (≥90%)
-
-========================================
-Test Run Complete
-========================================
-```
-
-## Troubleshooting
-
-### "httpx not installed"
 ```powershell
-pip install httpx pytest
+.\run-tests.ps1
 ```
 
-### "Node.js not found"
-Install Node.js from https://nodejs.org/
+Runner saat ini menjalankan backend pytest/Ruff, lint dan tes inti dashboard,
+build dashboard, tes plugin, serta test suite evaluasi. Sampai runner diperbarui
+untuk tes knowledge dan REQUEST, jalankan `npm run test:knowledge` dan
+`npm run test:requests` secara terpisah seperti daftar di atas.
 
-### "Connection refused" on smoke test
-Make sure FastAPI is running:
-```powershell
-cd services\api
-uv run uvicorn app.main:app --port 8000
-```
+## Uji manual wajib
+
+- Login, reload, logout, dan akses route terlindungi tanpa sesi.
+- REPORT: daftar/detail/filter, transisi status, reload, riwayat, dan foto ketika
+  endpoint privat telah tersedia.
+- ASK: sumber ada/kosong/gagal, sumber salah desa, dan jawaban tanpa evidence.
+- TRACK: tiket sendiri, tiket orang lain, tiket tidak ada, dan kegagalan API.
+- REQUEST: pratinjau responsif; integrasi nyata baru diuji setelah SOP disahkan.
+- `401`, `403`, scoped `404`, `409`, `422`, dan `503` pada boundary terkait.
+
+Catat tanggal, SHA commit, lingkungan, sumber data, hasil, dan batas simulasi.
+Gunakan [p0-verification-evidence.md](p0-verification-evidence.md) untuk bukti
+REPORT serta tautkan bukti ASK/TRACK/REQUEST dari
+[mvp-delivery-plan.md](mvp-delivery-plan.md).
