@@ -26,10 +26,10 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <Link href="/reports/requests" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-sky-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700"><ArrowLeft aria-hidden="true" size={17} /> Kembali ke antrean</Link>
-      <header className="space-y-2">
-        <p className="text-sm font-semibold text-sky-800">Layanan warga / REQUEST</p>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Detail pengajuan</h1>
+      <Link href="/reports/requests" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"><ArrowLeft aria-hidden="true" size={17} /> Kembali ke antrean</Link>
+      <header className="ui-page-header">
+        <p className="text-sm font-semibold text-brand">Layanan warga / REQUEST</p>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-3xl">Detail pengajuan</h1>
       </header>
       <RequestDetailView key={`${request.id}:${request.updated_at}`} initialRequest={request} />
     </div>

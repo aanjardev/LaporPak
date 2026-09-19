@@ -28,9 +28,9 @@ export default async function KnowledgeDetailPage({ params, searchParams }: { pa
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <Link href="/reports/knowledge" className="inline-flex min-h-11 items-center text-sm font-semibold text-sky-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">← Kembali ke sumber</Link>
-      <header className="min-w-0"><p className="text-sm font-semibold text-sky-800">Edit sumber ASK</p><h1 className="mt-1 break-all text-3xl font-bold">{document.title}</h1></header>
-      {query.saved === "1" && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">Perubahan berhasil disimpan.</p>}
+      <Link href="/reports/knowledge" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">← Kembali ke sumber</Link>
+      <header className="min-w-0"><p className="text-sm font-semibold text-brand">Edit sumber ASK</p><h1 className="mt-1 break-all text-3xl font-bold">{document.title}</h1></header>
+      {query.saved === "1" && <p role="status" className="ui-alert-success p-3 text-sm text-emerald-900">Perubahan berhasil disimpan.</p>}
       <KnowledgeForm mode="edit" action={updateKnowledgeAction.bind(null, id)} initialValues={{ title: document.title, category: document.category ?? "custom", serviceKey: document.service_key ?? "", content: document.content, isMandatory: document.is_mandatory }} />
     </div>
   );
