@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.schemas.knowledge import KnowledgeReviewStatus
 from app.services.knowledge import KnowledgeService
 
 
@@ -23,6 +24,7 @@ class ReviewedKnowledgeDocument(BaseModel):
     category: str | None = Field(default=None, max_length=100)
     service_key: str | None = Field(default=None, pattern=r"^[a-z0-9_-]+$")
     is_mandatory: bool = False
+    review_status: Literal["draft", "demo"]
 
     @field_validator("title", "source_reference", "content")
     @classmethod
@@ -54,7 +56,9 @@ class ReviewedKnowledgeManifest(BaseModel):
 
 
 def load_manifest(path: Path) -> ReviewedKnowledgeManifest:
-    return ReviewedKnowledgeManifest.model_validate_json(path.read_text(encoding="utf-8"))
+    return ReviewedKnowledgeManifest.model_validate_json(
+        path.read_text(encoding="utf-8")
+    )
 
 
 def import_manifest(
@@ -102,6 +106,7 @@ def import_manifest(
                 data=None,
                 service_key=document.service_key,
                 source_reference=document.source_reference,
+                review_status=KnowledgeReviewStatus(document.review_status),
             )
         imported += 1
     return imported, skipped

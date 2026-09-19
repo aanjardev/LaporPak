@@ -93,8 +93,16 @@ class CitizenService:
             )
         except SQLAlchemyError as exc:
             raise ReportPersistenceError("knowledge search") from exc
+        trust_level = None
+        if rows:
+            trust_level = (
+                "demo"
+                if any(row["review_status"] == "demo" for row in rows)
+                else "approved"
+            )
         return AskResponse(
             outcome="answered" if rows else "unavailable",
+            trust_level=trust_level,
             answer_blocks=[row["content"] for row in rows],
             sources=[
                 KnowledgeSource(
@@ -102,6 +110,7 @@ class CitizenService:
                     chunk_id=row["chunk_id"],
                     title=row["title"],
                     source_url=row["source_url"],
+                    review_status=row["review_status"],
                 )
                 for row in rows
             ],

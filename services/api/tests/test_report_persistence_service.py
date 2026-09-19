@@ -396,6 +396,33 @@ def test_create_rolls_back_when_initial_history_insert_fails():
     assert session.rolled_back == 1
 
 
+def test_attachment_object_is_removed_after_database_rollback(monkeypatch):
+    session = TransactionSession()
+    repository = FakeRepository()
+    repository.insert_attachment = lambda values: (_ for _ in ()).throw(
+        SQLAlchemyError("attachment row unavailable")
+    )
+    deleted = []
+    monkeypatch.setattr(
+        "app.services.reports.delete_storage_object",
+        lambda bucket, path: deleted.append((bucket, path)),
+    )
+
+    with pytest.raises(ReportPersistenceError):
+        ReportPersistenceService(session, repository).create_idempotent_report(
+            payload=valid_payload(),
+            idempotency_key=UUID("ef51f99f-a47d-4a31-a3db-e520838997f5"),
+        )
+
+    assert session.rolled_back == 1
+    assert deleted == [
+        (
+            "report-attachments",
+            "72af1a52-7016-48c7-aacc-6c35417be819/photo.jpg",
+        )
+    ]
+
+
 def test_status_update_rolls_back_when_history_insert_fails():
     session = TransactionSession()
     repository = FakeRepository()
@@ -568,6 +595,17 @@ def test_equivalent_phone_formats_produce_same_payload_hash():
     ) == canonical_payload_hash(
         international_payload,
         normalize_phone_number(international_payload.sender_phone_number),
+    )
+
+
+def test_report_payload_hash_is_bound_to_village():
+    payload = valid_payload()
+    phone = normalize_phone_number(payload.sender_phone_number)
+    unit_a = UUID("11111111-1111-4111-8111-111111111111")
+    unit_b = UUID("22222222-2222-4222-8222-222222222222")
+
+    assert canonical_payload_hash(payload, phone, unit_a) != canonical_payload_hash(
+        payload, phone, unit_b
     )
 
 

@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from app.db.citizen_repositories import CitizenRepository
+from app.core.config import settings
+from app.db.citizen_repositories import CitizenRepository, normalized_fts_question
 
 
 class EmptyResult:
@@ -14,9 +15,11 @@ class EmptyResult:
 class CapturingSession:
     def __init__(self):
         self.statements = []
+        self.parameters = []
 
-    def execute(self, statement, _parameters):
+    def execute(self, statement, parameters):
         self.statements.append(str(statement))
+        self.parameters.append(parameters)
         return EmptyResult()
 
 
@@ -30,11 +33,30 @@ def test_knowledge_queries_cast_optional_service_key_to_text():
 
     assert "cast(:service_key as text) is null" in session.statements[0]
     assert session.statements[1].count("cast(:service_key as text) is null") == 2
-    assert "d.metadata->>'approval_status'='approved'" in session.statements[0]
-    assert session.statements[1].count(
-        "d.metadata->>'approval_status'='approved'"
-    ) == 2
+    assert "d.review_status in ('approved','demo')" in session.statements[0]
+    assert session.statements[1].count("d.review_status in ('approved','demo')") == 2
     assert "coalesce(d.metadata->>'approval_status'" not in session.statements[0]
+    assert session.parameters[0]["question"] == "jam kantor"
+
+
+def test_fts_normalization_drops_common_filler_words():
+    assert (
+        normalized_fts_question("Apakah jam operasional di kantor desa?")
+        == "jam operasional kantor desa"
+    )
+
+
+def test_production_search_excludes_demo_sources(monkeypatch):
+    monkeypatch.setattr(settings, "app_env", "production")
+    session = CapturingSession()
+    CitizenRepository(session).hybrid_search(
+        "jam kantor",
+        [0.0] * 768,
+        UUID("00000000-0000-4000-8000-000000000002"),
+        None,
+    )
+    assert session.statements[0].count("d.review_status='approved'") == 2
+    assert "'demo'" not in session.statements[0]
 
 
 def test_track_queries_cast_optional_ticket_parameter_to_text():

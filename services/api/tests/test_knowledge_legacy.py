@@ -65,6 +65,10 @@ def canonical_row():
         "is_active": True,
         "processing_status": "pending",
         "failure_message": None,
+        "review_status": "draft",
+        "reviewer_display_name": None,
+        "reviewed_at": None,
+        "review_reason": None,
         "created_at": NOW,
         "updated_at": NOW,
     }
@@ -79,7 +83,7 @@ def test_list_query_quarantines_legacy_rows_for_system_admin():
     sql = session.statements[0]
     assert "administrative_unit_id is not null" in sql
     assert "source_type in ('paste', 'markdown', 'pdf')" in sql
-    assert "btrim(content) <> ''" in sql
+    assert "btrim(d.content) <> ''" in sql
 
 
 def test_detail_query_treats_legacy_document_as_not_found():
@@ -148,6 +152,7 @@ def reviewed_manifest():
                     "source_type": "paste",
                     "source_reference": "review/approval-001",
                     "content": "Konten yang sudah disetujui.",
+                    "review_status": "draft",
                 }
             ]
         }

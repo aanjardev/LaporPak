@@ -1,7 +1,30 @@
+import re
 from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+from app.core.config import settings
+
+FTS_FILLER_WORDS = {
+    "apa",
+    "apakah",
+    "bagaimana",
+    "dan",
+    "dari",
+    "di",
+    "ke",
+    "mohon",
+    "saya",
+    "untuk",
+    "yang",
+}
+
+
+def normalized_fts_question(question: str) -> str:
+    tokens = re.findall(r"[\w]+", question.casefold(), flags=re.UNICODE)
+    meaningful = [token for token in tokens if token not in FTS_FILLER_WORDS]
+    return " ".join(meaningful or tokens)
 
 
 class CitizenRepository:
@@ -70,29 +93,40 @@ class CitizenRepository:
         unit_id: UUID,
         service_key: str | None,
     ) -> list[dict]:
+        fts_question = normalized_fts_question(question)
+        review_filter = (
+            "d.review_status in ('approved','demo')"
+            if settings.app_env == "development"
+            else "d.review_status='approved'"
+        )
         if embedding is None:
             return list(
                 self.session.execute(
-                    text("""
+                    text(rf"""
                 select d.id document_id, c.id chunk_id, d.title, d.source_url,
-                       c.content
+                       c.content, d.review_status
                 from public.knowledge_chunks c
                 join public.knowledge_documents d on d.id=c.document_id
                 where d.administrative_unit_id=:unit
                   and d.is_active
                   and d.processing_status in ('pending', 'processing', 'ready')
-                  and d.metadata->>'approval_status'='approved'
+                  and {review_filter}
                   and (cast(:service_key as text) is null or
                        coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text))
-                  and c.search_vector @@ websearch_to_tsquery('simple', :question)
+                  and to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content)
+                      @@ websearch_to_tsquery(
+                          'simple', regexp_replace(btrim(:question), '\s+', ' OR ', 'g')
+                      )
                 order by ts_rank_cd(
-                    c.search_vector,
-                    websearch_to_tsquery('simple', :question)
+                    to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content),
+                    websearch_to_tsquery(
+                        'simple', regexp_replace(btrim(:question), '\s+', ' OR ', 'g')
+                    )
                 ) desc
                 limit 5
             """),
                     {
-                        "question": question,
+                        "question": fts_question,
                         "unit": unit_id,
                         "service_key": service_key,
                     },
@@ -103,33 +137,38 @@ class CitizenRepository:
         vector = "[" + ",".join(str(value) for value in embedding) + "]"
         return list(
             self.session.execute(
-                text("""
+                text(rf"""
             with fts as (
-              select c.id, row_number() over(order by ts_rank_cd(c.search_vector, websearch_to_tsquery('simple', :question)) desc) rank
+              select c.id, row_number() over(order by ts_rank_cd(
+                  to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content),
+                  websearch_to_tsquery('simple', regexp_replace(btrim(:question), '\s+', ' OR ', 'g'))
+              ) desc) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
               where d.administrative_unit_id=:unit and d.is_active
                 and d.processing_status in ('pending', 'processing', 'ready')
-                and d.metadata->>'approval_status'='approved'
+                and {review_filter}
                 and (cast(:service_key as text) is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text))
-                and c.search_vector @@ websearch_to_tsquery('simple', :question) limit 20
+                and to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content)
+                    @@ websearch_to_tsquery('simple', regexp_replace(btrim(:question), '\s+', ' OR ', 'g')) limit 20
             ), semantic as (
               select c.id, row_number() over(order by c.embedding <=> cast(:embedding as vector)) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
               where d.administrative_unit_id=:unit and d.is_active and d.processing_status='ready'
-                and d.metadata->>'approval_status'='approved'
+                and {review_filter}
                 and c.embedding is not null
                 and (cast(:service_key as text) is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text)) limit 20
             ), ranked as (
               select coalesce(f.id,s.id) id, coalesce(1.0/(60+f.rank),0)+coalesce(1.0/(60+s.rank),0) score
               from fts f full join semantic s on s.id=f.id
             )
-            select d.id document_id, c.id chunk_id, d.title, d.source_url, c.content
+            select d.id document_id, c.id chunk_id, d.title, d.source_url,
+                   c.content, d.review_status
             from ranked r join public.knowledge_chunks c on c.id=r.id
             join public.knowledge_documents d on d.id=c.document_id
             order by r.score desc limit 5
         """),
                 {
-                    "question": question,
+                    "question": fts_question,
                     "embedding": vector,
                     "unit": unit_id,
                     "service_key": service_key,

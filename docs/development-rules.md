@@ -449,10 +449,45 @@ Contoh:
 
 ```bash
 cd services/api
+uv run python -m app.db.migrate status
 uv run python -m app.db.check
 uv run pytest
 uv run ruff check .
 ```
+
+### Checksum migration runner
+
+Do not replay migrations manually against an existing shared database. The
+runner records migration number, filename, checksum, and applied time:
+
+```bash
+cd services/api
+uv run python -m app.db.migrate status
+```
+
+For the existing Supabase schema created manually before the ledger existed,
+validate it and record the historical baseline exactly once:
+
+```bash
+uv run python -m app.db.migrate baseline --through 13
+uv run python -m app.db.migrate apply
+```
+
+`baseline` verifies required tables, columns, constraints, indexes, vector,
+RLS/grants, and both private Storage buckets before recording anything. `apply`
+executes only pending files in order, rejects changed checksums, and never
+records a failed migration. There is no `fresh`/reset workflow for the shared
+Supabase project.
+
+Private Storage can be inspected without deletion:
+
+```bash
+uv run python -m app.db.storage_reconcile --bucket report-attachments
+uv run python -m app.db.storage_reconcile --bucket knowledge-files
+```
+
+Deletion requires the explicit `--delete` flag and only targets objects with
+no database row. Always review the dry-run count first.
 
 ---
 
@@ -512,7 +547,10 @@ Untuk deduplikasi event masuk, `external_message_id` dapat ditambahkan terpisah:
 external_message_id UNIQUE
 ```
 
-Retry create dengan key dan payload sama mengembalikan report pertama; key sama dengan payload berbeda menghasilkan `409 DUPLICATE_OPERATION`. Keduanya tidak boleh menghasilkan tiket kedua.
+Retry create dengan key dan payload sama dalam desa yang sama mengembalikan
+entity pertama. Hash REPORT dan REQUEST juga memuat `administrative_unit_id`;
+key sama dari desa berbeda menghasilkan `409 DUPLICATE_OPERATION`, bukan replay
+data desa pertama. Keduanya tidak boleh menghasilkan tiket kedua.
 
 Technical duplicate berbeda dengan semantic duplicate.
 

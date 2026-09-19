@@ -68,7 +68,12 @@ class ServiceRequestService:
         phone = normalize_phone_number(payload.sender_phone_number)
         digest = hashlib.sha256(
             json.dumps(
-                payload.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+                {
+                    **payload.model_dump(mode="json"),
+                    "administrative_unit_id": str(unit_id),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
             ).encode()
         ).hexdigest()
         try:

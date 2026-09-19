@@ -1,9 +1,27 @@
 from datetime import datetime
+from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.schemas.reports import StrictSchema
+
+
+class KnowledgeReviewStatus(StrEnum):
+    DRAFT = "draft"
+    DEMO = "demo"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class KnowledgeReviewHistory(StrictSchema):
+    old_status: KnowledgeReviewStatus | None
+    new_status: KnowledgeReviewStatus
+    actor_type: str
+    actor_display_name: str | None
+    reason: str
+    created_at: datetime
 
 
 class KnowledgePreview(StrictSchema):
@@ -23,6 +41,13 @@ class KnowledgeDocument(StrictSchema):
     is_active: bool
     processing_status: str
     failure_message: str | None
+    review_status: KnowledgeReviewStatus
+    reviewer_display_name: str | None = None
+    reviewed_at: datetime | None = None
+    review_reason: str | None = None
+    allowed_review_transitions: list[KnowledgeReviewStatus] = Field(
+        default_factory=list
+    )
     created_at: datetime
     updated_at: datetime
 
@@ -34,6 +59,7 @@ class KnowledgeDocumentList(StrictSchema):
 class KnowledgeDocumentDetail(KnowledgeDocument):
     content: str
     service_key: str | None
+    review_history: list[KnowledgeReviewHistory] = Field(default_factory=list)
 
 
 class KnowledgeUpdate(StrictSchema):
@@ -46,6 +72,32 @@ class KnowledgeUpdate(StrictSchema):
         default=None,
         pattern=r"^[a-z0-9_-]+$",
     )
+
+    @field_validator("title", "content")
+    @classmethod
+    def reject_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("value must not be blank")
+        return normalized
+
+
+class KnowledgeReviewUpdate(StrictSchema):
+    status: Literal[
+        KnowledgeReviewStatus.APPROVED,
+        KnowledgeReviewStatus.REJECTED,
+    ]
+    reason: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def reject_blank_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("reason must not be blank")
+        return normalized
 
 
 class EmbeddingChunk(StrictSchema):

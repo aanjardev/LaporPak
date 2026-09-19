@@ -38,7 +38,7 @@ def track(
         ) from exc
     except ReportNotFoundError as exc:
         raise APIError(
-            status_code=404, code="NOT_FOUND", message="Ticket not found"
+            status_code=404, code="TICKET_NOT_FOUND", message="Ticket not found"
         ) from exc
     except ReportPersistenceError as exc:
         raise APIError(

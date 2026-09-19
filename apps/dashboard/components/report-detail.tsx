@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Clock3, MapPin, UserRound } from "lucide-react";
 import { saveReportDecision } from "@/app/reports/[id]/actions";
 import { categoryLabels, formatLocation, formatReportDate, StatusBadge, statusLabels, urgencyLabels } from "@/components/report-display";
-import { reportStatusActions } from "@/lib/report-status-actions";
 import type { ReportAttachment, ReportDetail, ReportStatus } from "@/lib/reports";
 
 function ReportPhoto({ attachment, reportId, ticketNumber, index, isMock }: {
@@ -48,6 +47,9 @@ function ReportPhoto({ attachment, reportId, ticketNumber, index, isMock }: {
           </a>
         )}
       </div>
+      <p className="px-3 pb-3 text-xs text-slate-600">
+        {attachment.file_size.toLocaleString("id-ID")} byte · {formatReportDate(attachment.created_at)}
+      </p>
       {isMock && <p className="px-3 pb-3 text-xs text-amber-900">Foto simulasi untuk uji tampilan.</p>}
     </li>
   );
@@ -60,7 +62,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
   const [reason, setReason] = useState("");
   const [state, setState] = useState<"idle" | "saving" | "success" | "saved_unavailable" | "conflict" | "error">("idle");
   const saving = useRef(false);
-  const availableActions = reportStatusActions[report.status];
+  const availableActions = report.allowed_transitions;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -99,7 +101,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
               old_status: current.status,
               new_status: result.data.status,
               actor_type: "admin",
-              actor_identifier: null,
+              actor_display_name: "Petugas",
               notes: reason.trim(),
               created_at: result.data.updated_at,
             },

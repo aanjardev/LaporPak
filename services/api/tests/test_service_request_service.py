@@ -4,8 +4,8 @@ from uuid import UUID
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.schemas.service_requests import ServiceRequestStatus
-from app.services.exceptions import ReportPersistenceError
+from app.schemas.service_requests import ServiceRequestCreate, ServiceRequestStatus
+from app.services.exceptions import DuplicateOperationError, ReportPersistenceError
 from app.services.service_requests import ServiceRequestService
 
 REQUEST_ID = UUID("33333333-3333-4333-8333-333333333333")
@@ -99,3 +99,62 @@ def test_history_failure_aborts_atomic_status_transaction():
         )
 
     assert session.transaction.error_type is SQLAlchemyError
+
+
+class CreateRepository:
+    def __init__(self):
+        self.existing = None
+        self.inserted = None
+
+    def acquire_lock(self, _key):
+        return None
+
+    def by_key(self, _key):
+        return self.existing
+
+    def citizen(self, _phone):
+        return {"id": UUID("44444444-4444-4444-8444-444444444444")}
+
+    def request_type(self, _request_type):
+        return {"id": UUID("55555555-5555-4555-8555-555555555555")}
+
+    def insert_request(self, values):
+        self.inserted = {
+            **request_row(),
+            **values,
+        }
+        return self.inserted
+
+    def history(self, _values):
+        return None
+
+    def detail(self, _request_id, _unit_ids):
+        return {**request_row(), **self.existing}
+
+
+def test_request_idempotency_is_bound_to_village():
+    repository = CreateRepository()
+    service = ServiceRequestService(Session(), repository)
+    payload = ServiceRequestCreate(
+        sender_phone_number="+6281234567890",
+        applicant_name="Warga Uji",
+        domicile_address="RT 03",
+        domicile_duration="2 tahun",
+        purpose="Administrasi",
+    )
+    key = UUID("66666666-6666-4666-8666-666666666666")
+
+    service.create(payload, key, UNIT_ID)
+    repository.existing = {
+        "id": REQUEST_ID,
+        "idempotency_payload_hash": repository.inserted[
+            "idempotency_payload_hash"
+        ],
+    }
+
+    with pytest.raises(DuplicateOperationError):
+        service.create(
+            payload,
+            key,
+            UUID("77777777-7777-4777-8777-777777777777"),
+        )

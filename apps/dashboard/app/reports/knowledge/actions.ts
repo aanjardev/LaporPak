@@ -8,6 +8,7 @@ import {
   createKnowledgeDocument,
   deactivateKnowledgeDocument,
   KnowledgeApiError,
+  reviewKnowledgeDocument,
   updateKnowledgeDocument,
 } from "@/lib/knowledge";
 
@@ -113,4 +114,36 @@ export async function deactivateKnowledgeAction(formData: FormData) {
   }
   revalidatePath("/reports/knowledge");
   redirect("/reports/knowledge?deleted=1");
+}
+
+export async function reviewKnowledgeAction(
+  id: string,
+  _state: KnowledgeFormState,
+  formData: FormData,
+): Promise<KnowledgeFormState> {
+  const status = textValue(formData, "status");
+  const reason = textValue(formData, "reason");
+  const returnPath = `/reports/knowledge/${encodeURIComponent(id)}`;
+  if (!(["approved", "rejected"] as string[]).includes(status) || !reason || reason.length > 1000) {
+    return { message: "Pilih keputusan dan isi alasan 1–1000 karakter." };
+  }
+  try {
+    await reviewKnowledgeDocument(
+      id,
+      { status: status as "approved" | "rejected", reason },
+      await getAdminAccessToken(),
+    );
+  } catch (error) {
+    handleAuthError(error, returnPath);
+    if (error instanceof KnowledgeApiError && error.status === 404) {
+      return { message: "Sumber tidak ditemukan atau berada di luar cakupan desa Anda." };
+    }
+    if (error instanceof KnowledgeApiError && error.status === 409) {
+      return { message: "Status sumber telah berubah. Muat ulang lalu periksa kembali." };
+    }
+    return { message: "Keputusan review belum dapat disimpan. Silakan coba lagi." };
+  }
+  revalidatePath("/reports/knowledge");
+  revalidatePath(returnPath);
+  redirect(`${returnPath}?reviewed=1`);
 }

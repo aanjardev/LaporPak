@@ -7,6 +7,7 @@ import {
   getKnowledgeDocument,
   KnowledgeApiError,
   listKnowledgeDocuments,
+  reviewKnowledgeDocument,
   updateKnowledgeDocument,
 } from "../lib/knowledge.ts";
 
@@ -47,9 +48,10 @@ test("knowledge API meneruskan token, metode, dan payload; DELETE 204 berhasil",
   payload.set("title", "SOP uji");
   await createKnowledgeDocument(payload, "test-token");
   await updateKnowledgeDocument("doc-1", { title: "SOP revisi" }, "test-token");
+  await reviewKnowledgeDocument("doc-1", { status: "approved", reason: "Reviewed" }, "test-token");
   assert.equal(await deactivateKnowledgeDocument("doc-1", "test-token"), undefined);
 
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   assert.ok(calls.every(({ init }) => init.headers.Authorization === "Bearer test-token"));
   assert.equal(calls[0].url, "http://localhost:8000/api/v1/knowledge/documents");
   assert.equal(calls[1].init.method, "POST");
@@ -57,7 +59,9 @@ test("knowledge API meneruskan token, metode, dan payload; DELETE 204 berhasil",
   assert.equal(calls[1].init.headers["Content-Type"], undefined);
   assert.equal(calls[2].init.method, "PATCH");
   assert.deepEqual(JSON.parse(calls[2].init.body), { title: "SOP revisi" });
-  assert.equal(calls[3].init.method, "DELETE");
+  assert.equal(calls[3].url, "http://localhost:8000/api/v1/knowledge/documents/doc-1/review");
+  assert.deepEqual(JSON.parse(calls[3].init.body), { status: "approved", reason: "Reviewed" });
+  assert.equal(calls[4].init.method, "DELETE");
 });
 
 test("knowledge API mempertahankan data daftar dan detail dari API simulasi", async () => {
