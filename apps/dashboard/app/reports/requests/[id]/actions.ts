@@ -1,32 +1,28 @@
 "use server";
 
-import { redirect } from "next/navigation";
-
+import { requireSignedIn } from "@/lib/auth";
 import {
-  requestStatuses,
   ServiceRequestApiError,
   updateServiceRequest,
-  type ServiceRequestStatus,
 } from "@/lib/service-requests";
+import {
+  requestDecisionStatuses,
+  type ServiceRequestDecision,
+} from "@/lib/service-request-types";
 
-export async function updateRequestAction(id: string, formData: FormData) {
-  const status = String(formData.get("status") ?? "");
-  const reason = String(formData.get("reason") ?? "").trim();
-  if (!requestStatuses.includes(status as ServiceRequestStatus) || !reason) {
-    redirect(`/reports/requests/${id}?error=invalid`);
+export async function saveRequestDecision(id: string, input: ServiceRequestDecision) {
+  await requireSignedIn(`/reports/requests/${encodeURIComponent(id)}`);
+  const reason = input.reason.trim();
+  if (!requestDecisionStatuses.includes(input.status) || !reason || reason.length > 1000) {
+    return { ok: false as const, status: 422 };
   }
   try {
-    await updateServiceRequest(id, status as ServiceRequestStatus, reason);
+    const item = await updateServiceRequest(id, input.status, reason);
+    return { ok: true as const, item };
   } catch (error) {
-    if (error instanceof ServiceRequestApiError) {
-      if (error.status === 401) redirect("/login?reauth=1");
-      if (error.status === 403) redirect("/access-denied");
-      if (error.status === 404) redirect("/reports/requests?missing=1");
-      if (error.status === 409) {
-        redirect(`/reports/requests/${id}?error=conflict`);
-      }
-    }
-    redirect(`/reports/requests/${id}?error=save`);
+    return {
+      ok: false as const,
+      status: error instanceof ServiceRequestApiError ? error.status : 503,
+    };
   }
-  redirect(`/reports/requests/${id}?saved=1`);
 }

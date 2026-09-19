@@ -24,4 +24,4 @@ Use one directive per entry:
 
 ## Related
 
-- [Agent workspace](/concepts/agent-workspace)
+- [Agent workspace](https://docs.openclaw.ai/agent-workspace)

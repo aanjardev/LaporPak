@@ -61,9 +61,7 @@ export type ReportStatusHistory = {
 export type ReportAttachment = {
   id: string;
   file_name: string | null;
-  mime_type: string;
-  file_size: number;
-  created_at: string;
+  mime_type: string | null;
 };
 
 export type ReportDetail = ReportListItem & {
@@ -217,7 +215,18 @@ const mockReports: ReportDetail[] = Array.from({ length: 27 }, (_, index) => {
       ? { id: "b5e83fd3-71e2-4ec3-b432-b7e970b57c6a", name: "Unit Infrastruktur Desa" }
       : null,
     ai_recommendation: {},
-    attachments: [],
+    attachments: index === 0 ? [
+      {
+        id: "9a0d1245-4e4e-40be-bbba-000000000001",
+        file_name: "foto-jalan-rusak.png",
+        mime_type: "image/png",
+      },
+      {
+        id: "9a0d1245-4e4e-40be-bbba-000000000002",
+        file_name: "foto-kondisi-sekitar.png",
+        mime_type: "image/png",
+      },
+    ] : [],
     status_history: history,
     verified_at: verified?.created_at ?? null,
     resolved_at: resolved?.created_at ?? null,
@@ -325,11 +334,20 @@ export async function getReportById(
 ): Promise<ReportDetail | null> {
   if (process.env.REPORTS_DATA_SOURCE === "api") {
     try {
-      return await apiRequest(
+      const report = await apiRequest<ReportDetail>(
         `/api/v1/reports/${encodeURIComponent(id)}`,
         {},
         accessToken,
       );
+      // Keep private Storage paths and other backend metadata out of client props.
+      return {
+        ...report,
+        attachments: report.attachments.map((item) => ({
+          id: item.id,
+          file_name: typeof item.file_name === "string" ? item.file_name : null,
+          mime_type: typeof item.mime_type === "string" ? item.mime_type : null,
+        })),
+      };
     } catch (error) {
       if (error instanceof ReportApiError && error.status === 404) return null;
       throw error;
@@ -339,6 +357,34 @@ export async function getReportById(
   const scenario = await mockScenario();
   if (scenario === "empty") return null;
   return mockReports.find((report) => report.id === id) ?? null;
+}
+
+export async function getReportAttachment(
+  reportId: string,
+  attachmentId: string,
+  accessToken: string,
+): Promise<Response> {
+  if (process.env.REPORTS_DATA_SOURCE === "api") {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+    if (!baseUrl) throw new Error("NEXT_PUBLIC_API_URL is not configured");
+    return fetch(new URL(
+      `/api/v1/reports/${encodeURIComponent(reportId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      `${baseUrl.replace(/\/+$/, "")}/`,
+    ), {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  }
+
+  const report = mockReports.find((item) => item.id === reportId);
+  if (!report?.attachments.some((item) => item.id === attachmentId)) {
+    return new Response(null, { status: 404 });
+  }
+  // ponytail: one small synthetic image exercises the private-image path without storing a public photo fixture.
+  return new Response(Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAKAAAAB4CAIAAAD6wG44AAADeklEQVR42u3csW4TQRDG8fPo+hCJijxAhJQOpYjkvEKKiIaOAho6igiJBkGBhCjS0UBBi4RS0FFjiQLR0eQBQoW48AYUlpBl4/P6dnd2Z+4/VSI78t38/O2sz3Ymny9/N5TfEloAMAUwBTAFMAUwBTAFMMAUwBTAFMAUwBTAFMAAUwBTAFMAUwBTAFMAUwADHFFXz+/SX7fAc12MfQIvumLsDXhVFOOCNUn43aSNkHvPPtJxqwkOiSlRtgocLoexPeBtzTC2BDxMC2MbwDFOGFe9i07Iw9a6ugSnDR9Rrgs4hwfGtQDnk8C4PHBuA4xLAut0H+MCu+giTWdrrZTgUpEiyhrAZbuMcV7gGvqLscYMbprm1tWF5jH93DsFpszrYApgCmAKYApgKqhanYd58/1mz62P7vxCggRTgxL8/sP9jXd6Oj3RPKaQQ6LyLtFP3s56bn31cEpnWaIpR5ustLXTHZR66D+7P0iwW93ij84STRkHriFAtkIs6Po2VtpkxV+rqq2nO92BiQ0XM5gZzJJoeaEWdH0bt6PSPT/bn//w+PXlSIYxM5gZzAJo+TiFrvk+WqFfvo+ZGcwMJgqWj5wEOzcG2LkxwMxgynKIgy5Vvpx9Wj6B29vd3/HGqueMariEKTzffZ8XSzQzmPhaPjtB1/c5Crq+z7RtxlQJ3+dnBhPfKs5Xxqb77euXURm3YzjPJdR/vx4eHeufu/LVD7czOCSpBaXdAueLb8zaqymtHOLWtG4Manfd7d7YLSKtaTy59+LElu4w1O6667l1VXqxMmHrGNubwYdHx/3G/ZYb/6RUrG0Da+6c50IDmJewc0vrLNQaS3QO3fCFerB0yBoeL53bWDxld51N/4gd/OepcmwbON8kHuC0lXT//a3MY/Ed32GBjgx9VV0Su7oxGVoX6EDa5PHN1ysZT3b7wxqe2kyLc6aO2f5MVqpehy/I5l4Ky5jjW1vl6JtY19WMlM5bEVUDO86u2jMpbQ+F1rscvVmAvca3yAc/qgMuq+vvIxmp+ilkt9qnTpKuChK+F4bWU3xXPWI+01ODbvx7xq0b3RCk87P96ek7c8M4xrh1rPvfml08aBa+w7Iu4lUtzjHG4/puUuCq7mlPLqOKr92N1eBuC7q+XxkLur6N+R8dzkuIr+8QC7q+jQVd38bMYGYw8bUcYkHXt/FfdPJKapRuk5IAAAAASUVORK5CYII=",
+    "base64",
+  ), { headers: { "Content-Type": "image/png" } });
 }
 
 export async function updateReportStatus(
@@ -379,25 +425,4 @@ export async function updateReportStatus(
     status: request.status,
     updated_at: new Date().toISOString(),
   };
-}
-
-export async function getReportAttachment(
-  reportId: string,
-  attachmentId: string,
-  accessToken?: string,
-): Promise<Response> {
-  const token = accessToken ?? await (await import("./auth")).getAdminAccessToken();
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (!baseUrl) throw new Error("NEXT_PUBLIC_API_URL is not configured");
-
-  return fetch(
-    new URL(
-      `/api/v1/reports/${encodeURIComponent(reportId)}/attachments/${encodeURIComponent(attachmentId)}`,
-      `${baseUrl.replace(/\/+$/, "")}/`,
-    ),
-    {
-      cache: "no-store",
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  );
 }

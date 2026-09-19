@@ -79,10 +79,18 @@ test("REQUEST API uses admin token and contract paths", async () => {
 
 test("REQUEST detail UI uses transitions supplied by backend", async () => {
   const source = await readFile(
-    new URL("../app/reports/requests/[id]/page.tsx", import.meta.url),
+    new URL("../app/reports/requests/[id]/decision-form.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(source, /item\.allowed_transitions/);
-  assert.doesNotMatch(source, /const actions:/);
+  assert.match(source, /request\.allowed_transitions/);
+  assert.doesNotMatch(source, /availableDecisions/);
   assert.match(source, /status_history/);
+});
+
+test("REQUEST list does not render detail-only purpose", async () => {
+  const source = await readFile(
+    new URL("../app/reports/requests/page.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /item\.purpose/);
 });

@@ -568,14 +568,92 @@ Day 2 fokus pada vertical integration dan real event wiring, bukan redesign cont
 
 ---
 
-## 20. Next MVP Flows
+## 20. ASK dari sumber yang disetujui
 
-Tetap target MVP setelah REPORT stabil, bukan P0:
+Baseline teknis:
 
 ```text
-ASK
-TRACK
-REQUEST
+Pertanyaan warga di WhatsApp
+  ↓
+OpenClaw mengklasifikasikan ASK
+  ↓
+laporpak_ask dengan identitas channel tepercaya
+  ↓
+FastAPI menentukan unit administratif dari channel
+  ↓
+retrieval sumber aktif dalam scope desa
+  ├── sumber layak → answer_blocks + source IDs
+  └── sumber kosong/tidak layak → jawaban tidak diketahui / handoff
+  ↓
+OpenClaw menyusun respons hanya dari answer_blocks
 ```
 
-Boleh disiapkan enum dan struktur dasar, tetapi implementasinya tidak boleh memperlambat REPORT.
+Admin dapat menambah, membaca, mengubah, dan menonaktifkan sumber melalui
+dashboard dan FastAPI. Konten belum dianggap resmi sampai pemilik konten
+menyetujui SOP, cakupan desa, versi, dan tanggal peninjauan. Gemini tidak boleh
+mengisi fakta layanan yang tidak ada pada evidence.
+
+---
+
+## 21. TRACK dari status resmi
+
+```text
+Warga meminta status melalui WhatsApp
+  ↓
+OpenClaw memakai sender_phone_number dari metadata kanal
+  ↓
+laporpak_track_report
+  ↓
+FastAPI menentukan desa dari channel dan memeriksa kepemilikan citizen
+  ├── nomor tiket milik pengirim → status + timeline aman
+  ├── tiket tidak diberikan → maksimal 5 tiket terbaru milik pengirim
+  └── tiket tidak ada/bukan milik pengirim → 404 tanpa membocorkan data
+  ↓
+OpenClaw menyampaikan hasil tanpa mengarang progres atau ETA
+```
+
+Nomor tiket sendiri bukan bukti kepemilikan. FastAPI dan tool OpenClaw dapat
+membaca tiket REPORT `LP-*` maupun REQUEST `REQ-*`. Akses selalu ditentukan
+FastAPI dari metadata pengirim dan cakupan channel tepercaya.
+
+---
+
+## 22. REQUEST Surat Keterangan Domisili
+
+Baseline teknis memilih `residency_letter`, dengan status terpisah dari REPORT:
+
+```text
+pending_review
+  ├── approved → completed
+  └── rejected
+```
+
+Flow teknis saat ini:
+
+```text
+Warga meminta layanan
+  ↓
+OpenClaw menjelaskan syarat dari sumber resmi
+  ↓
+mengumpulkan field minimum + menampilkan ringkasan
+  ↓
+warga mengonfirmasi
+  ↓
+tool REQUEST memakai Idempotency-Key stabil
+  ↓
+FastAPI memvalidasi identitas channel, field, desa, dan duplikasi
+  ↓
+pending_review tersimpan
+  ↓
+petugas berwenang approve/reject dengan alasan
+  ↓
+status dan riwayat tersimpan atomik
+```
+
+Backend create/list/detail/status, tool submit OpenClaw, dan dashboard admin
+sudah tersedia. Gunakan data sintetis sampai keputusan SOP, field yang boleh
+dikumpulkan/ditampilkan, pejabat berwenang, dan bentuk riwayat detail disepakati.
+Ketersediaan teknis belum menjadi izin memproses pengajuan warga nyata.
+
+AI boleh menjelaskan dan menyiapkan data. AI tidak boleh approve, reject,
+menandai completed, atau menerbitkan dokumen resmi.

@@ -1,6 +1,6 @@
 # Checklist integrasi P0 REPORT
 
-> Status: daftar kerja tim per 2026-09-18. Checklist yang belum dicentang berarti
+> Status: daftar kerja tim diperbarui 2026-09-19. Checklist yang belum dicentang berarti
 > perlu diverifikasi dalam putaran integrasi berikutnya, bukan berarti fiturnya
 > belum dibuat. Gunakan data dan akun uji; jangan tulis secret, token, nomor
 > WhatsApp pribadi, atau isi laporan warga nyata di dokumen ini.
@@ -20,21 +20,31 @@
 - [ ] REQUEST belum dibuktikan melalui WhatsApp/OpenClaw host nyata dan dua
   desa belum dibuat pada environment bersama; test otomatis tidak menggantikan
   gerbang integrasi tersebut.
-- [ ] Endpoint foto privat belum diuji melalui HTTP memakai dua sesi admin nyata;
-  object Supabase Storage nyata sudah berhasil dibuat dan dibaca oleh service.
+- [x] Endpoint foto privat diuji melalui proxy Next.js dengan dua object
+  Supabase Storage nyata. Keduanya hanya termuat pada sesi admin dan permintaan
+  tanpa sesi ditolak `401`.
 
-## Pembaruan kesiapan demo 2026-09-19
+## Putaran penutupan REPORT 2026-09-19
 
-- [x] GitHub Actions `CI` berhasil pada merge `81417b0` di `main`.
-- [x] FastAPI nyata membuat laporan sintetis `LP-2026-0011` dengan PNG,
-  menyimpan object di bucket private, membaca object kembali, dan hanya
-  mengekspos `id`, `file_name`, `mime_type`, `file_size`, serta `created_at`.
-- [x] Dashboard memiliki proxy sesi dan galeri privat; bucket, storage path,
-  service-role key, dan URL object tidak dikirim ke browser.
-- [ ] Login admin nyata dan skenario lintas desa endpoint gambar masih harus
-  dijalankan melalui browser/API setelah akun uji kedua tersedia.
-- [ ] OpenClaw/WhatsApp memerlukan onboarding Gemini dan pemindaian QR pada
-  mesin operator; urutannya tersedia di `docs/demo-runbook.md`.
+- [x] Pada commit `40faf2f`, `LP-2026-0010` diverifikasi, dimulai
+  penanganannya, diteruskan, lalu diselesaikan. Status, waktu, alasan, dan lima
+  entri riwayat tetap sama setelah reload.
+- [x] Pada commit yang sama, `LP-2026-0011` ditolak dengan alasan uji. Status
+  dan dua entri riwayat tetap sama setelah reload.
+- [x] Foto privat kedua laporan berhasil dibaca melalui route Next.js lokal;
+  URL browser tetap same-origin dan permintaan tanpa sesi ke route Next.js
+  maupun endpoint FastAPI ditolak `401`.
+- [x] Detail UUID yang tidak ada menampilkan halaman laporan tidak ditemukan.
+  Detail serta galeri tidak memiliki overflow horizontal pada viewport 390 px
+  dan 1280 px, dan tidak ada error/warning pada console browser.
+- [ ] Bug TRACK `AmbiguousParameter` telah diperbaiki pada backend dengan cast
+  eksplisit untuk parameter tiket di `track_reports()` dan `track_requests()`,
+  serta regression test pemilik/lintas pengirim sudah lulus. Uji ulang FastAPI
+  nyata dan WhatsApp pemilik `LP-2026-0010` masih diperlukan sebelum REPORT
+  ditutup.
+- [ ] `403` akun terautentikasi tanpa izin dan scoped `404` lintas desa masih
+  memerlukan akun/unit uji kedua pada lingkungan bersama. Coverage otomatis
+  sudah lulus, tetapi belum menggantikan uji runtime ini.
 
 Dokumen ini mengatur pelaksanaan dan bukti uji. Kebutuhan P0 ada di
 [project-context.md](project-context.md), bentuk data dan respons di
@@ -70,9 +80,9 @@ harus dibuat di dokumen sumber tersebut, bukan di checklist ini.
 
 ### Ferdi — frontend (`apps/dashboard/`)
 
-- [ ] Aktifkan `REPORTS_DATA_SOURCE=api` secara lokal. Masuk dengan akun undangan;
+- [x] Aktifkan `REPORTS_DATA_SOURCE=api` secara lokal. Masuk dengan akun undangan;
   pastikan daftar, pencarian, filter, pagination, dan detail memakai data API.
-- [ ] Verifikasi dan tolak dua laporan uji yang berbeda dengan alasan. Setelah
+- [x] Verifikasi dan tolak dua laporan uji yang berbeda dengan alasan. Setelah
   reload, cocokkan status, waktu, dan riwayat yang tampil dengan respons API.
 - [ ] Periksa logout, akses tanpa sesi, serta respons GET/PATCH `401`, `403`,
   `404`, `409`, dan kegagalan layanan pada UI. Catat mana yang diuji dengan API
@@ -83,9 +93,10 @@ harus dibuat di dokumen sumber tersebut, bukan di checklist ini.
 Pemeriksaan parsial 2026-09-18 ada di
 [p0-verification-evidence.md](p0-verification-evidence.md#frontend-integration-recheck--2026-09-18):
 dashboard terhubung ke dua laporan FastAPI nyata, sedangkan halaman kedua dan
-respons gagal sudah disiapkan serta diuji pada API simulasi. Semua kotak di atas
-tetap terbuka sampai pemeriksaan UI dan keputusan pada laporan
-`pending_verification` benar-benar selesai.
+respons gagal sudah disiapkan serta diuji pada API simulasi. Bukti berikutnya
+mencatat verifikasi, penolakan, dan progres status yang tersimpan. Semua kotak
+tetap terbuka sampai ketiga role mengulang skenario pada commit dan lingkungan
+yang sama serta mencatat hasil `401`/`403`/scoped `404` nyata.
 
 ### Anjar — backend dan database (`services/api/`, `database/`)
 
@@ -125,8 +136,8 @@ perbaikan bila gagal. Gunakan nomor tiket uji dan bukti yang sudah disamarkan.
 | Lokasi atau data wajib belum lengkap | OpenClaw meminta klarifikasi; FastAPI menolak payload belum lengkap; tidak ada tiket palsu | Farel, Anjar | [ ] |
 | Pesan di luar REPORT atau output AI tidak valid | Tidak ada pemanggilan tool create dan tidak ada laporan baru | Farel, Anjar | [ ] |
 | Konfirmasi atau event terkirim ulang | Satu draf menghasilkan satu tiket; retry mengembalikan tiket yang sama | Farel, Anjar | [ ] |
-| Verifikasi dan penolakan petugas | Dua keputusan pada laporan berbeda tersimpan dengan alasan dan riwayat resmi | Ferdi, Anjar | [ ] |
-| Sesi tidak ada atau token ditolak | GET/PATCH ditolak `401`; dashboard meminta login ulang | Ferdi, Anjar | [ ] |
+| Verifikasi dan penolakan petugas | Dua keputusan pada laporan berbeda tersimpan dengan alasan dan riwayat resmi | Ferdi, Anjar | [x] |
+| Sesi tidak ada atau token ditolak | GET/PATCH ditolak `401`; dashboard meminta login ulang | Ferdi, Anjar | [x] |
 | Admin tidak berizin atau laporan di luar cakupan | API memberi `403` atau `404` sesuai kontrak; dashboard tidak menampilkan data terlarang | Anjar, Ferdi | [ ] |
 | Transisi status tidak sah | API memberi `409`; status dan riwayat resmi tidak berubah; UI meminta reload | Anjar, Ferdi | [ ] |
 | Gemini, API, atau database gagal | Tidak ada klaim tiket/status berhasil tanpa persistence; pengguna menerima pesan gagal yang jelas | Farel, Anjar, Ferdi | [ ] |

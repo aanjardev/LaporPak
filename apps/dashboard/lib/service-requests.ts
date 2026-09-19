@@ -1,53 +1,9 @@
-export const requestStatuses = [
-  "pending_review",
-  "approved",
-  "rejected",
-  "completed",
-] as const;
-
-export type ServiceRequestStatus = (typeof requestStatuses)[number];
-
-export type ServiceRequestSummary = {
-  id: string;
-  ticket_number: string;
-  request_type: "residency_letter";
-  applicant_name: string;
-  status: ServiceRequestStatus;
-  administrative_unit_id: string;
-  created_at: string;
-  updated_at: string;
-};
-
-export type ServiceRequestHistory = {
-  old_status: ServiceRequestStatus | null;
-  new_status: ServiceRequestStatus;
-  actor_type: string;
-  actor_display_name: string | null;
-  reason: string | null;
-  created_at: string;
-};
-
-export type ServiceRequestDetail = ServiceRequestSummary & {
-  domicile_address: string;
-  domicile_duration: string;
-  purpose: string;
-  allowed_transitions: ServiceRequestStatus[];
-  status_history: ServiceRequestHistory[];
-};
-
-export type ServiceRequestStatusUpdateResponse = {
-  id: string;
-  ticket_number: string;
-  status: ServiceRequestStatus;
-  updated_at: string;
-};
-
-export type ServiceRequestList = {
-  items: ServiceRequestSummary[];
-  page: number;
-  page_size: number;
-  total: number;
-};
+import type {
+  ServiceRequest,
+  ServiceRequestList,
+  ServiceRequestStatus,
+  ServiceRequestStatusUpdateResponse,
+} from "./service-request-types";
 
 export class ServiceRequestApiError extends Error {
   readonly status: number;
@@ -88,7 +44,7 @@ export function listServiceRequests(page: number, accessToken?: string) {
 }
 
 export function getServiceRequest(id: string, accessToken?: string) {
-  return request<ServiceRequestDetail>(
+  return request<ServiceRequest>(
     `/api/v1/service-requests/${encodeURIComponent(id)}`, undefined, accessToken,
   );
 }

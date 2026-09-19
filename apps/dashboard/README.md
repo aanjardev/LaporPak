@@ -1,6 +1,6 @@
 # Dashboard LaporPak
 
-Dashboard menggunakan Next.js, TypeScript, Tailwind CSS, dan shadcn/ui. Login petugas memakai Supabase Auth. Daftar, detail, dan keputusan petugas dapat memakai data sintetis atau FastAPI sesuai [kontrak API](../../docs/api-contract.md).
+Dashboard menggunakan Next.js, TypeScript, Tailwind CSS, dan shadcn/ui. Login petugas memakai Supabase Auth. REPORT dapat memakai data sintetis atau FastAPI; sumber ASK dan REQUEST memakai FastAPI sesuai [kontrak API](../../docs/api-contract.md).
 
 ## Menjalankan lokal
 
@@ -36,11 +36,39 @@ Untuk memeriksa state kosong, error, atau loading pada mode development, set `RE
 
 Pada detail laporan, pilih aksi yang tersedia untuk status saat ini: verifikasi/tolak, mulai penanganan, teruskan, atau selesaikan. Semua tindakan memerlukan alasan. Dalam mode mock, badge dan riwayat berubah selama halaman terbuka; muat ulang untuk kembali ke fixture awal. Pada mode API, dashboard membaca ulang detail resmi setelah PATCH berhasil. Untuk menguji proses lambat atau gagal, set `REPORTS_MOCK_MUTATION_SCENARIO=slow` atau `error` di `.env.local` dan mulai ulang server. Laporan pertama memiliki deskripsi panjang dan ringkasan kosong; laporan kelima memiliki riwayat status panjang. Lokasi mock hanya berupa teks tanpa koordinat.
 
+Detail laporan pertama juga memiliki dua foto sintetis untuk menguji galeri. Foto dibaca melalui route Next.js yang memerlukan sesi petugas; pada mode API route tersebut meneruskan token ke [endpoint foto privat FastAPI](../../docs/api-contract.md#read-private-report-attachment). Browser tidak menerima URL atau path bucket privat. Pada layar sempit, foto tersusun satu kolom; petugas dapat membuka gambar lewat tautan **Buka foto**. Integrasi dengan object Supabase Storage nyata tetap harus dibuktikan sesuai checklist P0.
+
 Lapisan data berada di `lib/reports.ts`. Set `REPORTS_DATA_SOURCE=api` untuk
 menggunakan GET/detail/PATCH FastAPI. Pemanggilan dilakukan server-side dan
 meneruskan access token Supabase milik sesi petugas; dashboard tidak menyimpan
 secret backend dan tidak membaca tabel laporan langsung dari Supabase.
 `/access-denied` menyiapkan tampilan untuk respons `403`.
+
+## Pengelolaan sumber ASK
+
+Route `/reports/knowledge` menyediakan daftar, tambah, edit, dan penonaktifan
+sumber ASK melalui FastAPI. Request dijalankan dari server Next.js dengan token
+sesi petugas. Respons `401` mengarah ke login, `403` ke halaman akses ditolak,
+`404` detail ke halaman tidak ditemukan, dan kegagalan layanan menampilkan pesan
+umum tanpa membocorkan detail internal. Frontend tidak membaca bucket knowledge
+atau tabel Supabase secara langsung.
+
+Gunakan data sintetis saat menguji formulir. Sumber baru belum dapat disebut
+resmi sampai pemilik konten desa memeriksa isi, versi, cakupan unit, dan status
+aktifnya. ASK warga tetap berjalan melalui WhatsApp/OpenClaw.
+
+## REQUEST Surat Keterangan Domisili
+
+Route `/reports/requests` membaca antrean dan detail dari FastAPI. Petugas dapat
+menyetujui atau menolak pengajuan `pending_review`, lalu menandai pengajuan
+`approved` sebagai `completed`. Semua keputusan memerlukan alasan dan FastAPI
+tetap menentukan apakah transisi, peran, dan cakupan desa diizinkan.
+
+Dashboard mempertahankan alasan ketika penyimpanan gagal, mencegah kirim ganda,
+dan menampilkan respons `401`, `403`, `404`, `409`, `422`, serta kegagalan
+layanan secara aman. Riwayat keputusan sudah disimpan backend, tetapi belum
+ditampilkan karena respons detail belum memuatnya. SOP layanan dan kewenangan
+petugas tetap harus disahkan sebelum REQUEST digunakan dengan data warga nyata.
 
 ## Pemeriksaan
 
@@ -48,6 +76,8 @@ secret backend dan tidak membaca tabel laporan langsung dari Supabase.
 npm run lint
 npx tsc --noEmit
 npm run test:reports
+npm run test:knowledge
+npm run test:requests
 npm run test:auth
 npm run build
 ```

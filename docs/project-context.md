@@ -144,48 +144,50 @@ Foundation harus siap sebelum vertical integration serius.
 
 #### Environment
 
-- [ ] Git
-- [ ] Node.js LTS
-- [ ] Python >= 3.14
-- [ ] VS Code
+- [x] Git
+- [x] Node.js LTS
+- [x] Python >= 3.14
+- [x] VS Code
 
 #### Repository
 
-- [ ] GitHub
-- [ ] Monorepo
-- [ ] Branch strategy
-- [ ] `.gitignore`
+- [x] GitHub
+- [x] Monorepo
+- [x] Branch strategy
+- [x] `.gitignore`
 
 #### Frontend foundation
 
-- [ ] Next.js dapat berjalan
+- [x] Next.js dapat berjalan
 
 #### Backend foundation
 
-- [ ] FastAPI dapat berjalan
-- [ ] Pydantic tersedia
-- [ ] `GET /health`
+- [x] FastAPI dapat berjalan
+- [x] Pydantic tersedia
+- [x] `GET /health`
 
 #### Database foundation
 
-- [ ] Supabase project
-- [ ] PostgreSQL connection
-- [ ] Initial schema
+- [x] Supabase project
+- [x] PostgreSQL connection
+- [x] Initial schema
 
-`pgvector` dan `PostGIS` baru diaktifkan dan diverifikasi jika fitur ASK/RAG atau geospasial membutuhkannya; keduanya bukan gerbang Day 1 REPORT.
+Migration ASK sekarang meminta `pgvector`, tetapi keberhasilannya tetap harus
+diverifikasi pada setiap environment Supabase. `PostGIS` belum menjadi baseline
+migration. Keduanya bukan gerbang Day 1 REPORT.
 
 #### AI foundation
 
-- [ ] Gemini connectivity melalui OpenClaw
-- [ ] OpenClaw baseline
-- [ ] WhatsApp development channel/connectivity
+- [x] Gemini connectivity melalui OpenClaw
+- [x] OpenClaw baseline
+- [x] WhatsApp development channel/connectivity
 
 #### Design foundation
 
-- [ ] Database/ERD baseline
-- [ ] API contract
-- [ ] Application flow
-- [ ] AI guardrail
+- [x] Database/ERD baseline
+- [x] API contract
+- [x] Application flow
+- [x] AI guardrail
 
 ---
 
@@ -378,13 +380,10 @@ official operational truth
 
 Day 1 dan P0 menggunakan **asumsi satu desa untuk tahap awal MVP**.
 
-Karena itu belum diwajibkan:
-
-- `villages` multi-tenant table;
-- village-based RLS;
-- multi-organization administration.
-
-Multi-desa tetap target MVP. Tambahkan isolasi data dan hak akses per desa melalui migration serta perubahan kontrak setelah REPORT satu desa stabil, sebelum admin desa dari beberapa desa menggunakan sistem yang sama.
+Entity desa memakai `administrative_units`; jangan membuat tabel `villages`
+paralel. Baseline sekarang memiliki akun admin, membership unit, channel scope,
+serta unit pada REPORT, knowledge, dan REQUEST. Multi-desa tetap belum selesai
+sampai isolasi dua desa lulus pada setiap query, detail, mutation, dan tool.
 
 ---
 
@@ -404,9 +403,21 @@ conversation_messages
 routing_rules
 knowledge_documents
 knowledge_chunks
+admin_accounts
+admin_unit_memberships
+channel_integrations
+service_request_types
+service_requests
+service_request_status_history
+village_profiles
+knowledge_templates
+knowledge_analytics
+resolution_confirmations
 ```
 
-Additional tables seperti generic `audit_logs` atau admin profile dapat ditambahkan kemudian bila memang dibutuhkan.
+Jangan menambah tabel duplikat untuk entity yang sama. `administrative_units`
+adalah scope canonical; `admin_accounts` dan `admin_unit_memberships` adalah
+boundary akses dashboard.
 
 Untuk P0, `report_status_history` adalah minimum audit trail status.
 

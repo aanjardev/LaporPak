@@ -1,7 +1,7 @@
-# OpenClaw REPORT integration
+# OpenClaw integration
 
-This directory contains the version-controlled, secret-free inputs for P0
-REPORT extraction. OpenClaw owns Gemini invocation and conversation state;
+This directory contains the version-controlled, secret-free inputs for REPORT,
+ASK, TRACK, and REQUEST support. OpenClaw owns Gemini invocation and conversation state;
 FastAPI does not call Gemini.
 
 ## Baseline setup
@@ -18,7 +18,7 @@ FastAPI does not call Gemini.
    directory only as a key-name template; never add a real value to Git.
 
 2. Enable `llm-task` and `laporpak-tools`, pin the evaluated model, and limit
-   the agent to the extraction and report-creation tools. Merge these entries
+   the agent to the approved LaporPak tools. Merge these entries
    with any existing plugin or tool allowlist:
 
    ```json5
@@ -71,17 +71,17 @@ Use `details.json` as the untrusted result and validate it again with
 Do not put `GEMINI_API_KEY`, channel credentials, or backend credentials in
 this directory, prompts, logs, or model input.
 
-The OpenClaw host also needs `LAPORPAK_API_URL` and `LAPORPAK_API_KEY` from
-its local environment when invoking the backend. Send the latter as
-`X-OpenClaw-API-Key` and send the stable report draft UUID as
-`Idempotency-Key` to `POST /api/v1/reports`.
+The OpenClaw host also needs `LAPORPAK_API_URL`, `LAPORPAK_API_KEY`, and
+`LAPORPAK_CHANNEL_ACCOUNT_ID` from its local environment. Send the channel ID
+as `X-Channel-Account-ID`, the API key as `X-OpenClaw-API-Key`, and a stable
+draft UUID as `Idempotency-Key` for create operations.
 
 The version-controlled plugin is in `plugins/laporpak-tools`. Install it on
-the OpenClaw host, enable it in `plugins.entries`, and add
-`laporpak_create_report` to `tools.allow`. The tool is available only for an
-authenticated WhatsApp context and takes the sender identity from OpenClaw's
-trusted runtime metadata. Call it only after the citizen confirms a complete
-REPORT draft.
+the OpenClaw host, enable it in `plugins.entries`, and allow only the tools
+listed above. Core tools require an authenticated WhatsApp context and take
+sender/channel identity from trusted runtime metadata. Call create operations
+only after the citizen confirms a complete draft. ASK and TRACK remain
+read-only.
 
 See `../../docs/whatsapp-setup.md` for Windows setup, QR pairing, access
 policy, verification, and troubleshooting.
@@ -101,9 +101,10 @@ scores exactly, and do not add real citizen data to this dataset.
 
 ## Current boundary
 
-Structured extraction and idempotent `create_report` are implemented.
-Conversation state, citizen confirmation behavior, and WhatsApp channel setup
-remain OpenClaw host responsibilities.
+Structured REPORT extraction, idempotent REPORT/REQUEST creation, grounded ASK,
+private TRACK, and supporting REPORT tools are implemented. Conversation state,
+citizen confirmation behavior, and WhatsApp channel setup remain OpenClaw host
+responsibilities. Administrative decisions remain human-only backend actions.
 
 For the repeatable local integration sequence, see
 [`../../docs/demo-runbook.md`](../../docs/demo-runbook.md).

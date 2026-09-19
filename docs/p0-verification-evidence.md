@@ -22,6 +22,49 @@ WhatsApp/Gemini flow remain manual integration gates documented in
 > Environment: Supabase development + FastAPI local process  
 > Branch: `feat/db-foundation`
 
+## REPORT closure recheck — 2026-09-19
+
+Code commit: `40faf2fee5a989b30905608a18b474bdc9e89063` on `main`.
+Environment: local Next.js on port 3000, local FastAPI on port 8000,
+development Supabase, and an invited admin session. Test records are synthetic
+or team-created test reports. No credentials, phone numbers, tokens, or photo
+contents are recorded here.
+
+| Check | Source | Observed result |
+|---|---|---|
+| Health and repository baseline | Running services + Git | FastAPI `/health` returned `200`; dashboard returned `200`; working tree was clean and synchronized with `origin/main` before documentation updates |
+| First decision and complete status path | Real dashboard + FastAPI + Supabase | `LP-2026-0010` changed `pending_verification -> verified -> in_progress -> forwarded -> resolved`; all reasons, timestamps, and five history entries persisted after reload |
+| Rejection path | Real dashboard + FastAPI + Supabase | `LP-2026-0011` changed `pending_verification -> rejected`; the reason and two history entries persisted after reload |
+| Private report photos | Real Next.js proxy + FastAPI + Supabase Storage | Both reports loaded one private image through a same-origin route; images completed with nonzero natural width. Direct unauthenticated requests to the proxy and FastAPI attachment endpoint returned `401` |
+| Missing detail | Real dashboard + FastAPI | A nonexistent UUID displayed “Laporan tidak ditemukan” |
+| Unauthenticated report access | Real FastAPI | List, detail, attachment, and PATCH requests without a session returned `401`; the unauthorized PATCH did not change the completed report |
+| Responsive and browser audit | Real dashboard | At 390 px and 1280 px, report detail had no horizontal overflow. Browser console contained no warnings or errors during the run |
+| TRACK by ticket owner | Real FastAPI + development Supabase | **Failed:** owner and unrelated sender requests both returned `503 DATABASE_UNAVAILABLE` |
+| TRACK diagnosis | Read-only repository call | PostgreSQL raised `AmbiguousParameter: could not determine data type of parameter $3` in the nullable ticket predicate of `CitizenRepository.track_reports()` |
+
+Automated checks on the same commit:
+
+```text
+Backend pytest:               119 passed
+Backend Ruff:                 passed
+Focused REPORT/backend tests: 53 passed
+OpenClaw plugin tests:          7 passed
+REPORT AI evaluation:          19/19 passed
+Dashboard auth tests:           1 passed
+Dashboard REPORT tests:        10 passed
+Dashboard knowledge tests:      4 passed
+Dashboard REQUEST tests:        2 passed
+Dashboard ESLint:              passed
+Dashboard TypeScript:          passed
+Dashboard production build:    passed
+```
+
+REPORT is not closed yet. Anjar must fix the TRACK query and the team must
+repeat TRACK through the owner’s WhatsApp number. Before public deployment,
+the shared environment must also prove an authenticated `403` and a scoped
+cross-village `404`; current automated coverage does not replace those runtime
+checks.
+
 ## Backend/knowledge/request recheck — 2026-09-19
 
 Baseline `main`: `1030aa4`. Work continued on
@@ -219,4 +262,33 @@ The failures are in `tests/test_create_report_api.py`: its older POST fixture
 does not supply a channel account ID or fallback village ID, so the route
 returns `422` before the mocked create service is called. This test-fixture
 issue is separate from the dashboard PATCH result and remains for Anjar to
-resolve.
+resolve at that point. The current automated recheck below confirms that the
+backend suite no longer has those failures.
+
+## Team runtime report — 2026-09-19
+
+The team later reported that a real WhatsApp test covering text plus photo,
+citizen confirmation, ticket visibility in the dashboard, ASK, and TRACK
+completed successfully after the AI integration merge (`5da486d`). This is
+useful runtime evidence, but the report did not include one shared commit SHA
+for every service, exact test identifiers, or the complete authorization and
+failure matrix. The corresponding checklist items therefore remain open until
+those details are recorded and repeated on the demo environment.
+
+## Automated repository recheck — 2026-09-19
+
+Base commit: `fb106b6` on `feat/frontend-request-residency-letter`, with
+documentation-only working-tree updates. Local results:
+
+```text
+Backend pytest:             103 passed, 2 dependency deprecation warnings
+OpenClaw plugin tests:       6 passed
+Dashboard auth tests:        1 passed
+Dashboard REPORT tests:      8 passed
+Dashboard knowledge tests:   4 passed
+Dashboard REQUEST tests:     4 passed
+```
+
+These checks confirm the current unit and data-layer baselines. They do not
+replace the shared-environment WhatsApp flow, authorization matrix, two-village
+isolation, approved ASK source review, or real REQUEST integration gates.
