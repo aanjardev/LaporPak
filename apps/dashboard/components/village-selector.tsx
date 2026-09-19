@@ -1,18 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Building2,
   ChevronDown,
-  MapPin,
   Settings,
   Bot,
   MessageSquare,
   Users,
   FileText,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { getMyVillages, type Village } from "@/lib/villages";
 import { cn } from "@/lib/utils";
 
@@ -24,17 +21,14 @@ interface VillageSelectorProps {
 export function VillageSelector({ currentVillageId, className }: VillageSelectorProps) {
   const [villages, setVillages] = useState<Village[]>([]);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   // Load villages on mount
-  useState(() => {
+  useEffect(() => {
     getMyVillages()
-      .then((data) => setVillages(data.items))
-      .finally(() => setLoading(false));
-  });
+      .then((data) => setVillages(data.items));
+  }, []);
 
   const currentVillage = villages.find((v) => v.id === currentVillageId);
-  const aiName = currentVillage?.metadata?.ai_personality?.name || "LaporPak";
   const aiEmoji = currentVillage?.metadata?.ai_personality?.emoji || "📋";
 
   return (

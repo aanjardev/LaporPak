@@ -20,8 +20,7 @@ import {
   listVillageAdmins,
   type VillageDetail,
 } from "@/lib/villages";
-import { createInvitation, type AdminInvitation } from "@/lib/admin";
-import { cn } from "@/lib/utils";
+import { createInvitation } from "@/lib/admin";
 
 interface AdminsPageProps {
   params: Promise<{ id: string }>;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, Building2, Plus } from "lucide-react";
+import { Building2, Plus } from "lucide-react";
 import { VillageList } from "@/components/village-list";
 import { Button } from "@/components/ui/button";
 

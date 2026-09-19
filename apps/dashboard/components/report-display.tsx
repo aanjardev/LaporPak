@@ -1,4 +1,4 @@
-` import type { ReportCategory, ReportLocation, ReportStatus, ReportUrgency } from "@/lib/reports";
+import type { ReportCategory, ReportLocation, ReportStatus, ReportUrgency } from "@/lib/reports";
 
 export const statusLabels: Record<ReportStatus, string> = {
   pending_verification: "Menunggu verifikasi",
@@ -40,7 +40,7 @@ export function StatusBadge({ status }: { status: ReportStatus }) {
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${statusStyles[status]}`}>
       {statusLabels[status]}
     </span>
-  );` 
+  );
 }
 
 export function formatReportDate(value: string) {

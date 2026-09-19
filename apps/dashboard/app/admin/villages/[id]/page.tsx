@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -12,7 +11,6 @@ import {
   Loader2,
   MessageSquare,
   Settings,
-  Users,
   AlertCircle,
   RefreshCw,
   QrCode,
@@ -27,7 +25,6 @@ import {
   type VillageDetail,
   type WhatsAppChannelInfo,
 } from "@/lib/villages";
-import { cn } from "@/lib/utils";
 
 interface VillageDetailPageProps {
   params: Promise<{ id: string }>;

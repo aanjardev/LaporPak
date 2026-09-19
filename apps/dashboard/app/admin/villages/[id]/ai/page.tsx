@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -18,9 +17,7 @@ import {
   getVillage,
   updateVillage,
   type VillageDetail,
-  type VillageAIPersonality,
 } from "@/lib/villages";
-import { cn } from "@/lib/utils";
 
 interface AICustomizationPageProps {
   params: Promise<{ id: string }>;

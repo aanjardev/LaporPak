@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -27,7 +26,6 @@ interface SettingsPageProps {
 }
 
 export default function VillageSettingsPage({ params }: SettingsPageProps) {
-  const router = useRouter();
   const [villageId, setVillageId] = useState<string | null>(null);
   const [village, setVillage] = useState<VillageDetail | null>(null);
   const [loading, setLoading] = useState(true);

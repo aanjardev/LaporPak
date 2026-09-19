@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  FileText,
   Loader2,
   BookOpen,
 } from "lucide-react";

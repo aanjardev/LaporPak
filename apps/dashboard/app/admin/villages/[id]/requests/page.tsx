@@ -4,11 +4,6 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   FileText,
-  Loader2,
-  AlertCircle,
-  Clock,
-  CheckCircle,
-  ArrowUpRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { VillageSelector } from "@/components/village-selector";
@@ -19,26 +14,10 @@ interface ReportsListPageProps {
 
 export default function VillageReportsPage({ params }: ReportsListPageProps) {
   const [villageId, setVillageId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     params.then((p) => setVillageId(p.id));
   }, [params]);
-
-  useEffect(() => {
-    if (villageId) {
-      // TODO: Fetch village reports
-      setLoading(false);
-    }
-  }, [villageId]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="size-8 animate-spin text-slate-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">

@@ -5,9 +5,6 @@ import Link from "next/link";
 import {
   Plus,
   Search,
-  MapPin,
-  Users,
-  MessageSquare,
   FileText,
   CheckCircle,
   Clock,
@@ -18,7 +15,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getVillages, getMyVillages, type Village, type VillageDetail } from "@/lib/villages";
-import { cn } from "@/lib/utils";
 
 interface VillageCardProps {
   village: Village | VillageDetail;

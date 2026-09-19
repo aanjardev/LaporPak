@@ -137,7 +137,7 @@ export default function WhatsAppPage({ params }: WhatsAppPageProps) {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+    } catch {
       // Fallback for older browsers
       const textarea = document.createElement("textarea");
       textarea.value = text;
