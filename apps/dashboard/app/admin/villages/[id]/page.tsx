@@ -44,14 +44,15 @@ export default function VillageDetailPage({ params }: VillageDetailPageProps) {
 
   useEffect(() => {
     if (!villageId) return;
+    const id = villageId;
 
     async function fetchData() {
       try {
         setLoading(true);
         setError(null);
         const [villageData, waStatus] = await Promise.all([
-          getVillage(villageId),
-          getWhatsAppStatus(villageId),
+          getVillage(id),
+          getWhatsAppStatus(id),
         ]);
         setVillage(villageData);
         setWhatsappStatus(waStatus);

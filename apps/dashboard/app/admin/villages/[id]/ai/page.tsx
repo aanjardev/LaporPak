@@ -47,11 +47,12 @@ export default function AICustomizationPage({ params }: AICustomizationPageProps
 
   useEffect(() => {
     if (!villageId) return;
+    const id = villageId;
 
     async function fetchVillage() {
       try {
         setLoading(true);
-        const data = await getVillage(villageId);
+        const data = await getVillage(id);
         setVillage(data);
 
         const ai = data.metadata?.ai_personality || {};
@@ -73,7 +74,7 @@ export default function AICustomizationPage({ params }: AICustomizationPageProps
   }, [villageId]);
 
   const handleSave = async () => {
-    if (!villageId) return;
+    if (!villageId || !village) return;
 
     try {
       setSaving(true);
@@ -82,7 +83,7 @@ export default function AICustomizationPage({ params }: AICustomizationPageProps
 
       await updateVillage(villageId, {
         metadata: {
-          ...village?.metadata,
+          ...village.metadata,
           ai_personality: {
             name: formData.name,
             emoji: formData.emoji,

@@ -2,7 +2,7 @@
  * Admin invitation API client for multi-desa support.
  */
 
-import { getAdminAccessToken } from "./auth";
+import { getBrowserAccessToken } from "./supabase/browser";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -10,7 +10,7 @@ async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = await getAdminAccessToken();
+  const token = await getBrowserAccessToken();
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,

@@ -5,13 +5,13 @@ import { AlertCircle } from "lucide-react";
 
 export default function ReportsError({ reset }: { reset: () => void }) {
   return (
-    <div role="alert" className="mx-auto flex max-w-xl flex-col items-center rounded-2xl border border-rose-200 bg-white px-6 py-16 text-center shadow-sm">
+    <div role="alert" className="mx-auto flex max-w-xl flex-col items-center rounded-lg border border-rose-200 bg-card px-6 py-16 text-center">
       <AlertCircle aria-hidden="true" className="text-rose-700" size={40} />
       <h1 className="mt-5 text-2xl font-bold">Laporan belum dapat dimuat</h1>
-      <p className="mt-2 text-sm leading-6 text-slate-600">Terjadi kendala saat mengambil data laporan. Silakan coba lagi.</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">Terjadi kendala saat mengambil data laporan. Silakan coba lagi.</p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
-        <button type="button" onClick={reset} className="min-h-11 rounded-lg bg-sky-800 px-5 text-sm font-semibold text-white hover:bg-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">Coba lagi</button>
-        <Link href="/reports" className="inline-flex min-h-11 items-center rounded-lg border border-slate-300 px-5 text-sm font-semibold text-slate-800 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">Daftar laporan</Link>
+        <button type="button" onClick={reset} className="ui-primary">Coba lagi</button>
+        <Link href="/reports" className="inline-flex min-h-11 items-center rounded-lg border border-input px-5 text-sm font-semibold text-foreground hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Daftar laporan</Link>
       </div>
     </div>
   );

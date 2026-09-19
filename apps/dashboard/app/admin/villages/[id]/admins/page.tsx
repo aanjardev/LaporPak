@@ -51,14 +51,15 @@ export default function VillageAdminsPage({ params }: AdminsPageProps) {
 
   useEffect(() => {
     if (!villageId) return;
+    const id = villageId;
 
     async function fetchData() {
       try {
         setLoading(true);
         setError(null);
         const [villageData, adminList] = await Promise.all([
-          getVillage(villageId),
-          listVillageAdmins(villageId),
+          getVillage(id),
+          listVillageAdmins(id),
         ]);
         setVillage(villageData);
         setAdmins(adminList);

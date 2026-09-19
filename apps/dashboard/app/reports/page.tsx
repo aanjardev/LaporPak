@@ -72,91 +72,90 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
 
   return (
     <div className="mx-auto max-w-6xl space-y-7">
-      <header className="space-y-2">
-        <p className="text-sm font-semibold text-sky-800">Layanan warga / REPORT</p>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Laporan warga</h1>
-        <p className="max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-          Pantau laporan yang masuk dan buka detailnya untuk melihat informasi serta riwayat penanganan.
-        </p>
+      <header className="ui-page-header">
+        <p className="text-sm font-semibold text-brand">Layanan warga / REPORT</p>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-3xl">Laporan warga</h1>
       </header>
 
-      <section aria-label="Pencarian dan filter laporan" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <section aria-label="Pencarian dan filter laporan" className="ui-panel p-4 sm:p-5">
         <form action="/reports" method="get" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_155px_155px_170px_auto] xl:items-end">
           <div className="space-y-1.5">
-            <label htmlFor="search" className="text-sm font-medium text-slate-700">Cari laporan</label>
+            <label htmlFor="search" className="text-sm font-medium text-foreground">Cari laporan</label>
             <div className="relative">
-              <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-              <input id="search" name="search" type="search" defaultValue={query.search ?? ""} placeholder="Nomor tiket, deskripsi, atau lokasi" className="min-h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none placeholder:text-slate-500 focus-visible:border-sky-700 focus-visible:ring-2 focus-visible:ring-sky-200" />
+              <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+              <input id="search" name="search" type="search" defaultValue={query.search ?? ""} placeholder="Nomor tiket, deskripsi, atau lokasi" className="ui-control pl-10 pr-3" />
             </div>
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="status" className="text-sm font-medium text-slate-700">Status</label>
-            <select id="status" name="status" defaultValue={query.status ?? ""} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:border-sky-700 focus-visible:ring-2 focus-visible:ring-sky-200">
+            <label htmlFor="status" className="text-sm font-medium text-foreground">Status</label>
+            <select id="status" name="status" defaultValue={query.status ?? ""} className="ui-control px-3">
               <option value="">Semua status</option>
               {reportStatuses.map((value) => <option key={value} value={value}>{statusLabels[value]}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="urgency" className="text-sm font-medium text-slate-700">Urgensi</label>
-            <select id="urgency" name="urgency" defaultValue={query.urgency ?? ""} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:border-sky-700 focus-visible:ring-2 focus-visible:ring-sky-200">
+            <label htmlFor="urgency" className="text-sm font-medium text-foreground">Urgensi</label>
+            <select id="urgency" name="urgency" defaultValue={query.urgency ?? ""} className="ui-control px-3">
               <option value="">Semua urgensi</option>
               {reportUrgencies.map((value) => <option key={value} value={value}>{urgencyLabels[value]}</option>)}
             </select>
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="category" className="text-sm font-medium text-slate-700">Kategori</label>
-            <select id="category" name="category" defaultValue={query.category ?? ""} className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus-visible:border-sky-700 focus-visible:ring-2 focus-visible:ring-sky-200">
+            <label htmlFor="category" className="text-sm font-medium text-foreground">Kategori</label>
+            <select id="category" name="category" defaultValue={query.category ?? ""} className="ui-control px-3">
               <option value="">Semua kategori</option>
               {reportCategories.map((value) => <option key={value} value={value}>{categoryLabels[value]}</option>)}
             </select>
           </div>
-          <button type="submit" className="min-h-11 rounded-lg bg-sky-800 px-5 text-sm font-semibold text-white transition-colors hover:bg-sky-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">
+          <button type="submit" className="ui-primary">
             Terapkan
           </button>
         </form>
         {(query.search || query.status || query.urgency || query.category) && (
-          <Link href="/reports" className="mt-4 inline-block text-sm font-medium text-sky-800 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">Hapus filter</Link>
+          <Link href="/reports" className="mt-4 inline-flex min-h-11 items-center text-sm font-medium text-brand underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Hapus filter</Link>
         )}
       </section>
 
-      <section aria-labelledby="hasil-laporan" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-4 sm:px-6">
-          <h2 id="hasil-laporan" className="text-lg font-semibold text-slate-950">Daftar laporan</h2>
-          <p className="text-sm text-slate-600">{result.total} laporan</p>
+      <section aria-labelledby="hasil-laporan" className="overflow-hidden ui-panel">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-4 sm:px-6">
+          <h2 id="hasil-laporan" className="text-lg font-semibold text-foreground">Daftar laporan</h2>
+          <p className="text-sm text-muted-foreground">{result.total} laporan</p>
         </div>
 
         {result.items.length === 0 ? (
           <div className="flex flex-col items-center px-6 py-16 text-center">
-            <span className="flex size-14 items-center justify-center rounded-full bg-slate-100 text-slate-600"><Inbox aria-hidden="true" size={27} /></span>
+            <span className="flex size-14 items-center justify-center rounded-full bg-muted text-muted-foreground"><Inbox aria-hidden="true" size={27} /></span>
             <h3 className="mt-4 text-lg font-semibold">Belum ada laporan yang cocok</h3>
-            <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">Coba ubah kata kunci atau filter untuk melihat laporan lain.</p>
-            <Link href="/reports" className="mt-5 inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-semibold text-sky-800 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-sky-700">Lihat semua laporan</Link>
+            <p className="mt-2 max-w-sm text-sm leading-6 text-muted-foreground">Coba ubah kata kunci atau filter untuk melihat laporan lain.</p>
+            <Link href="/reports" className="mt-5 inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-semibold text-brand underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-ring">Lihat semua laporan</Link>
           </div>
         ) : (
           <>
-            <div className="divide-y divide-slate-200 md:hidden">
+            <div className="divide-y divide-border md:hidden">
               {result.items.map((report) => (
-                <article key={report.id} className="space-y-3 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <Link href={`/reports/${report.id}`} className="text-sm font-bold text-sky-800 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-sky-700">{report.ticket_number}</Link>
-                    <StatusBadge status={report.status} />
-                  </div>
-                  <p className="break-words text-sm font-medium leading-6 text-slate-900">{report.description}</p>
-                  <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                    <div><dt className="text-slate-500">Kategori</dt><dd className="mt-0.5 font-medium">{categoryLabels[report.category]}</dd></div>
-                    <div><dt className="text-slate-500">Urgensi</dt><dd className="mt-0.5 font-medium">{urgencyLabels[report.urgency]}</dd></div>
-                    <div className="col-span-2"><dt className="text-slate-500">Lokasi</dt><dd className="mt-0.5 break-words font-medium">{formatLocation(report.location)}</dd></div>
-                  </dl>
-                  <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-600">
-                    <time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time>
-                    <Link href={`/reports/${report.id}`} className="inline-flex min-h-10 items-center gap-1 font-semibold text-sky-800 focus-visible:outline-2 focus-visible:outline-sky-700">Detail <ArrowRight aria-hidden="true" size={15} /></Link>
-                  </div>
-                </article>
+                <Link key={report.id} href={`/reports/${report.id}`} aria-label={`Buka detail laporan ${report.ticket_number}`} className="group block p-4 transition-colors hover:bg-background focus-visible:bg-background focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring">
+                  <article className="space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <span className="text-sm font-bold text-brand group-hover:underline">{report.ticket_number}</span>
+                      <StatusBadge status={report.status} />
+                    </div>
+                    <p className="break-words text-sm font-medium leading-6 text-foreground">{report.description}</p>
+                    <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                      <div><dt className="text-muted-foreground">Kategori</dt><dd className="mt-0.5 font-medium">{categoryLabels[report.category]}</dd></div>
+                      <div><dt className="text-muted-foreground">Urgensi</dt><dd className="mt-0.5 font-medium">{urgencyLabels[report.urgency]}</dd></div>
+                      <div className="col-span-2"><dt className="text-muted-foreground">Lokasi</dt><dd className="mt-0.5 break-words font-medium">{formatLocation(report.location)}</dd></div>
+                    </dl>
+                    <div className="flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
+                      <time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time>
+                      <span className="inline-flex min-h-11 items-center gap-1 font-semibold text-brand">Buka detail <ArrowRight aria-hidden="true" size={15} /></span>
+                    </div>
+                  </article>
+                </Link>
               ))}
             </div>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[820px] text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                <thead className="bg-background text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th scope="col" className="px-5 py-4 font-semibold">Tiket dan laporan</th>
                     <th scope="col" className="px-4 py-4 font-semibold">Kategori / lokasi</th>
@@ -165,17 +164,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
                     <th scope="col" className="px-4 py-4 font-semibold">Dibuat</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {result.items.map((report) => (
-                    <tr key={report.id} className="align-top transition-colors hover:bg-slate-50">
+                    <tr key={report.id} className="group relative cursor-pointer align-top transition-colors hover:bg-background focus-within:bg-background">
                       <td className="max-w-xs px-5 py-4">
-                        <Link href={`/reports/${report.id}`} className="font-semibold text-sky-800 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-sky-700">{report.ticket_number}</Link>
-                        <p className="mt-1 line-clamp-2 leading-5 text-slate-800">{report.description}</p>
+                        <Link href={`/reports/${report.id}`} aria-label={`Buka detail laporan ${report.ticket_number}`} className="font-semibold text-brand underline-offset-4 after:absolute after:inset-0 after:z-10 after:content-[''] group-hover:underline focus-visible:outline-2 focus-visible:outline-ring">{report.ticket_number}</Link>
+                        <p className="mt-1 line-clamp-2 leading-5 text-foreground">{report.description}</p>
                       </td>
-                      <td className="px-4 py-4"><span className="font-medium">{categoryLabels[report.category]}</span><span className="mt-1 block text-xs text-slate-600">{formatLocation(report.location)}</span></td>
-                      <td className="px-4 py-4 text-slate-700">{urgencyLabels[report.urgency]}</td>
+                      <td className="px-4 py-4"><span className="font-medium">{categoryLabels[report.category]}</span><span className="mt-1 block text-xs text-muted-foreground">{formatLocation(report.location)}</span></td>
+                      <td className="px-4 py-4 text-foreground">{urgencyLabels[report.urgency]}</td>
                       <td className="px-4 py-4"><StatusBadge status={report.status} /></td>
-                      <td className="whitespace-nowrap px-4 py-4 text-xs text-slate-600"><time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time></td>
+                      <td className="whitespace-nowrap px-4 py-4 text-xs text-muted-foreground"><time dateTime={report.created_at}>{formatReportDate(report.created_at)}</time></td>
                     </tr>
                   ))}
                 </tbody>
@@ -184,15 +183,15 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
           </>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-4 text-sm sm:px-6">
-          <p className="text-slate-600">Menampilkan {start}–{end} dari {result.total}</p>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-4 text-sm sm:px-6">
+          <p className="text-muted-foreground">Menampilkan {start}–{end} dari {result.total}</p>
           <nav aria-label="Halaman laporan" className="flex items-center gap-2">
             {result.page > 1 ? (
-              <Link href={pageHref(query, result.page - 1)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-300 px-3 font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-sky-700"><ChevronLeft aria-hidden="true" size={16} /> Sebelumnya</Link>
+              <Link href={pageHref(query, result.page - 1)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-input px-3 font-medium text-foreground hover:bg-background focus-visible:outline-2 focus-visible:outline-ring"><ChevronLeft aria-hidden="true" size={16} /> Sebelumnya</Link>
             ) : null}
-            <span className="px-1 text-slate-600">{result.page} / {totalPages}</span>
+            <span className="px-1 text-muted-foreground">{result.page} / {totalPages}</span>
             {result.page < totalPages ? (
-              <Link href={pageHref(query, result.page + 1)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-300 px-3 font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-sky-700">Berikutnya <ChevronRight aria-hidden="true" size={16} /></Link>
+              <Link href={pageHref(query, result.page + 1)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-input px-3 font-medium text-foreground hover:bg-background focus-visible:outline-2 focus-visible:outline-ring">Berikutnya <ChevronRight aria-hidden="true" size={16} /></Link>
             ) : null}
           </nav>
         </div>

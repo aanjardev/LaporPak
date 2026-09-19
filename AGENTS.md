@@ -17,6 +17,7 @@ Sebelum mengubah kode, baca dokumen berikut dalam urutan ini:
 4. `docs/api-contract.md`
 5. `docs/workflows.md`
 6. `docs/development-rules.md`
+7. Untuk pekerjaan frontend/UI: `docs/design-system.md` (panduan visual; kontrak API dan aturan arsitektur tetap berlaku).
 
 Jika terdapat konflik:
 
