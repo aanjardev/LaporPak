@@ -42,7 +42,6 @@ def report_detail() -> ReportDetail:
     return ReportDetail(
         **item.model_dump(),
         citizen=ReportCitizen(
-            id=UUID("5c242fc6-77a8-4fa7-a12f-a67bbc75839b"),
             display_name="Warga",
         ),
         summary="Kerusakan jalan di RT 03.",
@@ -54,11 +53,12 @@ def report_detail() -> ReportDetail:
                 old_status=None,
                 new_status="pending_verification",
                 actor_type="system",
-                actor_identifier=None,
+                actor_display_name=None,
                 notes="Report created",
                 created_at=CREATED_AT,
             )
         ],
+        allowed_transitions=["verified", "rejected"],
         verified_at=None,
         resolved_at=None,
         updated_at=CREATED_AT,
@@ -185,6 +185,9 @@ def test_detail_returns_ai_metadata_attachments_and_history(auth_tokens):
     assert body["ai_recommendation"] == {}
     assert body["attachments"] == []
     assert body["status_history"][0]["new_status"] == "pending_verification"
+    assert body["allowed_transitions"] == ["verified", "rejected"]
+    assert "id" not in body["citizen"]
+    assert "actor_identifier" not in body["status_history"][0]
 
 
 def test_read_endpoints_require_admin_token(auth_tokens):

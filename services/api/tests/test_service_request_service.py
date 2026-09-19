@@ -189,7 +189,6 @@ def test_create_history_failure_aborts_atomic_transaction():
 
     assert session.transaction.error_type is SQLAlchemyError
 
-
 def test_detail_exposes_safe_history_and_backend_transitions():
     service = ServiceRequestService(Session(), Repository())
     detail = service.detail(REQUEST_ID, (UNIT_ID,), can_transition=True)
@@ -213,3 +212,5 @@ def test_history_failure_aborts_atomic_status_transaction():
         )
 
     assert session.transaction.error_type is SQLAlchemyError
+
+

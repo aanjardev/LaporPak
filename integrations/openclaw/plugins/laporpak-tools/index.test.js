@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
+import plugin from "./index.js";
 import {
   buildAskTool,
   buildConfirmResolutionTool,
@@ -10,16 +13,22 @@ import {
   buildTrackTool,
 } from "./index.js";
 
-const manifest = JSON.parse(
-  readFileSync(new URL("./openclaw.plugin.json", import.meta.url), "utf8"),
-);
-
-test("manifest declares the REQUEST tool contract", () => {
-  assert.ok(manifest.contracts.tools.includes("laporpak_create_service_request"));
-  assert.deepEqual(manifest.toolMetadata.laporpak_create_service_request, {
-    optional: true,
-    replaySafe: true,
+test("manifest tool contract matches every registered tool", async () => {
+  const manifest = JSON.parse(
+    await readFile(new URL("./openclaw.plugin.json", import.meta.url), "utf8"),
+  );
+  const registered = [];
+  plugin.register({
+    on() {},
+    registerTool(_factory, metadata) {
+      registered.push(metadata.name);
+    },
   });
+  assert.deepEqual([...registered].sort(), [...manifest.contracts.tools].sort());
+  assert.deepEqual(
+    Object.keys(manifest.toolMetadata).sort(),
+    [...manifest.contracts.tools].sort(),
+  );
 });
 
 const input = {
@@ -143,6 +152,34 @@ test("ASK returns approved knowledge payload", async () => {
   assert.equal(result.details.outcome, "answered");
 });
 
+test("ASK creates a 768-dimensional query embedding and labels demo data", async () => {
+  const calls = [];
+  const tool = buildAskTool(
+    { messageChannel: "whatsapp", requesterSenderId: "6281234567890" },
+    async (url, options) => {
+      calls.push({ url: String(url), options });
+      if (String(url).includes("generativelanguage.googleapis.com")) {
+        const request = JSON.parse(options.body);
+        assert.equal(request.taskType, "RETRIEVAL_QUERY");
+        assert.equal(request.outputDimensionality, 768);
+        return Response.json({ embedding: { values: Array(768).fill(0.25) } });
+      }
+      return Response.json({
+        outcome: "answered",
+        trust_level: "demo",
+        answer_blocks: ["Kantor buka pukul 08.00."],
+        sources: [],
+      });
+    },
+    { ...testEnv, GEMINI_API_KEY: "gemini-test" },
+  );
+
+  const result = await tool.execute("call-demo", { question: "Jam kantor?" });
+  const backendBody = JSON.parse(calls[1].options.body);
+  assert.equal(backendBody.query_embedding.length, 768);
+  assert.match(result.details.notice, /SIMULASI/);
+});
+
 test("TRACK injects trusted sender identity", async () => {
   let body;
   const tool = buildTrackTool(
@@ -258,6 +295,64 @@ test("REQUEST injects trusted identity and uses a stable idempotency key", async
     calls[2].options.headers["Idempotency-Key"],
   );
   assert.equal(calls[0].options.headers["X-Channel-Account-ID"], "whatsapp-demo");
+});
+
+test("trusted media is isolated by session and cannot move to another draft", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "laporpak-media-"));
+  const photo = join(directory, "photo.jpg");
+  await writeFile(photo, Buffer.from("photo"));
+  const previous = {
+    url: process.env.LAPORPAK_API_URL,
+    key: process.env.LAPORPAK_API_KEY,
+    channel: process.env.LAPORPAK_CHANNEL_ACCOUNT_ID,
+  };
+  process.env.LAPORPAK_API_URL = testEnv.LAPORPAK_API_URL;
+  process.env.LAPORPAK_API_KEY = testEnv.LAPORPAK_API_KEY;
+  process.env.LAPORPAK_CHANNEL_ACCOUNT_ID = testEnv.LAPORPAK_CHANNEL_ACCOUNT_ID;
+  let inbound;
+  plugin.register({
+    on(_event, handler) { inbound = handler; },
+    registerTool() {},
+  });
+  inbound({
+    senderId: "628199999999",
+    sessionId: "session-a",
+    messageId: "media-message",
+    media: [{ path: photo, contentType: "image/jpeg" }],
+  });
+  const fetchImpl = async () => Response.json({
+    id: "72af1a52-7016-48c7-aacc-6c35417be819",
+    ticket_number: "LP-2026-0001",
+    status: "pending_verification",
+    created_at: "2026-09-19T00:00:00Z",
+  }, { status: 201 });
+  try {
+    const otherSession = buildCreateReportTool(
+      { messageChannel: "whatsapp", requesterSenderId: "628199999999", sessionId: "session-b" },
+      fetchImpl,
+      testEnv,
+    );
+    await assert.rejects(otherSession.execute("other", input), /No trusted WhatsApp photo/);
+
+    const tool = buildCreateReportTool(
+      { messageChannel: "whatsapp", requesterSenderId: "628199999999", sessionId: "session-a" },
+      fetchImpl,
+      testEnv,
+    );
+    await tool.execute("first", input);
+    await assert.rejects(
+      tool.execute("second", { ...input, description: "Draft laporan yang berbeda." }),
+      /already used by another report draft/,
+    );
+  } finally {
+    if (previous.url === undefined) delete process.env.LAPORPAK_API_URL;
+    else process.env.LAPORPAK_API_URL = previous.url;
+    if (previous.key === undefined) delete process.env.LAPORPAK_API_KEY;
+    else process.env.LAPORPAK_API_KEY = previous.key;
+    if (previous.channel === undefined) delete process.env.LAPORPAK_CHANNEL_ACCOUNT_ID;
+    else process.env.LAPORPAK_CHANNEL_ACCOUNT_ID = previous.channel;
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("REQUEST does not return success when persistence fails", async () => {

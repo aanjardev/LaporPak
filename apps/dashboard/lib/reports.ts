@@ -53,7 +53,7 @@ export type ReportStatusHistory = {
   old_status: ReportStatus | null;
   new_status: ReportStatus;
   actor_type: string;
-  actor_identifier: string | null;
+  actor_display_name: string | null;
   notes: string | null;
   created_at: string;
 };
@@ -62,15 +62,18 @@ export type ReportAttachment = {
   id: string;
   file_name: string | null;
   mime_type: string | null;
+  file_size: number;
+  created_at: string;
 };
 
 export type ReportDetail = ReportListItem & {
-  citizen: { id: string; display_name: string };
+  citizen: { display_name: string };
   summary: string | null;
   responsible_unit: { id: string; name: string } | null;
   ai_recommendation: Record<string, unknown>;
   attachments: ReportAttachment[];
   status_history: ReportStatusHistory[];
+  allowed_transitions: ReportStatus[];
   verified_at: string | null;
   resolved_at: string | null;
   updated_at: string;
@@ -164,6 +167,10 @@ const mockStatuses: ReportStatus[] = [
   "rejected",
 ];
 
+function reportStatusActionsForMock(status: ReportStatus) {
+  return reportStatusActions[status];
+}
+
 function statusPath(status: ReportStatus): ReportStatus[] {
   if (status === "rejected") return ["pending_verification", "rejected"];
   if (status === "forwarded") {
@@ -187,7 +194,7 @@ const mockReports: ReportDetail[] = Array.from({ length: 27 }, (_, index) => {
     old_status: step === 0 ? null : path[step - 1],
     new_status: next,
     actor_type: step === 0 ? "system" : "admin",
-    actor_identifier: step === 0 ? null : "admin-desa-demo",
+    actor_display_name: step === 0 ? null : "Admin Desa",
     notes: index === 4
       ? `Tahap ${step + 1}: petugas meninjau informasi lokasi, berkoordinasi dengan unit terkait, dan mencatat tindak lanjut agar warga dapat memahami perjalanan laporan secara utuh.`
       : step === 0 ? "Laporan dibuat" : "Status diperbarui oleh petugas.",
@@ -200,7 +207,6 @@ const mockReports: ReportDetail[] = Array.from({ length: 27 }, (_, index) => {
     id: `72af1a52-7016-48c7-aacc-${String(index + 1).padStart(12, "0")}`,
     ticket_number: `LP-2026-${String(index + 1).padStart(4, "0")}`,
     citizen: {
-      id: `5c242fc6-77a8-4fa7-a12f-${String(index + 1).padStart(12, "0")}`,
       display_name: "Warga",
     },
     category: topic.category,
@@ -220,14 +226,19 @@ const mockReports: ReportDetail[] = Array.from({ length: 27 }, (_, index) => {
         id: "9a0d1245-4e4e-40be-bbba-000000000001",
         file_name: "foto-jalan-rusak.png",
         mime_type: "image/png",
+        file_size: 1024,
+        created_at: created.toISOString(),
       },
       {
         id: "9a0d1245-4e4e-40be-bbba-000000000002",
         file_name: "foto-kondisi-sekitar.png",
         mime_type: "image/png",
+        file_size: 2048,
+        created_at: created.toISOString(),
       },
     ] : [],
     status_history: history,
+    allowed_transitions: reportStatusActionsForMock(status),
     verified_at: verified?.created_at ?? null,
     resolved_at: resolved?.created_at ?? null,
     created_at: created.toISOString(),
@@ -346,6 +357,8 @@ export async function getReportById(
           id: item.id,
           file_name: typeof item.file_name === "string" ? item.file_name : null,
           mime_type: typeof item.mime_type === "string" ? item.mime_type : null,
+          file_size: Number.isSafeInteger(item.file_size) ? item.file_size : 0,
+          created_at: item.created_at,
         })),
       };
     } catch (error) {

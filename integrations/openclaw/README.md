@@ -83,6 +83,20 @@ sender/channel identity from trusted runtime metadata. Call create operations
 only after the citizen confirms a complete draft. ASK and TRACK remain
 read-only.
 
+Knowledge embeddings are generated only on this host. Configure
+`GEMINI_API_KEY` and optionally `GEMINI_EMBEDDING_MODEL` (default
+`gemini-embedding-001`), then drain all approved/development-demo jobs with:
+
+```powershell
+cd integrations/openclaw/plugins/laporpak-tools
+npm run embeddings:drain
+```
+
+The worker requests 768-dimensional `RETRIEVAL_DOCUMENT` vectors and reports a
+failed job to FastAPI before exiting. ASK creates a matching
+`RETRIEVAL_QUERY` vector. If ASK returns `trust_level=demo`, the tool includes a
+simulation notice which must remain visible in the citizen response.
+
 See `../../docs/whatsapp-setup.md` for Windows setup, QR pairing, access
 policy, verification, and troubleshooting.
 

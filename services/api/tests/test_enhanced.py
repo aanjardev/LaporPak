@@ -96,3 +96,17 @@ def test_enhanced_endpoints_require_openclaw_key():
     )
 
     assert response.status_code == 401
+
+
+def test_resolution_confirmation_rejects_malformed_ticket():
+    response = TestClient(app).post(
+        "/api/v1/confirm-resolution/not-a-ticket",
+        json={
+            "confirmed": True,
+            "sender_phone_number": "+6281234567890",
+        },
+        headers=HEADERS,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"

@@ -1,3 +1,14 @@
+export type KnowledgeReviewStatus = "draft" | "demo" | "approved" | "rejected";
+
+export type KnowledgeReviewHistory = {
+  old_status: KnowledgeReviewStatus | null;
+  new_status: KnowledgeReviewStatus;
+  actor_type: string;
+  actor_display_name: string | null;
+  reason: string;
+  created_at: string;
+};
+
 export type KnowledgeDocument = {
   id: string;
   title: string;
@@ -8,6 +19,11 @@ export type KnowledgeDocument = {
   is_active: boolean;
   processing_status: "pending" | "processing" | "ready" | "failed";
   failure_message: string | null;
+  review_status: KnowledgeReviewStatus;
+  reviewer_display_name: string | null;
+  reviewed_at: string | null;
+  review_reason: string | null;
+  allowed_review_transitions: KnowledgeReviewStatus[];
   created_at: string;
   updated_at: string;
 };
@@ -15,6 +31,7 @@ export type KnowledgeDocument = {
 export type KnowledgeDocumentDetail = KnowledgeDocument & {
   content: string;
   service_key: string | null;
+  review_history: KnowledgeReviewHistory[];
 };
 
 export class KnowledgeApiError extends Error {
@@ -75,6 +92,22 @@ export function updateKnowledgeDocument(
 ) {
   return request<KnowledgeDocumentDetail>(
     `/api/v1/knowledge/documents/${encodeURIComponent(id)}`,
+    token,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function reviewKnowledgeDocument(
+  id: string,
+  input: { status: "approved" | "rejected"; reason: string },
+  token: string,
+) {
+  return request<KnowledgeDocumentDetail>(
+    `/api/v1/knowledge/documents/${encodeURIComponent(id)}/review`,
     token,
     {
       method: "PATCH",

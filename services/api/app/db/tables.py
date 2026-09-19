@@ -341,8 +341,38 @@ knowledge_documents = Table(
     Column("processing_status", Text, nullable=False),
     Column("checksum", Text),
     Column("failure_message", Text),
+    Column("review_status", Text),
+    Column(
+        "reviewed_by_admin_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.admin_accounts.id"),
+    ),
+    Column("reviewed_at", DateTime(timezone=True)),
+    Column("review_reason", Text),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+knowledge_review_history = Table(
+    "knowledge_review_history",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "document_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.knowledge_documents.id"),
+        nullable=False,
+    ),
+    Column("old_status", Text),
+    Column("new_status", Text, nullable=False),
+    Column("actor_type", Text, nullable=False),
+    Column(
+        "admin_account_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.admin_accounts.id"),
+    ),
+    Column("reason", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
 )
 
 knowledge_chunks = Table(

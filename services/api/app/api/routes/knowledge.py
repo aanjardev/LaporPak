@@ -18,9 +18,14 @@ from app.schemas.knowledge import (
     KnowledgeDocumentDetail,
     KnowledgeDocumentList,
     KnowledgePreview,
+    KnowledgeReviewUpdate,
     KnowledgeUpdate,
 )
-from app.services.exceptions import ReportNotFoundError, ReportPersistenceError
+from app.services.exceptions import (
+    InvalidStatusTransitionError,
+    ReportNotFoundError,
+    ReportPersistenceError,
+)
 from app.services.knowledge import (
     CANONICAL_DOCUMENT_SQL,
     KnowledgeService,
@@ -77,6 +82,17 @@ def choose_unit(caller, requested: UUID | None) -> UUID:
     return requested or caller.unit_ids[0]
 
 
+def can_review(caller) -> bool:
+    return caller.role is AdminRole.VILLAGE_ADMIN
+
+
+def embedding_review_sql(alias: str | None = None) -> str:
+    prefix = f"{alias}." if alias else ""
+    if settings.app_env == "development":
+        return f"{prefix}review_status in ('approved','demo')"
+    return f"{prefix}review_status='approved'"
+
+
 @router.post("/preview", response_model=KnowledgePreview)
 async def preview(
     _caller: AdminCaller,
@@ -106,9 +122,16 @@ async def create_document(
     file: Annotated[UploadFile | None, File()] = None,
 ) -> KnowledgeDocument:
     data, content, source_type = await read_source(file, pasted_content)
+    normalized_title = title.strip()
+    if not normalized_title:
+        raise APIError(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="Knowledge title must not be blank",
+        )
     try:
         return KnowledgeService(session).create(
-            title=title.strip(),
+            title=normalized_title,
             category=category,
             is_mandatory=is_mandatory,
             unit_id=choose_unit(caller, administrative_unit_id),
@@ -131,7 +154,9 @@ def list_documents(
     caller: AdminCaller, session: Annotated[Session, Depends(get_db_session)]
 ) -> KnowledgeDocumentList:
     try:
-        return KnowledgeService(session).list(unit_scope(caller))
+        return KnowledgeService(session).list(
+            unit_scope(caller), can_review=can_review(caller)
+        )
     except ReportPersistenceError as exc:
         raise APIError(
             status_code=503,
@@ -147,12 +172,20 @@ def document_detail(
     session: Annotated[Session, Depends(get_db_session)],
 ) -> KnowledgeDocumentDetail:
     try:
-        return KnowledgeService(session).detail(document_id, unit_scope(caller))
+        return KnowledgeService(session).detail(
+            document_id, unit_scope(caller), can_review=can_review(caller)
+        )
     except ReportNotFoundError as exc:
         raise APIError(
             status_code=404,
-            code="NOT_FOUND",
+            code="KNOWLEDGE_DOCUMENT_NOT_FOUND",
             message="Knowledge document not found",
+        ) from exc
+    except ReportPersistenceError as exc:
+        raise APIError(
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Knowledge document could not be loaded",
         ) from exc
 
 
@@ -165,12 +198,15 @@ def update_document(
 ) -> KnowledgeDocumentDetail:
     try:
         return KnowledgeService(session).update(
-            document_id, payload.model_dump(), unit_scope(caller)
+            document_id,
+            payload.model_dump(),
+            unit_scope(caller),
+            caller.admin_account_id,
         )
     except ReportNotFoundError as exc:
         raise APIError(
             status_code=404,
-            code="NOT_FOUND",
+            code="KNOWLEDGE_DOCUMENT_NOT_FOUND",
             message="Knowledge document not found",
         ) from exc
     except ReportPersistenceError as exc:
@@ -178,6 +214,47 @@ def update_document(
             status_code=503,
             code="DATABASE_UNAVAILABLE",
             message="Knowledge document could not be updated",
+        ) from exc
+
+
+@router.patch("/documents/{document_id}/review", response_model=KnowledgeDocumentDetail)
+def review_document(
+    document_id: UUID,
+    payload: KnowledgeReviewUpdate,
+    caller: AdminCaller,
+    session: Annotated[Session, Depends(get_db_session)],
+) -> KnowledgeDocumentDetail:
+    if caller.role is not AdminRole.VILLAGE_ADMIN or caller.admin_account_id is None:
+        raise APIError(
+            status_code=403,
+            code="FORBIDDEN",
+            message="Village administrator role required",
+        )
+    try:
+        return KnowledgeService(session).review(
+            document_id,
+            payload.status,
+            payload.reason,
+            caller.unit_ids,
+            caller.admin_account_id,
+        )
+    except ReportNotFoundError as exc:
+        raise APIError(
+            status_code=404,
+            code="KNOWLEDGE_DOCUMENT_NOT_FOUND",
+            message="Knowledge document not found",
+        ) from exc
+    except InvalidStatusTransitionError as exc:
+        raise APIError(
+            status_code=409,
+            code="INVALID_STATUS_TRANSITION",
+            message="Knowledge review transition is not allowed",
+        ) from exc
+    except ReportPersistenceError as exc:
+        raise APIError(
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Knowledge review could not be stored",
         ) from exc
 
 
@@ -192,7 +269,7 @@ def deactivate_document(
     except ReportNotFoundError as exc:
         raise APIError(
             status_code=404,
-            code="NOT_FOUND",
+            code="KNOWLEDGE_DOCUMENT_NOT_FOUND",
             message="Knowledge document not found",
         ) from exc
     except ReportPersistenceError as exc:
@@ -215,6 +292,7 @@ def embedding_job(
                         "select id from public.knowledge_documents "
                         "where processing_status='pending' "
                         f"and {CANONICAL_DOCUMENT_SQL} "
+                        f"and {embedding_review_sql()} "
                         "order by created_at for update skip locked limit 1"
                     )
                 )
@@ -262,7 +340,8 @@ def complete_embedding(
                     text(
                         "select c.id from public.knowledge_chunks c "
                         "join public.knowledge_documents d on d.id=c.document_id "
-                        f"where c.document_id=:id and {canonical_document_sql('d')}"
+                        f"where c.document_id=:id and {canonical_document_sql('d')} "
+                        f"and {embedding_review_sql('d')} for update of d"
                     ),
                     {"id": document_id},
                 )
@@ -284,13 +363,20 @@ def complete_embedding(
                     ),
                     {"embedding": vector, "id": item.chunk_id, "document": document_id},
                 )
-            session.execute(
+            result = session.execute(
                 text(
                     "update public.knowledge_documents set processing_status='ready', "
-                    f"failure_message=null, updated_at=now() where id=:id and {CANONICAL_DOCUMENT_SQL}"
+                    f"failure_message=null, updated_at=now() where id=:id and {CANONICAL_DOCUMENT_SQL} "
+                    f"and {embedding_review_sql()}"
                 ),
                 {"id": document_id},
             )
+            if result.rowcount != 1:
+                raise APIError(
+                    status_code=409,
+                    code="INVALID_STATUS_TRANSITION",
+                    message="Knowledge review status changed during embedding",
+                )
         return {"document_id": document_id, "processing_status": "ready"}
     except APIError:
         raise
@@ -314,14 +400,15 @@ def fail_embedding(
             result = session.execute(
                 text(
                     "update public.knowledge_documents set processing_status='failed', "
-                    f"failure_message=:message, updated_at=now() where id=:id and {CANONICAL_DOCUMENT_SQL}"
+                    f"failure_message=:message, updated_at=now() where id=:id and {CANONICAL_DOCUMENT_SQL} "
+                    f"and {embedding_review_sql()}"
                 ),
                 {"id": document_id, "message": payload.message},
             )
             if result.rowcount == 0:
                 raise APIError(
                     status_code=404,
-                    code="NOT_FOUND",
+                    code="KNOWLEDGE_DOCUMENT_NOT_FOUND",
                     message="Knowledge document not found",
                 )
         return {"document_id": document_id, "processing_status": "failed"}

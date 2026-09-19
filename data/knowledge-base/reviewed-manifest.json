@@ -8,7 +8,8 @@
       "content": "DATA UJI. Untuk skenario demo, Kantor Desa Sukamaju melayani warga pada hari Senin sampai Jumat pukul 08.00 sampai 15.00 WIB. Informasi ini wajib diganti dan ditinjau perangkat desa sebelum digunakan untuk warga nyata.",
       "category": "administration",
       "service_key": "office_hours_demo",
-      "is_mandatory": true
+      "is_mandatory": true,
+      "review_status": "demo"
     },
     {
       "title": "Demo Persyaratan Surat Keterangan Domisili",
@@ -18,7 +19,8 @@
       "content": "DATA UJI. Dalam skenario demo, warga menyiapkan nama pemohon, alamat domisili, lama tinggal, dan tujuan pengajuan surat domisili. Persyaratan resmi harus dikonfirmasi kepada perangkat Desa Sukamaju sebelum layanan digunakan oleh warga nyata.",
       "category": "administration",
       "service_key": "residency_letter_demo",
-      "is_mandatory": true
+      "is_mandatory": true,
+      "review_status": "demo"
     },
     {
       "title": "Demo Alur Pengaduan Infrastruktur",
@@ -28,7 +30,8 @@
       "content": "DATA UJI. Dalam skenario demo, laporan infrastruktur memerlukan deskripsi masalah, lokasi kejadian, dan foto pendukung. Laporan yang tersimpan menunggu verifikasi petugas dan rekomendasi AI tidak menggantikan keputusan petugas.",
       "category": "infrastructure",
       "service_key": "infrastructure_report_demo",
-      "is_mandatory": false
+      "is_mandatory": false,
+      "review_status": "demo"
     },
     {
       "title": "Demo Informasi Pengelolaan Sampah",
@@ -38,7 +41,8 @@
       "content": "DATA UJI. Pertanyaan mengenai pengangkutan sampah yang belum memiliki jadwal resmi harus diarahkan kepada petugas Desa Sukamaju. Sistem tidak boleh mengarang hari pengangkutan, biaya, atau nomor kontak.",
       "category": "cleanliness",
       "service_key": "waste_service_demo",
-      "is_mandatory": false
+      "is_mandatory": false,
+      "review_status": "demo"
     },
     {
       "title": "Demo Jalur Handoff ke Petugas Desa",
@@ -48,7 +52,8 @@
       "content": "DATA UJI. Jika informasi layanan tidak tersedia, bertentangan, atau belum disetujui, sistem harus menyatakan bahwa informasi belum dapat dipastikan dan mengarahkan warga untuk menghubungi petugas desa melalui kanal resmi yang telah diverifikasi.",
       "category": "administration",
       "service_key": "human_handoff_demo",
-      "is_mandatory": true
+      "is_mandatory": true,
+      "review_status": "demo"
     }
   ]
 }

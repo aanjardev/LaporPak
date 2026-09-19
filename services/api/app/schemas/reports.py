@@ -68,9 +68,7 @@ class ReportCreateAIAnalysis(StrictSchema):
         return normalized or None
 
 
-ALLOWED_ATTACHMENT_MIME_TYPES = frozenset(
-    {"image/jpeg", "image/png", "image/webp"}
-)
+ALLOWED_ATTACHMENT_MIME_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 
 
 class ReportAttachmentInput(StrictSchema):
@@ -153,7 +151,6 @@ class ReportListResponse(StrictSchema):
 
 
 class ReportCitizen(StrictSchema):
-    id: UUID
     display_name: str
 
 
@@ -161,7 +158,7 @@ class ReportStatusHistory(StrictSchema):
     old_status: ReportStatus | None
     new_status: ReportStatus
     actor_type: ReportActorType
-    actor_identifier: str | None
+    actor_display_name: str | None
     notes: str | None
     created_at: datetime
 
@@ -181,6 +178,7 @@ class ReportDetail(ReportListItem):
     ai_recommendation: dict[str, Any]
     attachments: list[ReportAttachment]
     status_history: list[ReportStatusHistory]
+    allowed_transitions: list[ReportStatus]
     verified_at: datetime | None
     resolved_at: datetime | None
     updated_at: datetime

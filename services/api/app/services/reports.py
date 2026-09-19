@@ -1,6 +1,8 @@
 import base64
+import binascii
 import hashlib
 import json
+import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -45,20 +47,21 @@ MIME_EXTENSIONS = {
     "image/png": "png",
     "image/webp": "webp",
 }
+logger = logging.getLogger(__name__)
 
 ALLOWED_STATUS_TRANSITIONS = {
-    ReportStatus.PENDING_VERIFICATION: {
+    ReportStatus.PENDING_VERIFICATION: (
         ReportStatus.VERIFIED,
         ReportStatus.REJECTED,
-    },
-    ReportStatus.VERIFIED: {ReportStatus.IN_PROGRESS},
-    ReportStatus.IN_PROGRESS: {
+    ),
+    ReportStatus.VERIFIED: (ReportStatus.IN_PROGRESS,),
+    ReportStatus.IN_PROGRESS: (
         ReportStatus.FORWARDED,
         ReportStatus.RESOLVED,
-    },
-    ReportStatus.FORWARDED: {ReportStatus.RESOLVED},
-    ReportStatus.RESOLVED: set(),
-    ReportStatus.REJECTED: set(),
+    ),
+    ReportStatus.FORWARDED: (ReportStatus.RESOLVED,),
+    ReportStatus.RESOLVED: (),
+    ReportStatus.REJECTED: (),
 }
 
 
@@ -80,9 +83,16 @@ def normalize_phone_number(value: str) -> str:
     return compact
 
 
-def canonical_payload_hash(payload: ReportCreate, phone_number: str) -> str:
+def canonical_payload_hash(
+    payload: ReportCreate,
+    phone_number: str,
+    administrative_unit_id: UUID | None = None,
+) -> str:
     canonical_payload = payload.model_dump(mode="json")
     canonical_payload["sender_phone_number"] = phone_number
+    canonical_payload["administrative_unit_id"] = (
+        str(administrative_unit_id) if administrative_unit_id else None
+    )
     serialized = json.dumps(
         canonical_payload,
         ensure_ascii=False,
@@ -131,6 +141,21 @@ def upload_report_attachment(report_id: UUID, data: bytes, mime_type: str) -> st
     return storage_path
 
 
+def delete_storage_object(bucket: str, storage_path: str) -> None:
+    server_key = settings.supabase_secret_key or settings.supabase_service_role_key
+    if not settings.supabase_url or not server_key:
+        return
+    try:
+        response = httpx.delete(
+            f"{settings.supabase_url.rstrip('/')}/storage/v1/object/{bucket}/{storage_path}",
+            headers={"Authorization": f"Bearer {server_key}", "apikey": server_key},
+            timeout=30,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError:
+        logger.warning("Could not remove orphaned object from bucket %s", bucket)
+
+
 class ReportPersistenceService:
     def __init__(
         self,
@@ -148,7 +173,11 @@ class ReportPersistenceService:
         administrative_unit_id: UUID | None = None,
     ) -> IdempotentReportResult:
         phone_number = normalize_phone_number(payload.sender_phone_number)
-        payload_hash = canonical_payload_hash(payload, phone_number)
+        payload_hash = canonical_payload_hash(
+            payload, phone_number, administrative_unit_id
+        )
+        uploaded_paths: list[str] = []
+        transaction_work_complete = False
 
         try:
             with self.session.begin():
@@ -214,7 +243,14 @@ class ReportPersistenceService:
                     }
                 )
                 for attachment in payload.attachments:
-                    data = base64.b64decode(attachment.data_base64, validate=True)
+                    try:
+                        data = base64.b64decode(
+                            attachment.data_base64, validate=True
+                        )
+                    except (binascii.Error, ValueError) as exc:
+                        raise InvalidAttachmentError(
+                            "attachment data is not valid base64"
+                        ) from exc
                     if len(data) > MAX_ATTACHMENT_BYTES:
                         raise InvalidAttachmentError("attachment exceeds 5 MB")
                     try:
@@ -224,6 +260,7 @@ class ReportPersistenceService:
                     storage_path = upload_report_attachment(
                         report["id"], data, attachment.mime_type
                     )
+                    uploaded_paths.append(storage_path)
                     filename = (
                         Path(attachment.filename).name
                         if attachment.filename
@@ -239,10 +276,30 @@ class ReportPersistenceService:
                             "metadata": {"file_size": len(data)},
                         }
                     )
+                transaction_work_complete = True
                 return IdempotentReportResult(report, replayed=False)
         except CategoryNotFoundError, DuplicateOperationError, InvalidAttachmentError:
+            for storage_path in uploaded_paths:
+                delete_storage_object("report-attachments", storage_path)
             raise
         except (httpx.HTTPError, RuntimeError, SQLAlchemyError) as exc:
+            should_cleanup = not transaction_work_complete
+            if transaction_work_complete:
+                try:
+                    should_cleanup = (
+                        self.repository.find_report_by_idempotency_key(
+                            idempotency_key
+                        )
+                        is None
+                    )
+                except SQLAlchemyError:
+                    logger.warning(
+                        "Report commit outcome is unknown; orphan cleanup deferred"
+                    )
+                    should_cleanup = False
+            if should_cleanup:
+                for storage_path in uploaded_paths:
+                    delete_storage_object("report-attachments", storage_path)
             raise ReportPersistenceError("report creation") from exc
 
     def list_reports(
@@ -280,7 +337,11 @@ class ReportPersistenceService:
         )
 
     def get_report_detail(
-        self, report_id: UUID, unit_ids: tuple[UUID, ...] | None = None
+        self,
+        report_id: UUID,
+        unit_ids: tuple[UUID, ...] | None = None,
+        *,
+        can_transition: bool = True,
     ) -> ReportDetail:
         try:
             report = (
@@ -297,7 +358,10 @@ class ReportPersistenceService:
             ]
             history = [
                 ReportStatusHistory.model_validate(
-                    {field: row[field] for field in ReportStatusHistory.model_fields}
+                    {
+                        field: row.get(field)
+                        for field in ReportStatusHistory.model_fields
+                    }
                 )
                 for row in self.repository.list_status_history(report_id)
             ]
@@ -317,7 +381,6 @@ class ReportPersistenceService:
         return ReportDetail(
             **list_item.model_dump(),
             citizen=ReportCitizen(
-                id=report["citizen_id"],
                 display_name=report["citizen_display_name"] or "Warga",
             ),
             summary=report["summary"],
@@ -325,6 +388,11 @@ class ReportPersistenceService:
             ai_recommendation=report["ai_recommendation"] or {},
             attachments=attachments,
             status_history=history,
+            allowed_transitions=(
+                list(ALLOWED_STATUS_TRANSITIONS[ReportStatus(report["status"])])
+                if can_transition
+                else []
+            ),
             verified_at=report["verified_at"],
             resolved_at=report["resolved_at"],
             updated_at=report["updated_at"],

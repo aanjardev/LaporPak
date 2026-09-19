@@ -3,7 +3,11 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { deactivateKnowledgeAction, type KnowledgeFormState } from "./actions";
+import {
+  deactivateKnowledgeAction,
+  type KnowledgeFormState,
+  reviewKnowledgeAction,
+} from "./actions";
 
 type Values = {
   title: string;
@@ -79,4 +83,43 @@ export function DeactivateKnowledgeForm({ id }: { id: string }) {
 function DeactivateButton() {
   const { pending } = useFormStatus();
   return <button type="submit" disabled={pending} className="min-h-11 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-800 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-wait disabled:opacity-60">{pending ? "Menonaktifkan…" : "Nonaktifkan"}</button>;
+}
+
+export function KnowledgeReviewForm({
+  id,
+  transitions,
+}: {
+  id: string;
+  transitions: Array<"draft" | "demo" | "approved" | "rejected">;
+}) {
+  const [state, action, pending] = useActionState(
+    reviewKnowledgeAction.bind(null, id),
+    { message: null },
+  );
+  const options = transitions.filter(
+    (status): status is "approved" | "rejected" =>
+      status === "approved" || status === "rejected",
+  );
+  if (options.length === 0) return null;
+  return (
+    <form action={action} className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="font-semibold text-slate-950">Keputusan review</h2>
+      <label className="grid gap-1.5 text-sm font-medium">
+        Status
+        <select name="status" required className="min-h-11 rounded-lg border border-slate-300 px-3 font-normal">
+          {options.map((status) => (
+            <option key={status} value={status}>{status === "approved" ? "Setujui" : "Tolak / cabut persetujuan"}</option>
+          ))}
+        </select>
+      </label>
+      <label className="grid gap-1.5 text-sm font-medium">
+        Alasan
+        <textarea name="reason" required minLength={1} maxLength={1000} rows={4} className="rounded-lg border border-slate-300 p-3 font-normal" />
+      </label>
+      {state.message && <p role="alert" className="text-sm text-red-800">{state.message}</p>}
+      <button disabled={pending} className="min-h-11 justify-self-start rounded-lg bg-sky-800 px-5 text-sm font-semibold text-white disabled:opacity-60">
+        {pending ? "Menyimpan…" : "Simpan keputusan"}
+      </button>
+    </form>
+  );
 }

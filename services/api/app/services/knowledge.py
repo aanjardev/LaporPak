@@ -1,7 +1,9 @@
 import hashlib
 import io
 import json
+import logging
 import re
+from pathlib import Path
 from uuid import UUID
 
 import httpx
@@ -15,8 +17,17 @@ from app.schemas.knowledge import (
     KnowledgeDocument,
     KnowledgeDocumentDetail,
     KnowledgeDocumentList,
+    KnowledgeReviewHistory,
+    KnowledgeReviewStatus,
 )
-from app.services.exceptions import ReportNotFoundError, ReportPersistenceError
+from app.services.exceptions import (
+    InvalidStatusTransitionError,
+    ReportNotFoundError,
+    ReportPersistenceError,
+)
+from app.services.reports import delete_storage_object
+
+logger = logging.getLogger(__name__)
 
 
 def canonical_document_sql(alias: str | None = None) -> str:
@@ -91,21 +102,42 @@ class KnowledgeService:
         self.session = session
 
     @staticmethod
-    def _model(row) -> KnowledgeDocument:
+    def _model(row, *, can_review: bool = False) -> KnowledgeDocument:
+        status = KnowledgeReviewStatus(row["review_status"])
+        transitions = []
+        if can_review:
+            transitions = [
+                candidate
+                for candidate in (
+                    KnowledgeReviewStatus.APPROVED,
+                    KnowledgeReviewStatus.REJECTED,
+                )
+                if candidate is not status
+            ]
         return KnowledgeDocument.model_validate(
-            {field: row[field] for field in KnowledgeDocument.model_fields}
+            {
+                **{
+                    field: row[field]
+                    for field in KnowledgeDocument.model_fields
+                    if field not in {"allowed_review_transitions"}
+                },
+                "allowed_review_transitions": transitions,
+            }
         )
 
     @staticmethod
-    def _detail_model(row) -> KnowledgeDocumentDetail:
+    def _detail_model(
+        row, history, *, can_review: bool = False
+    ) -> KnowledgeDocumentDetail:
         metadata = row["metadata"] or {}
+        document = KnowledgeService._model(row, can_review=can_review)
         return KnowledgeDocumentDetail(
-            **{
-                field: row[field]
-                for field in KnowledgeDocument.model_fields
-            },
+            **document.model_dump(),
             content=row["content"] or "",
             service_key=metadata.get("service_key"),
+            review_history=[
+                KnowledgeReviewHistory.model_validate(item) for item in history
+            ],
         )
 
     def create(
@@ -121,12 +153,17 @@ class KnowledgeService:
         data: bytes | None,
         service_key: str | None = None,
         source_reference: str | None = None,
+        review_status: KnowledgeReviewStatus = KnowledgeReviewStatus.DRAFT,
     ) -> KnowledgeDocument:
         chunks = chunk_content(content)
         checksum = hashlib.sha256(content.encode()).hexdigest()
-        storage_path = f"{unit_id}/{checksum}/{filename}" if filename else None
+        safe_filename = Path(filename).name if filename else None
+        storage_path = (
+            f"{unit_id}/{checksum}/{safe_filename}" if safe_filename else None
+        )
         if data is not None and storage_path:
             self._upload(storage_path, data)
+        transaction_work_complete = False
         try:
             with self.session.begin():
                 document = (
@@ -135,18 +172,17 @@ class KnowledgeService:
                     insert into public.knowledge_documents
                     (title, document_type, source_name, metadata, is_active, administrative_unit_id,
                      category, content, source_type, storage_bucket, storage_path, is_mandatory,
-                     processing_status, checksum)
+                     processing_status, checksum, review_status)
                     values (:title,:source_type,:filename,cast(:metadata as jsonb),true,:unit,
-                            :category,:content,:source_type,:bucket,:path,:mandatory,'pending',:checksum)
+                            :category,:content,:source_type,:bucket,:path,:mandatory,'pending',:checksum,:review_status)
                     returning *
                 """),
                         {
                             "title": title,
                             "source_type": source_type,
-                            "filename": filename,
+                            "filename": safe_filename,
                             "metadata": json.dumps(
                                 {
-                                    "approval_status": "approved",
                                     **(
                                         {"service_key": service_key}
                                         if service_key
@@ -168,6 +204,7 @@ class KnowledgeService:
                             "path": storage_path,
                             "mandatory": is_mandatory,
                             "checksum": checksum,
+                            "review_status": review_status.value,
                         },
                     )
                     .mappings()
@@ -188,8 +225,17 @@ class KnowledgeService:
                             "checksum": hashlib.sha256(chunk.encode()).hexdigest(),
                         },
                     )
+                document = dict(document)
+                document["reviewer_display_name"] = None
+                transaction_work_complete = True
                 return self._model(document)
         except SQLAlchemyError as exc:
+            if storage_path and not transaction_work_complete:
+                delete_storage_object(settings.knowledge_storage_bucket, storage_path)
+            elif storage_path:
+                logger.warning(
+                    "Knowledge commit outcome is unknown; orphan cleanup deferred"
+                )
             raise ReportPersistenceError("knowledge creation") from exc
 
     def _upload(self, path: str, data: bytes) -> None:
@@ -212,7 +258,12 @@ class KnowledgeService:
         except httpx.HTTPError as exc:
             raise ReportPersistenceError("knowledge file upload") from exc
 
-    def list(self, unit_ids: tuple[UUID, ...] | None) -> KnowledgeDocumentList:
+    def list(
+        self,
+        unit_ids: tuple[UUID, ...] | None,
+        *,
+        can_review: bool = False,
+    ) -> KnowledgeDocumentList:
         unit_condition = (
             "" if unit_ids is None else "and administrative_unit_id = any(:units)"
         )
@@ -220,16 +271,21 @@ class KnowledgeService:
             rows = (
                 self.session.execute(
                     text(
-                        f"select * from public.knowledge_documents "
-                        f"where {CANONICAL_DOCUMENT_SQL} {unit_condition} "
-                        "order by created_at desc"
+                        "select d.*, a.display_name reviewer_display_name "
+                        "from public.knowledge_documents d "
+                        "left join public.admin_accounts a on a.id=d.reviewed_by_admin_id "
+                        f"where {canonical_document_sql('d')} "
+                        f"{unit_condition.replace('administrative_unit_id', 'd.administrative_unit_id')} "
+                        "order by d.created_at desc"
                     ),
                     {"units": list(unit_ids or [])},
                 )
                 .mappings()
                 .all()
             )
-            return KnowledgeDocumentList(items=[self._model(row) for row in rows])
+            return KnowledgeDocumentList(
+                items=[self._model(row, can_review=can_review) for row in rows]
+            )
         except SQLAlchemyError as exc:
             raise ReportPersistenceError("knowledge list") from exc
 
@@ -237,6 +293,8 @@ class KnowledgeService:
         self,
         document_id: UUID,
         unit_ids: tuple[UUID, ...] | None,
+        *,
+        can_review: bool = False,
     ) -> KnowledgeDocumentDetail:
         unit_condition = (
             "" if unit_ids is None else "and administrative_unit_id = any(:units)"
@@ -244,8 +302,12 @@ class KnowledgeService:
         row = (
             self.session.execute(
                 text(
-                    f"select * from public.knowledge_documents where id=:id "
-                    f"and {CANONICAL_DOCUMENT_SQL} {unit_condition}"
+                    "select d.*, a.display_name reviewer_display_name "
+                    "from public.knowledge_documents d "
+                    "left join public.admin_accounts a on a.id=d.reviewed_by_admin_id "
+                    "where d.id=:id "
+                    f"and {canonical_document_sql('d')} "
+                    f"{unit_condition.replace('administrative_unit_id', 'd.administrative_unit_id')}"
                 ),
                 {"id": document_id, "units": list(unit_ids or [])},
             )
@@ -254,10 +316,28 @@ class KnowledgeService:
         )
         if row is None:
             raise ReportNotFoundError(document_id)
-        return self._detail_model(row)
+        history = (
+            self.session.execute(
+                text(
+                    "select h.old_status,h.new_status,h.actor_type,"
+                    "a.display_name actor_display_name,h.reason,h.created_at "
+                    "from public.knowledge_review_history h "
+                    "left join public.admin_accounts a on a.id=h.admin_account_id "
+                    "where h.document_id=:id order by h.created_at,h.id"
+                ),
+                {"id": document_id},
+            )
+            .mappings()
+            .all()
+        )
+        return self._detail_model(row, history, can_review=can_review)
 
     def update(
-        self, document_id: UUID, values: dict, unit_ids: tuple[UUID, ...] | None
+        self,
+        document_id: UUID,
+        values: dict,
+        unit_ids: tuple[UUID, ...] | None,
+        actor_admin_id: UUID | None = None,
     ):
         allowed = {key: value for key, value in values.items() if value is not None}
         if not allowed:
@@ -266,14 +346,18 @@ class KnowledgeService:
         service_key = allowed.pop("service_key", None)
         assignments = [f"{key}=:{key}" for key in allowed]
         if content is not None:
-            allowed["content"] = content.strip()
-            allowed["checksum"] = hashlib.sha256(content.strip().encode()).hexdigest()
+            allowed["content"] = content
+            allowed["checksum"] = hashlib.sha256(content.encode()).hexdigest()
             assignments.extend(
                 [
                     "content=:content",
                     "checksum=:checksum",
                     "processing_status='pending'",
                     "failure_message=null",
+                    "review_status='draft'",
+                    "reviewed_by_admin_id=null",
+                    "reviewed_at=null",
+                    "review_reason=null",
                 ]
             )
         if service_key is not None:
@@ -286,6 +370,18 @@ class KnowledgeService:
         )
         try:
             with self.session.begin():
+                previous_status = None
+                if content is not None:
+                    previous_status = self.session.execute(
+                        text(
+                            "select review_status from public.knowledge_documents "
+                            "where id=:id and "
+                            f"{CANONICAL_DOCUMENT_SQL} {unit_condition} for update"
+                        ),
+                        {"id": document_id, "units": list(unit_ids or [])},
+                    ).scalar_one_or_none()
+                    if previous_status is None:
+                        raise ReportNotFoundError(document_id)
                 if not assignments:
                     return self.detail(document_id, unit_ids)
                 result = self.session.execute(
@@ -305,7 +401,7 @@ class KnowledgeService:
                         ),
                         {"id": document_id},
                     )
-                    for index, chunk in enumerate(chunk_content(content.strip())):
+                    for index, chunk in enumerate(chunk_content(content)):
                         self.session.execute(
                             text("""
                                 insert into public.knowledge_chunks
@@ -318,11 +414,23 @@ class KnowledgeService:
                                 "index": index,
                                 "content": chunk,
                                 "metadata": json.dumps(
-                                    {"service_key": service_key}
-                                    if service_key
-                                    else {}
+                                    {"service_key": service_key} if service_key else {}
                                 ),
                                 "checksum": hashlib.sha256(chunk.encode()).hexdigest(),
+                            },
+                        )
+                    if previous_status != "draft":
+                        self.session.execute(
+                            text(
+                                "insert into public.knowledge_review_history "
+                                "(document_id,old_status,new_status,actor_type,admin_account_id,reason) "
+                                "values (:id,:old,'draft','admin',:actor,:reason)"
+                            ),
+                            {
+                                "id": document_id,
+                                "old": previous_status,
+                                "actor": actor_admin_id,
+                                "reason": "Content changed; review reset",
                             },
                         )
                 elif service_key is not None:
@@ -344,6 +452,68 @@ class KnowledgeService:
             raise
         except SQLAlchemyError as exc:
             raise ReportPersistenceError("knowledge update") from exc
+
+    def review(
+        self,
+        document_id: UUID,
+        status: KnowledgeReviewStatus,
+        reason: str,
+        unit_ids: tuple[UUID, ...],
+        actor_admin_id: UUID,
+    ) -> KnowledgeDocumentDetail:
+        if status not in {
+            KnowledgeReviewStatus.APPROVED,
+            KnowledgeReviewStatus.REJECTED,
+        }:
+            raise InvalidStatusTransitionError("review", status.value)
+        unit_condition = "and administrative_unit_id = any(:units)"
+        try:
+            with self.session.begin():
+                current = self.session.execute(
+                    text(
+                        "select review_status from public.knowledge_documents "
+                        "where id=:id and "
+                        f"{CANONICAL_DOCUMENT_SQL} {unit_condition} for update"
+                    ),
+                    {"id": document_id, "units": list(unit_ids)},
+                ).scalar_one_or_none()
+                if current is None:
+                    raise ReportNotFoundError(document_id)
+                if current == status.value:
+                    raise InvalidStatusTransitionError(current, status.value)
+                self.session.execute(
+                    text(
+                        "update public.knowledge_documents set review_status=:status, "
+                        "reviewed_by_admin_id=:actor,reviewed_at=now(),review_reason=:reason, "
+                        "processing_status=case when :status='approved' then 'pending' else processing_status end, "
+                        "updated_at=now() where id=:id"
+                    ),
+                    {
+                        "id": document_id,
+                        "status": status.value,
+                        "actor": actor_admin_id,
+                        "reason": reason,
+                    },
+                )
+                self.session.execute(
+                    text(
+                        "insert into public.knowledge_review_history "
+                        "(document_id,old_status,new_status,actor_type,admin_account_id,reason) "
+                        "values (:id,:old,:new,'admin',:actor,:reason)"
+                    ),
+                    {
+                        "id": document_id,
+                        "old": current,
+                        "new": status.value,
+                        "actor": actor_admin_id,
+                        "reason": reason,
+                    },
+                )
+            return self.detail(document_id, unit_ids, can_review=True)
+        except ReportNotFoundError, InvalidStatusTransitionError:
+            raise
+        except SQLAlchemyError as exc:
+            raise ReportPersistenceError("knowledge review") from exc
 
     def deactivate(
         self,
