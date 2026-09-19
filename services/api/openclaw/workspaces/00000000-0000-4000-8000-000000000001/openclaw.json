@@ -1,0 +1,15 @@
+{
+  "workspace": "D:\\Dev\\LaporPak\\services\\api\\openclaw\\workspaces\\00000000-0000-4000-8000-000000000001",
+  "api_url": "",
+  "channels": {
+    "whatsapp": {
+      "enabled": true,
+      "village_id": "00000000-0000-4000-8000-000000000001"
+    }
+  },
+  "memory": {
+    "enabled": true,
+    "storage": "filesystem",
+    "path": "openclaw\\workspaces\\00000000-0000-4000-8000-000000000001\\memory"
+  }
+}

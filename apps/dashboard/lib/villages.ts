@@ -2,15 +2,25 @@
  * Village API client for multi-desa support.
  */
 
-import { getAdminAccessToken } from "./auth";
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+async function getToken(): Promise<string> {
+  const response = await fetch('/api/auth/token', {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to get auth token');
+  }
+  const data = await response.json();
+  return data.token;
+}
 
 async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = await getAdminAccessToken();
+  const token = await getToken();
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
