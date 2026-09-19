@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Building2 } from "lucide-react";
 import { logoutAction } from "@/app/auth-actions";
 import { ReportsNav } from "@/components/reports-nav";
+import { VillageSelector } from "@/components/village-selector";
 
 export default function ReportsLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,7 +20,25 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
           {process.env.REPORTS_DATA_SOURCE !== "api" && (
             <p className="mt-4 inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 ring-1 ring-amber-200 ring-inset">Data simulasi</p>
           )}
+
+          {/* Village Selector */}
+          <div className="mt-4">
+            <VillageSelector />
+          </div>
+
           <ReportsNav showKnowledge={process.env.REPORTS_DATA_SOURCE === "api"} />
+
+          {/* Admin Menu Link */}
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <Link
+              href="/admin/villages"
+              className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              <Building2 size={16} />
+              Manajemen Desa
+            </Link>
+          </div>
+
           <form action={logoutAction} className="mt-5 lg:mt-8">
             <button type="submit" className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-slate-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">Keluar</button>
           </form>

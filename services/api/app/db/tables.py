@@ -452,3 +452,24 @@ report_status_history = Table(
         server_default=text("now()"),
     ),
 )
+
+admin_invitations = Table(
+    "admin_invitations",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column("email", Text, nullable=False),
+    Column("role", Text, nullable=False),
+    Column("village_id", UUID(as_uuid=True), ForeignKey("public.administrative_units.id")),
+    Column("token", Text, nullable=False, unique=True),
+    Column("status", Text, nullable=False, server_default=text("'pending'")),
+    Column("invited_by", Text),
+    Column("invited_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True)),
+    Column("accepted_at", DateTime(timezone=True)),
+    Column("revoked_at", DateTime(timezone=True)),
+)

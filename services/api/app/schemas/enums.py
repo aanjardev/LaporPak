@@ -44,3 +44,8 @@ class ReportActorType(StrEnum):
     ADMIN = "admin"
     AI = "ai"
     CITIZEN = "citizen"
+
+
+class AdminRole(StrEnum):
+    SYSTEM_ADMIN = "system_admin"
+    VILLAGE_ADMIN = "village_admin"
