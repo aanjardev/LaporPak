@@ -74,22 +74,30 @@ class CitizenRepository:
             return list(
                 self.session.execute(
                     text("""
+                with query as (
+                  select to_tsquery(
+                    'simple',
+                    string_agg(quote_literal(term), ' | ')
+                  ) value
+                  from unnest(
+                    tsvector_to_array(to_tsvector('simple', :question))
+                  ) term
+                )
                 select d.id document_id, c.id chunk_id, d.title, d.source_url,
                        c.content
                 from public.knowledge_chunks c
                 join public.knowledge_documents d on d.id=c.document_id
+                cross join query q
                 where d.administrative_unit_id=:unit
                   and d.is_active
                   and d.processing_status in ('pending', 'processing', 'ready')
                   and d.metadata->>'approval_status'='approved'
                   and (cast(:service_key as text) is null or
                        coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text))
-                  and c.search_vector @@ websearch_to_tsquery('simple', :question)
-                order by ts_rank_cd(
-                    c.search_vector,
-                    websearch_to_tsquery('simple', :question)
-                ) desc
-                limit 5
+                  and q.value is not null
+                  and c.search_vector @@ q.value
+                order by ts_rank_cd(c.search_vector, q.value) desc
+                limit 1
             """),
                     {
                         "question": question,
@@ -104,14 +112,23 @@ class CitizenRepository:
         return list(
             self.session.execute(
                 text("""
-            with fts as (
-              select c.id, row_number() over(order by ts_rank_cd(c.search_vector, websearch_to_tsquery('simple', :question)) desc) rank
+            with query as (
+              select to_tsquery(
+                'simple',
+                string_agg(quote_literal(term), ' | ')
+              ) value
+              from unnest(
+                tsvector_to_array(to_tsvector('simple', :question))
+              ) term
+            ), fts as (
+              select c.id, row_number() over(order by ts_rank_cd(c.search_vector, q.value) desc) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
+              cross join query q
               where d.administrative_unit_id=:unit and d.is_active
                 and d.processing_status in ('pending', 'processing', 'ready')
                 and d.metadata->>'approval_status'='approved'
                 and (cast(:service_key as text) is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text))
-                and c.search_vector @@ websearch_to_tsquery('simple', :question) limit 20
+                and q.value is not null and c.search_vector @@ q.value limit 20
             ), semantic as (
               select c.id, row_number() over(order by c.embedding <=> cast(:embedding as vector)) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
