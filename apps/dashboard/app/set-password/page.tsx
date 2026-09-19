@@ -1,3 +1,4 @@
+import { AuthBackground } from "@/components/auth-background";
 import { BrandLogo } from "@/components/brand-logo";
 import { requireSignedIn } from "@/lib/auth";
 import { PasswordForm } from "./password-form";
@@ -7,6 +8,7 @@ export default async function SetPasswordPage() {
 
   return (
     <main className="auth-surface">
+      <AuthBackground />
       <div className="auth-panel">
         <BrandLogo />
         <p className="mt-6 text-sm font-semibold text-brand">LaporPak / Akun petugas</p>

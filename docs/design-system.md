@@ -1304,3 +1304,14 @@ When this file is supplied as context to Codex, use the following directive:
 If a proposed component looks like a trendy SaaS dashboard, simplify it.
 
 If it looks like a clear, modern Indonesian public-service interface that prioritizes search, service status, human authority, and trustworthy information, it is aligned with LaporPak.
+
+
+## Latar halaman autentikasi
+
+Halaman login, undangan, pengaturan kata sandi, dan akses ditolak memakai
+latar navy dengan pola chevron tonal serta gelombang statis menuju latar
+terang, mengikuti referensi SP4N LAPOR yang diberikan pengguna. Aksen kuning
+tetap pada garis atas dan tombol utama. Form tetap pada panel putih solid.
+Pola dibuat dengan SVG dekoratif lokal, `aria-hidden`, tanpa animasi, request
+gambar, atau JavaScript client tambahan. Pengecualian dekoratif ini khusus
+halaman auth; dashboard operasional tetap menggunakan permukaan sederhana.

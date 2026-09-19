@@ -1,3 +1,4 @@
+import { AuthBackground } from "@/components/auth-background";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { getSupabaseConfig } from "@/lib/supabase/config";
@@ -9,6 +10,7 @@ export default async function AcceptInvitationPage({ searchParams }: { searchPar
 
   return (
     <main className="auth-surface">
+      <AuthBackground />
       <div className="auth-panel">
         <BrandLogo />
         <p className="mt-6 text-sm font-semibold text-brand">LaporPak / Akun petugas</p>

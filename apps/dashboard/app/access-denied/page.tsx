@@ -1,3 +1,4 @@
+import { AuthBackground } from "@/components/auth-background";
 import { BrandLogo } from "@/components/brand-logo";
 import { logoutAction } from "@/app/auth-actions";
 import { requireSignedIn } from "@/lib/auth";
@@ -6,6 +7,7 @@ export default async function AccessDeniedPage() {
   await requireSignedIn("/reports");
   return (
     <main className="auth-surface">
+      <AuthBackground />
       <div className="auth-panel">
         <BrandLogo />
         <h1 className="mt-6 text-3xl font-bold tracking-tight">Akses ditolak</h1>

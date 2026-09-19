@@ -1,3 +1,4 @@
+import { AuthBackground } from "@/components/auth-background";
 import { redirect } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { safeReturnPath } from "@/lib/safe-return-path";
@@ -12,6 +13,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="auth-surface">
+      <AuthBackground />
       <div className="auth-panel">
         <BrandLogo />
         <p className="mt-6 text-sm font-semibold text-brand">LaporPak / Dashboard petugas</p>

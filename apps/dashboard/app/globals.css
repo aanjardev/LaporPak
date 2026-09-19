@@ -61,8 +61,11 @@
   .ui-page-header { @apply space-y-2 border-b border-border pb-6; }
   .ui-page-header h1 { @apply text-2xl font-bold tracking-tight sm:text-3xl; }
   .ui-badge { @apply inline-flex max-w-full items-center rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset; }
-  .auth-surface { @apply flex min-h-screen items-center justify-center border-t-4 border-primary bg-background px-4 py-12 text-foreground; }
-  .auth-panel { @apply w-full max-w-md rounded-lg border border-border bg-card p-6 sm:p-9; }
+  .auth-surface { @apply relative isolate flex min-h-dvh items-center justify-center border-t-4 border-primary bg-background px-4 py-12 text-foreground; }
+  .auth-background { @apply pointer-events-none absolute inset-x-0 top-0 -z-10 overflow-hidden bg-brand; height: 65%; min-height: 320px; }
+  .auth-background-pattern { @apply absolute inset-0 h-full w-full text-secondary; }
+  .auth-background-waves { @apply absolute inset-x-0 bottom-0 h-24 w-full text-card sm:h-36; }
+  .auth-panel { @apply relative w-full max-w-md rounded-lg border border-border bg-card p-6 sm:p-9; box-shadow: 0 4px 20px rgb(23 35 63 / 6%); }
   .auth-panel h1 { @apply text-2xl leading-tight; }
 
 }
