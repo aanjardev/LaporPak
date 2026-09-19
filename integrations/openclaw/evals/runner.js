@@ -31,6 +31,7 @@ for (const envFile of [
 // Configuration
 const API_URL = process.env.LAPORPAK_API_URL || 'http://localhost:8000';
 const API_KEY = process.env.LAPORPAK_API_KEY || process.env.OPENCLAW_API_KEY;
+const CHANNEL_ACCOUNT_ID = process.env.LAPORPAK_CHANNEL_ACCOUNT_ID;
 
 // Colors for output
 const colors = {
@@ -136,6 +137,9 @@ async function callAPI(endpoint, payload, method = 'POST') {
       headers: {
         'Content-Type': 'application/json',
         'X-OpenClaw-API-Key': API_KEY,
+        ...(CHANNEL_ACCOUNT_ID && {
+          'X-Channel-Account-ID': CHANNEL_ACCOUNT_ID,
+        }),
         ...(payload?.idempotencyKey && { 'Idempotency-Key': payload.idempotencyKey }),
       },
       body: method === 'POST' ? JSON.stringify(payload) : undefined,
@@ -507,8 +511,8 @@ async function main() {
   log(`API URL: ${API_URL}`);
   log('Mode: hybrid (live ASK/TRACK; deterministic REPORT/security)\n');
 
-  if (!API_KEY) {
-    log('❌ LAPORPAK_API_KEY atau OPENCLAW_API_KEY belum dikonfigurasi.\n', 'red');
+  if (!API_KEY || !CHANNEL_ACCOUNT_ID) {
+    log('❌ API key atau LAPORPAK_CHANNEL_ACCOUNT_ID belum dikonfigurasi.\n', 'red');
     process.exitCode = 1;
     return;
   }

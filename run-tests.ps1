@@ -32,10 +32,12 @@ finally { Pop-Location }
 
 Push-Location $dashboard
 try {
-    Invoke-Checked { npm run lint }
-    Invoke-Checked { npm run test:auth }
-    Invoke-Checked { npm run test:reports }
-    Invoke-Checked { npm run build }
+        Invoke-Checked { npm run lint }
+        Invoke-Checked { npm run test:auth }
+        Invoke-Checked { npm run test:reports }
+        Invoke-Checked { npm run test:knowledge }
+        Invoke-Checked { npm run test:requests }
+        Invoke-Checked { npm run build }
 }
 finally { Pop-Location }
 

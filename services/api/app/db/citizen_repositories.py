@@ -82,6 +82,11 @@ class CitizenRepository:
                   from unnest(
                     tsvector_to_array(to_tsvector('simple', :question))
                   ) term
+                  where term not in (
+                    'apa', 'apakah', 'bagaimana', 'gimana', 'ini', 'itu',
+                    'yang', 'paling', 'hari', 'saya', 'mau', 'ingin', 'bisa',
+                    'dan', 'atau', 'di', 'ke', 'dari', 'untuk', 'dengan'
+                  )
                 )
                 select d.id document_id, c.id chunk_id, d.title, d.source_url,
                        c.content
@@ -120,6 +125,11 @@ class CitizenRepository:
               from unnest(
                 tsvector_to_array(to_tsvector('simple', :question))
               ) term
+              where term not in (
+                'apa', 'apakah', 'bagaimana', 'gimana', 'ini', 'itu',
+                'yang', 'paling', 'hari', 'saya', 'mau', 'ingin', 'bisa',
+                'dan', 'atau', 'di', 'ke', 'dari', 'untuk', 'dengan'
+              )
             ), fts as (
               select c.id, row_number() over(order by ts_rank_cd(c.search_vector, q.value) desc) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id

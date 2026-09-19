@@ -66,10 +66,8 @@ memerlukan host OpenClaw, Gemini, channel aktif, FastAPI, dan Supabase yang sama
 .\run-tests.ps1
 ```
 
-Runner saat ini menjalankan backend pytest/Ruff, lint dan tes inti dashboard,
-build dashboard, tes plugin, serta test suite evaluasi. Sampai runner diperbarui
-untuk tes knowledge dan REQUEST, jalankan `npm run test:knowledge` dan
-`npm run test:requests` secara terpisah seperti daftar di atas.
+Runner menjalankan backend pytest/Ruff, seluruh tes dashboard termasuk
+knowledge dan REQUEST, build dashboard, tes plugin, serta test suite evaluasi.
 
 ## Uji manual wajib
 
