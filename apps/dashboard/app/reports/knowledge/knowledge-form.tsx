@@ -69,7 +69,7 @@ export function KnowledgeForm({ action, initialValues, mode }: Props) {
 
 export function DeactivateKnowledgeForm({ id }: { id: string }) {
   return (
-    <form action={deactivateKnowledgeAction}>
+    <form action={deactivateKnowledgeAction} className="relative z-20">
       <input type="hidden" name="id" value={id} />
       <DeactivateButton />
     </form>

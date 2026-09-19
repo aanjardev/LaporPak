@@ -60,8 +60,8 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Se
           <div className="p-10 text-center text-sm text-muted-foreground"><BookOpen aria-hidden="true" className="mx-auto mb-3" />Belum ada sumber.</div>
         ) : (
           <div className="divide-y divide-border">{documents.map((document) => (
-            <article key={document.id} className="flex min-w-0 flex-wrap items-center justify-between gap-4 px-5 py-4">
-              <div className="min-w-0 flex-1"><Link className="break-all font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`/reports/knowledge/${document.id}`}>{document.title}</Link><p className="mt-1 text-xs leading-5 text-muted-foreground">{categoryLabels[document.category ?? "custom"] ?? document.category ?? "Lainnya"} · {processingLabels[document.processing_status] ?? document.processing_status} · {document.is_active ? "aktif" : "nonaktif"}</p></div>
+            <article key={document.id} className="group relative flex min-w-0 flex-wrap items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-background focus-within:bg-background">
+              <div className="min-w-0 flex-1"><Link aria-label={`Buka detail sumber ${document.title}`} className="break-all font-semibold text-brand after:absolute after:inset-0 after:z-10 after:content-[''] group-hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`/reports/knowledge/${document.id}`}>{document.title}</Link><p className="mt-1 text-xs leading-5 text-muted-foreground">{categoryLabels[document.category ?? "custom"] ?? document.category ?? "Lainnya"} · {processingLabels[document.processing_status] ?? document.processing_status} · {document.is_active ? "aktif" : "nonaktif"}</p></div>
               {document.is_active && <DeactivateKnowledgeForm id={document.id} />}
             </article>
           ))}</div>

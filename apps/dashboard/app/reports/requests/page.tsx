@@ -50,14 +50,16 @@ export default async function RequestsPage({ searchParams }: { searchParams: Sea
         ) : (
           <div className="divide-y divide-border">
             {result.items.map((item) => (
-              <article key={item.id} className="grid min-w-0 gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                <div className="min-w-0 space-y-1">
-                  <Link href={`/reports/requests/${item.id}`} className="break-all font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">{item.ticket_number}</Link>
-                  <p className="break-words text-sm text-foreground">{item.applicant_name}</p>
-                  <p className="text-xs text-muted-foreground">Diajukan {new Date(item.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" })}</p>
-                </div>
-                <span className="ui-badge bg-muted text-foreground ring-border">{requestStatusLabels[item.status]}</span>
-              </article>
+              <Link key={item.id} href={`/reports/requests/${item.id}`} aria-label={`Buka detail pengajuan ${item.ticket_number}`} className="group block px-5 py-4 transition-colors hover:bg-background focus-visible:bg-background focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring">
+                <article className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <div className="min-w-0 space-y-1">
+                    <span className="break-all font-semibold text-brand group-hover:underline">{item.ticket_number}</span>
+                    <p className="break-words text-sm text-foreground">{item.applicant_name}</p>
+                    <p className="text-xs text-muted-foreground">Diajukan {new Date(item.created_at).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jakarta" })}</p>
+                  </div>
+                  <span className="ui-badge bg-muted text-foreground ring-border">{requestStatusLabels[item.status]}</span>
+                </article>
+              </Link>
             ))}
           </div>
         )}
