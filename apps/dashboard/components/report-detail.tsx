@@ -8,6 +8,7 @@ import { saveReportDecision } from "@/app/reports/[id]/actions";
 import { categoryLabels, formatLocation, formatReportDate, StatusBadge, statusLabels, urgencyLabels } from "@/components/report-display";
 import { reportStatusActions } from "@/lib/report-status-actions";
 import type { ReportDetail, ReportStatus } from "@/lib/reports";
+import { ReportAttachmentImage } from "@/components/report-attachment-image";
 
 export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { initialReport: ReportDetail; actionsEnabled: boolean; isMock: boolean }) {
   const router = useRouter();
@@ -101,6 +102,26 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
               </dl>
             </div>
           </section>
+          {report.attachments.length > 0 && (
+            <section aria-labelledby="foto-laporan" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <h2 id="foto-laporan" className="text-lg font-semibold">Foto laporan</h2>
+              <p className="mt-2 text-sm text-slate-600">Foto hanya dapat dibuka oleh petugas yang memiliki akses ke laporan ini.</p>
+              <ul className="mt-5 grid gap-4 sm:grid-cols-2">
+                {report.attachments.map((attachment, index) => (
+                  <li key={attachment.id} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                    <ReportAttachmentImage
+                      src={`/api/reports/${encodeURIComponent(report.id)}/attachments/${encodeURIComponent(attachment.id)}`}
+                      alt={attachment.file_name ? `Lampiran ${attachment.file_name}` : `Foto laporan ${index + 1}`}
+                    />
+                    <div className="space-y-1 border-t border-slate-200 bg-white p-3 text-xs text-slate-600">
+                      <p className="truncate font-medium text-slate-800">{attachment.file_name ?? `Foto ${index + 1}`}</p>
+                      <p>{attachment.mime_type} · {(attachment.file_size / 1024).toFixed(1)} KB</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           <section aria-labelledby="riwayat-status" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <h2 id="riwayat-status" className="text-lg font-semibold">Riwayat status</h2>
             {report.status_history.length === 0 ? <p className="mt-4 text-sm text-slate-600">Belum ada riwayat status.</p> : (

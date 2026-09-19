@@ -58,12 +58,20 @@ export type ReportStatusHistory = {
   created_at: string;
 };
 
+export type ReportAttachment = {
+  id: string;
+  file_name: string | null;
+  mime_type: string;
+  file_size: number;
+  created_at: string;
+};
+
 export type ReportDetail = ReportListItem & {
   citizen: { id: string; display_name: string };
   summary: string | null;
   responsible_unit: { id: string; name: string } | null;
   ai_recommendation: Record<string, unknown>;
-  attachments: unknown[];
+  attachments: ReportAttachment[];
   status_history: ReportStatusHistory[];
   verified_at: string | null;
   resolved_at: string | null;
@@ -371,4 +379,25 @@ export async function updateReportStatus(
     status: request.status,
     updated_at: new Date().toISOString(),
   };
+}
+
+export async function getReportAttachment(
+  reportId: string,
+  attachmentId: string,
+  accessToken?: string,
+): Promise<Response> {
+  const token = accessToken ?? await (await import("./auth")).getAdminAccessToken();
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!baseUrl) throw new Error("NEXT_PUBLIC_API_URL is not configured");
+
+  return fetch(
+    new URL(
+      `/api/v1/reports/${encodeURIComponent(reportId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      `${baseUrl.replace(/\/+$/, "")}/`,
+    ),
+    {
+      cache: "no-store",
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
 }

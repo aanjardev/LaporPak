@@ -45,7 +45,18 @@ FastAPI does not call Gemini.
         },
         allow: ["google", "llm-task", "laporpak-tools"]
       },
-      tools: { allow: ["llm-task", "laporpak_create_report"] }
+      tools: {
+        allow: [
+          "llm-task",
+          "laporpak_create_report",
+          "laporpak_ask",
+          "laporpak_track_report",
+          "laporpak_create_service_request",
+          "laporpak_detect_emergency",
+          "laporpak_check_similar",
+          "laporpak_confirm_resolution"
+        ]
+      }
    }
    ```
 
@@ -93,3 +104,6 @@ scores exactly, and do not add real citizen data to this dataset.
 Structured extraction and idempotent `create_report` are implemented.
 Conversation state, citizen confirmation behavior, and WhatsApp channel setup
 remain OpenClaw host responsibilities.
+
+For the repeatable local integration sequence, see
+[`../../docs/demo-runbook.md`](../../docs/demo-runbook.md).

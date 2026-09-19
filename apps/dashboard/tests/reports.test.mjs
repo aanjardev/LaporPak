@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
-import { getReportById, getReports, ReportApiError, updateReportStatus } from "../lib/reports.ts";
+import { getReportAttachment, getReportById, getReports, ReportApiError, updateReportStatus } from "../lib/reports.ts";
 import { reportStatusActions } from "../lib/report-status-actions.ts";
 
 test("mock daftar dan detail mengikuti alur laporan", async () => {
@@ -38,6 +38,7 @@ test("mock daftar dan detail mengikuti alur laporan", async () => {
     id: "b5e83fd3-71e2-4ec3-b432-b7e970b57c6a",
     name: "Unit Infrastruktur Desa",
   });
+  assert.deepEqual(detail?.attachments, []);
   assert.equal(await getReportById("unknown"), null);
 });
 
@@ -207,5 +208,31 @@ test("mode API meneruskan respons gagal GET dan PATCH melalui HTTP", async () =>
     if (oldUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
     else process.env.NEXT_PUBLIC_API_URL = oldUrl;
     await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test("proxy attachment meneruskan token tanpa mengekspos path storage", async () => {
+  const oldUrl = process.env.NEXT_PUBLIC_API_URL;
+  const oldFetch = globalThis.fetch;
+  try {
+    process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
+    globalThis.fetch = async (url, init) => {
+      assert.equal(
+        String(url),
+        "http://localhost:8000/api/v1/reports/report%20id/attachments/attachment%2Fid",
+      );
+      assert.equal(init.headers.Authorization, "Bearer admin-token");
+      assert.equal(init.cache, "no-store");
+      return new Response(new Uint8Array([0xff, 0xd8, 0xff]), {
+        headers: { "Content-Type": "image/jpeg" },
+      });
+    };
+    const response = await getReportAttachment("report id", "attachment/id", "admin-token");
+    assert.equal(response.headers.get("content-type"), "image/jpeg");
+    assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [0xff, 0xd8, 0xff]);
+  } finally {
+    if (oldUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = oldUrl;
+    globalThis.fetch = oldFetch;
   }
 });

@@ -20,7 +20,21 @@
 - [ ] REQUEST belum dibuktikan melalui WhatsApp/OpenClaw host nyata dan dua
   desa belum dibuat pada environment bersama; test otomatis tidak menggantikan
   gerbang integrasi tersebut.
-- [ ] Endpoint foto privat belum diuji dengan object Supabase Storage nyata.
+- [ ] Endpoint foto privat belum diuji melalui HTTP memakai dua sesi admin nyata;
+  object Supabase Storage nyata sudah berhasil dibuat dan dibaca oleh service.
+
+## Pembaruan kesiapan demo 2026-09-19
+
+- [x] GitHub Actions `CI` berhasil pada merge `81417b0` di `main`.
+- [x] FastAPI nyata membuat laporan sintetis `LP-2026-0011` dengan PNG,
+  menyimpan object di bucket private, membaca object kembali, dan hanya
+  mengekspos `id`, `file_name`, `mime_type`, `file_size`, serta `created_at`.
+- [x] Dashboard memiliki proxy sesi dan galeri privat; bucket, storage path,
+  service-role key, dan URL object tidak dikirim ke browser.
+- [ ] Login admin nyata dan skenario lintas desa endpoint gambar masih harus
+  dijalankan melalui browser/API setelah akun uji kedua tersedia.
+- [ ] OpenClaw/WhatsApp memerlukan onboarding Gemini dan pemindaian QR pada
+  mesin operator; urutannya tersedia di `docs/demo-runbook.md`.
 
 Dokumen ini mengatur pelaksanaan dan bukti uji. Kebutuhan P0 ada di
 [project-context.md](project-context.md), bentuk data dan respons di
