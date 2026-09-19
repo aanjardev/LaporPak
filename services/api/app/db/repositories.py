@@ -175,6 +175,24 @@ class ReportRepository:
         )
         return list(self.session.execute(statement).mappings().all())
 
+    def get_scoped_attachment(
+        self,
+        report_id: UUID,
+        attachment_id: UUID,
+        unit_ids: tuple[UUID, ...] | None = None,
+    ) -> RowMapping | None:
+        statement = (
+            select(report_attachments)
+            .join(reports, reports.c.id == report_attachments.c.report_id)
+            .where(
+                report_attachments.c.id == attachment_id,
+                report_attachments.c.report_id == report_id,
+            )
+        )
+        if unit_ids is not None:
+            statement = statement.where(reports.c.administrative_unit_id.in_(unit_ids))
+        return self.session.execute(statement).mappings().one_or_none()
+
     def list_status_history(self, report_id: UUID) -> list[RowMapping]:
         statement = (
             select(report_status_history)

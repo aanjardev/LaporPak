@@ -27,6 +27,7 @@ from app.schemas.reports import (
 )
 from app.services.dependencies import ReportServiceDependency
 from app.services.exceptions import (
+    AttachmentUnavailableError,
     CategoryNotFoundError,
     DuplicateOperationError,
     InvalidAttachmentError,
@@ -188,6 +189,41 @@ def get_report_detail(
             status_code=503,
             code="DATABASE_UNAVAILABLE",
             message="Report could not be loaded",
+        ) from exc
+
+
+@router.get("/{report_id}/attachments/{attachment_id}")
+def get_report_attachment(
+    report_id: UUID,
+    attachment_id: UUID,
+    caller: AdminCaller,
+    report_service: ReportServiceDependency,
+) -> Response:
+    unit_ids = (
+        None
+        if caller.admin_account_id is None or caller.role is AdminRole.SYSTEM_ADMIN
+        else caller.unit_ids
+    )
+    try:
+        content, mime_type = report_service.get_report_attachment(
+            report_id, attachment_id, unit_ids
+        )
+        return Response(
+            content=content,
+            media_type=mime_type,
+            headers={"Content-Disposition": "inline"},
+        )
+    except ReportNotFoundError as exc:
+        raise APIError(
+            status_code=404,
+            code="REPORT_NOT_FOUND",
+            message="Report not found",
+        ) from exc
+    except (AttachmentUnavailableError, ReportPersistenceError) as exc:
+        raise APIError(
+            status_code=503,
+            code="ATTACHMENT_UNAVAILABLE",
+            message="Report attachment is unavailable",
         ) from exc
 
 

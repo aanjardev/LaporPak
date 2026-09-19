@@ -21,7 +21,13 @@ from app.schemas.knowledge import (
     KnowledgeUpdate,
 )
 from app.services.exceptions import ReportNotFoundError, ReportPersistenceError
-from app.services.knowledge import KnowledgeService, chunk_content, extract_content
+from app.services.knowledge import (
+    CANONICAL_DOCUMENT_SQL,
+    KnowledgeService,
+    canonical_document_sql,
+    chunk_content,
+    extract_content,
+)
 
 router = APIRouter(prefix="/api/v1/knowledge", tags=["Knowledge"])
 tools_router = APIRouter(prefix="/api/v1/tools/knowledge", tags=["Knowledge tools"])
@@ -206,7 +212,10 @@ def embedding_job(
             document = (
                 session.execute(
                     text(
-                        "select id from public.knowledge_documents where processing_status='pending' order by created_at for update skip locked limit 1"
+                        "select id from public.knowledge_documents "
+                        "where processing_status='pending' "
+                        f"and {CANONICAL_DOCUMENT_SQL} "
+                        "order by created_at for update skip locked limit 1"
                     )
                 )
                 .mappings()
@@ -251,7 +260,9 @@ def complete_embedding(
             expected = set(
                 session.execute(
                     text(
-                        "select id from public.knowledge_chunks where document_id=:id"
+                        "select c.id from public.knowledge_chunks c "
+                        "join public.knowledge_documents d on d.id=c.document_id "
+                        f"where c.document_id=:id and {canonical_document_sql('d')}"
                     ),
                     {"id": document_id},
                 )
@@ -275,7 +286,8 @@ def complete_embedding(
                 )
             session.execute(
                 text(
-                    "update public.knowledge_documents set processing_status='ready', failure_message=null, updated_at=now() where id=:id"
+                    "update public.knowledge_documents set processing_status='ready', "
+                    f"failure_message=null, updated_at=now() where id=:id and {CANONICAL_DOCUMENT_SQL}"
                 ),
                 {"id": document_id},
             )
@@ -301,7 +313,8 @@ def fail_embedding(
         with session.begin():
             result = session.execute(
                 text(
-                    "update public.knowledge_documents set processing_status='failed', failure_message=:message, updated_at=now() where id=:id"
+                    "update public.knowledge_documents set processing_status='failed', "
+                    f"failure_message=:message, updated_at=now() where id=:id and {CANONICAL_DOCUMENT_SQL}"
                 ),
                 {"id": document_id, "message": payload.message},
             )

@@ -70,6 +70,7 @@ class FakeReadReportService:
         self.error = error
         self.list_calls = []
         self.detail_calls = []
+        self.attachment_calls = []
 
     def list_reports(self, **parameters):
         self.list_calls.append(parameters)
@@ -87,6 +88,12 @@ class FakeReadReportService:
         if self.error is not None:
             raise self.error
         return report_detail()
+
+    def get_report_attachment(self, report_id, attachment_id, unit_ids):
+        self.attachment_calls.append((report_id, attachment_id, unit_ids))
+        if self.error is not None:
+            raise self.error
+        return b"image-bytes", "image/jpeg"
 
 
 @pytest.fixture
@@ -193,6 +200,35 @@ def test_read_endpoints_require_admin_token(auth_tokens):
     assert missing.status_code == 401
     assert openclaw.status_code == 401
     assert service.list_calls == []
+
+
+def test_attachment_endpoint_returns_private_image(auth_tokens):
+    service = FakeReadReportService()
+    client = client_with_service(service)
+    attachment_id = UUID("33333333-3333-4333-8333-333333333333")
+
+    response = client.get(
+        f"/api/v1/reports/{REPORT_ID}/attachments/{attachment_id}",
+        headers=admin_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.content == b"image-bytes"
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.headers["content-disposition"] == "inline"
+    assert service.attachment_calls == [(REPORT_ID, attachment_id, None)]
+
+
+def test_attachment_endpoint_hides_missing_or_out_of_scope_attachment(auth_tokens):
+    attachment_id = UUID("33333333-3333-4333-8333-333333333333")
+    service = FakeReadReportService(error=ReportNotFoundError(REPORT_ID))
+    response = client_with_service(service).get(
+        f"/api/v1/reports/{REPORT_ID}/attachments/{attachment_id}",
+        headers=admin_headers(),
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "REPORT_NOT_FOUND"
 
 
 @pytest.mark.parametrize(
