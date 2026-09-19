@@ -30,3 +30,8 @@ def test_knowledge_queries_cast_optional_service_key_to_text():
 
     assert "cast(:service_key as text) is null" in session.statements[0]
     assert session.statements[1].count("cast(:service_key as text) is null") == 2
+    assert "d.metadata->>'approval_status'='approved'" in session.statements[0]
+    assert session.statements[1].count(
+        "d.metadata->>'approval_status'='approved'"
+    ) == 2
+    assert "coalesce(d.metadata->>'approval_status'" not in session.statements[0]

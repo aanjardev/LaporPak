@@ -283,7 +283,7 @@ export function buildTrackTool(context, fetchImpl = globalThis.fetch, env = proc
       properties: {
         ticket_number: {
           type: ["string", "null"],
-          pattern: "^LP-[0-9]{4}-[0-9]{4,}$",
+          pattern: "^(LP|REQ)-[0-9]{4}-[0-9]{4,}$",
         },
       },
     },
@@ -296,6 +296,78 @@ export function buildTrackTool(context, fetchImpl = globalThis.fetch, env = proc
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
         details: result,
+      };
+    },
+  };
+}
+
+export function buildServiceRequestTool(
+  context,
+  fetchImpl = globalThis.fetch,
+  env = process.env,
+) {
+  return {
+    name: "laporpak_create_service_request",
+    label: "Create residency letter request",
+    description:
+      "Submit one citizen-confirmed residency-letter REQUEST. The authenticated WhatsApp sender and village are supplied by the trusted plugin runtime; human administrators make the official decision.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "applicant_name",
+        "domicile_address",
+        "domicile_duration",
+        "purpose",
+      ],
+      properties: {
+        applicant_name: { type: "string", minLength: 1, maxLength: 200 },
+        domicile_address: { type: "string", minLength: 1, maxLength: 1000 },
+        domicile_duration: { type: "string", minLength: 1, maxLength: 200 },
+        purpose: { type: "string", minLength: 1, maxLength: 1000 },
+      },
+    },
+    async execute(_toolCallId, input) {
+      requireWhatsappContext(context, "laporpak_create_service_request");
+      const { apiUrl, apiKey, channelAccountId } = backendConfig(env);
+      const body = {
+        sender_phone_number: context.requesterSenderId,
+        request_type: "residency_letter",
+        applicant_name: input.applicant_name,
+        domicile_address: input.domicile_address,
+        domicile_duration: input.domicile_duration,
+        purpose: input.purpose,
+      };
+      const draftId = uuidFromFingerprint(stableJson({
+        sender: senderKey(context.requesterSenderId),
+        sessionId: context.sessionId ?? null,
+        request: body,
+      }));
+      const response = await fetchImpl(
+        apiEndpoint(apiUrl, "/api/v1/service-requests"),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": draftId,
+            "X-OpenClaw-API-Key": apiKey,
+            "X-Channel-Account-ID": channelAccountId,
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(60_000),
+        },
+      );
+      const result = await responseJson(response);
+      if (!response.ok) {
+        const code = result?.error?.code ?? "REQUEST_FAILED";
+        throw new Error(
+          `LaporPak API rejected the service request (${response.status} ${code})`,
+        );
+      }
+      const details = { ...result, replayed: response.status === 200 };
+      return {
+        content: [{ type: "text", text: JSON.stringify(details) }],
+        details,
       };
     },
   };
@@ -443,6 +515,10 @@ export default {
     });
     api.registerTool((context) => buildTrackTool(context), {
       name: "laporpak_track_report",
+      optional: true,
+    });
+    api.registerTool((context) => buildServiceRequestTool(context), {
+      name: "laporpak_create_service_request",
       optional: true,
     });
     api.registerTool((context) => buildDetectEmergencyTool(context), {
