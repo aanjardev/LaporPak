@@ -395,7 +395,7 @@ export function buildServiceRequestTool(
     name: "laporpak_create_service_request",
     label: "Create residency letter request",
     description:
-      "Submit one citizen-confirmed residency-letter REQUEST. The authenticated WhatsApp sender and village are supplied by the trusted plugin runtime; human administrators make the official decision.",
+      "Submit one residency-letter REQUEST only after the citizen explicitly confirms a summary in a separate later message. Never call in the same turn that first supplies or corrects request data. The authenticated WhatsApp sender and village are supplied by the trusted plugin runtime; human administrators make the official decision.",
     parameters: {
       type: "object",
       additionalProperties: false,

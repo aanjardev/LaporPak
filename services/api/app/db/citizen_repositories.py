@@ -1,30 +1,9 @@
-import re
 from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-
-FTS_FILLER_WORDS = {
-    "apa",
-    "apakah",
-    "bagaimana",
-    "dan",
-    "dari",
-    "di",
-    "ke",
-    "mohon",
-    "saya",
-    "untuk",
-    "yang",
-}
-
-
-def normalized_fts_question(question: str) -> str:
-    tokens = re.findall(r"[\w]+", question.casefold(), flags=re.UNICODE)
-    meaningful = [token for token in tokens if token not in FTS_FILLER_WORDS]
-    return " ".join(meaningful or tokens)
 
 
 class CitizenRepository:
@@ -93,7 +72,6 @@ class CitizenRepository:
         unit_id: UUID,
         service_key: str | None,
     ) -> list[dict]:
-        fts_question = normalized_fts_question(question)
         review_filter = (
             "d.review_status in ('approved','demo')"
             if settings.app_env == "development"
@@ -103,30 +81,43 @@ class CitizenRepository:
             return list(
                 self.session.execute(
                     text(rf"""
+                with query as (
+                  select to_tsquery(
+                    'simple',
+                    string_agg(quote_literal(term), ' | ')
+                  ) value
+                  from unnest(
+                    tsvector_to_array(to_tsvector('simple', :question))
+                  ) term
+                  where term not in (
+                    'apa', 'apakah', 'bagaimana', 'gimana', 'ini', 'itu',
+                    'yang', 'paling', 'hari', 'saya', 'mau', 'ingin', 'bisa',
+                    'dan', 'atau', 'di', 'ke', 'dari', 'untuk', 'dengan'
+                  )
+                )
                 select d.id document_id, c.id chunk_id, d.title, d.source_url,
                        c.content, d.review_status
                 from public.knowledge_chunks c
                 join public.knowledge_documents d on d.id=c.document_id
+                cross join query q
                 where d.administrative_unit_id=:unit
                   and d.is_active
                   and d.processing_status in ('pending', 'processing', 'ready')
                   and {review_filter}
                   and (cast(:service_key as text) is null or
                        coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text))
-                  and to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content)
-                      @@ websearch_to_tsquery(
-                          'simple', regexp_replace(btrim(:question), '\s+', ' OR ', 'g')
-                      )
+                  and q.value is not null
+                  and to_tsvector(
+                    'simple', coalesce(d.title,'') || ' ' || c.content
+                  ) @@ q.value
                 order by ts_rank_cd(
-                    to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content),
-                    websearch_to_tsquery(
-                        'simple', regexp_replace(btrim(:question), '\s+', ' OR ', 'g')
-                    )
+                  to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content),
+                  q.value
                 ) desc
-                limit 5
+                limit 1
             """),
                     {
-                        "question": fts_question,
+                        "question": question,
                         "unit": unit_id,
                         "service_key": service_key,
                     },
@@ -138,18 +129,34 @@ class CitizenRepository:
         return list(
             self.session.execute(
                 text(rf"""
-            with fts as (
+            with query as (
+              select to_tsquery(
+                'simple',
+                string_agg(quote_literal(term), ' | ')
+              ) value
+              from unnest(
+                tsvector_to_array(to_tsvector('simple', :question))
+              ) term
+              where term not in (
+                'apa', 'apakah', 'bagaimana', 'gimana', 'ini', 'itu',
+                'yang', 'paling', 'hari', 'saya', 'mau', 'ingin', 'bisa',
+                'dan', 'atau', 'di', 'ke', 'dari', 'untuk', 'dengan'
+              )
+            ), fts as (
               select c.id, row_number() over(order by ts_rank_cd(
-                  to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content),
-                  websearch_to_tsquery('simple', regexp_replace(btrim(:question), '\s+', ' OR ', 'g'))
+                to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content),
+                q.value
               ) desc) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
+              cross join query q
               where d.administrative_unit_id=:unit and d.is_active
                 and d.processing_status in ('pending', 'processing', 'ready')
                 and {review_filter}
                 and (cast(:service_key as text) is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text))
-                and to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content)
-                    @@ websearch_to_tsquery('simple', regexp_replace(btrim(:question), '\s+', ' OR ', 'g')) limit 20
+                and q.value is not null
+                and to_tsvector(
+                  'simple', coalesce(d.title,'') || ' ' || c.content
+                ) @@ q.value limit 20
             ), semantic as (
               select c.id, row_number() over(order by c.embedding <=> cast(:embedding as vector)) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
@@ -168,7 +175,7 @@ class CitizenRepository:
             order by r.score desc limit 5
         """),
                 {
-                    "question": fts_question,
+                    "question": question,
                     "embedding": vector,
                     "unit": unit_id,
                     "service_key": service_key,

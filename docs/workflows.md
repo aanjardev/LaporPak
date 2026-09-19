@@ -639,7 +639,7 @@ mengumpulkan field minimum + menampilkan ringkasan
   ↓
 warga mengonfirmasi
   ↓
-tool REQUEST memakai Idempotency-Key stabil
+tool REQUEST memakai Idempotency-Key stabil dari sesi, pengirim, channel, dan draf
   ↓
 FastAPI memvalidasi identitas channel, field, desa, dan duplikasi
   ↓
@@ -657,3 +657,8 @@ Ketersediaan teknis belum menjadi izin memproses pengajuan warga nyata.
 
 AI boleh menjelaskan dan menyiapkan data. AI tidak boleh approve, reject,
 menandai completed, atau menerbitkan dokumen resmi.
+
+Retry dengan key, payload, dan desa yang sama mengembalikan tiket lama. Key
+yang sama dengan payload atau desa berbeda menghasilkan
+`409 DUPLICATE_OPERATION`. Pengujian demo hanya memakai data sintetis dan
+selalu menyebutkan bahwa tiket bukan surat resmi.

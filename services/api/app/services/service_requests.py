@@ -37,6 +37,22 @@ TRANSITIONS = {
 }
 
 
+def canonical_request_payload_hash(
+    payload: ServiceRequestCreate, phone_number: str, unit_id: UUID
+) -> str:
+    canonical_payload = payload.model_dump(mode="json")
+    canonical_payload["sender_phone_number"] = phone_number
+    canonical_payload["administrative_unit_id"] = str(unit_id)
+    return hashlib.sha256(
+        json.dumps(
+            canonical_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+
+
 @dataclass(frozen=True)
 class RequestResult:
     item: ServiceRequestCreated
@@ -66,16 +82,7 @@ class ServiceRequestService:
         self, payload: ServiceRequestCreate, key: UUID, unit_id: UUID
     ) -> RequestResult:
         phone = normalize_phone_number(payload.sender_phone_number)
-        digest = hashlib.sha256(
-            json.dumps(
-                {
-                    **payload.model_dump(mode="json"),
-                    "administrative_unit_id": str(unit_id),
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode()
-        ).hexdigest()
+        digest = canonical_request_payload_hash(payload, phone, unit_id)
         try:
             with self.session.begin():
                 self.repository.acquire_lock(advisory_lock_key(key))
@@ -83,7 +90,9 @@ class ServiceRequestService:
                 if existing:
                     if existing["idempotency_payload_hash"] != digest:
                         raise DuplicateOperationError
-                    row = self.repository.detail(existing["id"], None)
+                    row = self.repository.detail(existing["id"], (unit_id,))
+                    if row is None:
+                        raise DuplicateOperationError
                     return RequestResult(self.created(row), True)
                 citizen = self.repository.citizen(phone)
                 request_type = self.repository.request_type(payload.request_type)

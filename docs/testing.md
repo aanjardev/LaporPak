@@ -66,10 +66,8 @@ memerlukan host OpenClaw, Gemini, channel aktif, FastAPI, dan Supabase yang sama
 .\run-tests.ps1
 ```
 
-Runner saat ini menjalankan backend pytest/Ruff, lint dan tes inti dashboard,
-build dashboard, tes plugin, serta test suite evaluasi. Sampai runner diperbarui
-untuk tes knowledge dan REQUEST, jalankan `npm run test:knowledge` dan
-`npm run test:requests` secara terpisah seperti daftar di atas.
+Runner menjalankan backend pytest/Ruff, seluruh tes dashboard termasuk
+knowledge dan REQUEST, build dashboard, tes plugin, serta test suite evaluasi.
 
 ## Uji manual wajib
 
@@ -87,3 +85,41 @@ Catat tanggal, SHA commit, lingkungan, sumber data, hasil, dan batas simulasi.
 Gunakan [p0-verification-evidence.md](p0-verification-evidence.md) untuk bukti
 REPORT serta tautkan bukti ASK/TRACK/REQUEST dari
 [mvp-delivery-plan.md](mvp-delivery-plan.md).
+
+## Bukti demo REQUEST — 19 September 2026
+
+Versi implementasi yang diuji: `943435434c1b725a2a69f60e9d334336ad34c9ad`.
+Pengujian memakai FastAPI dan Supabase development aktif, tool OpenClaw asli,
+serta dua identitas WhatsApp sintetis. Tidak ada data warga nyata atau dokumen
+identitas yang digunakan.
+
+Hasil alur lengkap:
+
+- `REQ-2026-0001` dibuat, retry mengembalikan tiket yang sama tanpa duplikasi,
+  lalu admin desa mengubah status `pending_review → approved → completed`;
+- `REQ-2026-0002` dibuat lalu admin desa mengubah status
+  `pending_review → rejected` dengan alasan;
+- pemilik dapat TRACK status dan riwayat masing-masing, sedangkan pemilik lain
+  menerima `404`;
+- admin desa lain tidak dapat membaca tiket, admin sistem tidak dapat mengambil
+  keputusan, dan transisi ilegal menghasilkan `409`;
+- percakapan OpenClaw/Gemini memvalidasi data kurang, ringkasan dan konfirmasi
+  terpisah, koreksi, pembatalan, serta perpindahan REQUEST ke ASK dan kembali;
+- pengiriman WhatsApp keluar tidak dilakukan dalam demo ini. Uji percakapan
+  memakai agent/channel WhatsApp tanpa opsi delivery, sedangkan persistence
+  memakai tool dengan trusted channel context.
+
+Pemeriksaan otomatis yang lulus:
+
+- backend: 133 pytest dan Ruff;
+- dashboard: lint, 18 test, dan production build;
+- plugin OpenClaw: 9 test;
+- FTS recall: 35/35;
+- evaluasi live: 153/153 (REPORT 29, ASK 42, TRACK 29, security/error 52,
+  E2E simulasi 1).
+
+Untuk mengulang, aktifkan FastAPI development dan konfigurasi OpenClaw lokal,
+pastikan seed `database/seeds/0004_scope_simulation_knowledge.sql` telah
+diterapkan, lalu jalankan `./run-tests.ps1` dari root repository. Pengujian
+manual harus memakai identitas sintetis baru dan mengikuti alur REQUEST pada
+`integrations/openclaw/workspace/AGENTS.md`.

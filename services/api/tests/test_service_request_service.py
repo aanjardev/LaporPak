@@ -6,10 +6,17 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.schemas.service_requests import ServiceRequestCreate, ServiceRequestStatus
 from app.services.exceptions import DuplicateOperationError, ReportPersistenceError
-from app.services.service_requests import ServiceRequestService
+from app.services.service_requests import (
+    ServiceRequestService,
+    canonical_request_payload_hash,
+)
 
 REQUEST_ID = UUID("33333333-3333-4333-8333-333333333333")
 UNIT_ID = UUID("22222222-2222-4222-8222-222222222222")
+OTHER_UNIT_ID = UUID("44444444-4444-4444-8444-444444444444")
+TYPE_ID = UUID("55555555-5555-4555-8555-555555555555")
+IDEMPOTENCY_KEY = UUID("66666666-6666-4666-8666-666666666666")
+CITIZEN_ID = UUID("77777777-7777-4777-8777-777777777777")
 NOW = datetime(2026, 9, 19, tzinfo=UTC)
 
 
@@ -76,6 +83,112 @@ class Repository:
         ]
 
 
+class CreateRepository:
+    def __init__(self, *, existing=None, fail_history=False):
+        self.existing = existing
+        self.fail_history = fail_history
+        self.inserted = None
+        self.history_values = None
+
+    def acquire_lock(self, _key):
+        pass
+
+    def by_key(self, _key):
+        return self.existing
+
+    def citizen(self, phone):
+        return {"id": CITIZEN_ID, "phone_number": phone}
+
+    def request_type(self, _code):
+        return {"id": TYPE_ID}
+
+    def insert_request(self, values):
+        self.inserted = values
+        return {
+            **request_row(),
+            **values,
+            "status": "pending_review",
+            "ticket_number": "REQ-2026-0001",
+            "created_at": NOW,
+            "updated_at": NOW,
+        }
+
+    def history(self, values):
+        if self.fail_history:
+            raise SQLAlchemyError("history failed")
+        self.history_values = values
+
+    def detail(self, _request_id, unit_ids, lock=False):
+        if self.existing and self.existing["administrative_unit_id"] in unit_ids:
+            return {**request_row(), **self.existing, "request_type": "residency_letter"}
+        return None
+
+
+def request_payload(phone="0812-3456-7890"):
+    return ServiceRequestCreate(
+        sender_phone_number=phone,
+        applicant_name="Warga Uji",
+        domicile_address="RT 03",
+        domicile_duration="2 tahun",
+        purpose="Administrasi",
+    )
+
+
+def test_create_persists_normalized_scoped_request_and_initial_history():
+    repository = CreateRepository()
+    service = ServiceRequestService(Session(), repository)
+
+    result = service.create(request_payload(), IDEMPOTENCY_KEY, UNIT_ID)
+
+    assert result.replayed is False
+    assert repository.inserted["administrative_unit_id"] == UNIT_ID
+    assert repository.inserted["citizen_id"] == CITIZEN_ID
+    assert repository.history_values["new_status"] == "pending_review"
+
+
+def test_same_key_and_scoped_payload_replays_without_another_insert():
+    payload = request_payload()
+    existing = {
+        **request_row(),
+        "idempotency_payload_hash": canonical_request_payload_hash(
+            payload, "+6281234567890", UNIT_ID
+        ),
+    }
+    repository = CreateRepository(existing=existing)
+
+    result = ServiceRequestService(Session(), repository).create(
+        payload, IDEMPOTENCY_KEY, UNIT_ID
+    )
+
+    assert result.replayed is True
+    assert repository.inserted is None
+
+
+def test_same_key_cannot_replay_across_villages():
+    payload = request_payload()
+    existing = {
+        **request_row(),
+        "idempotency_payload_hash": canonical_request_payload_hash(
+            payload, "+6281234567890", UNIT_ID
+        ),
+    }
+
+    with pytest.raises(DuplicateOperationError):
+        ServiceRequestService(Session(), CreateRepository(existing=existing)).create(
+            payload, IDEMPOTENCY_KEY, OTHER_UNIT_ID
+        )
+
+
+def test_create_history_failure_aborts_atomic_transaction():
+    session = Session()
+
+    with pytest.raises(ReportPersistenceError):
+        ServiceRequestService(
+            session, CreateRepository(fail_history=True)
+        ).create(request_payload(), IDEMPOTENCY_KEY, UNIT_ID)
+
+    assert session.transaction.error_type is SQLAlchemyError
+
 def test_detail_exposes_safe_history_and_backend_transitions():
     service = ServiceRequestService(Session(), Repository())
     detail = service.detail(REQUEST_ID, (UNIT_ID,), can_transition=True)
@@ -101,60 +214,3 @@ def test_history_failure_aborts_atomic_status_transaction():
     assert session.transaction.error_type is SQLAlchemyError
 
 
-class CreateRepository:
-    def __init__(self):
-        self.existing = None
-        self.inserted = None
-
-    def acquire_lock(self, _key):
-        return None
-
-    def by_key(self, _key):
-        return self.existing
-
-    def citizen(self, _phone):
-        return {"id": UUID("44444444-4444-4444-8444-444444444444")}
-
-    def request_type(self, _request_type):
-        return {"id": UUID("55555555-5555-4555-8555-555555555555")}
-
-    def insert_request(self, values):
-        self.inserted = {
-            **request_row(),
-            **values,
-        }
-        return self.inserted
-
-    def history(self, _values):
-        return None
-
-    def detail(self, _request_id, _unit_ids):
-        return {**request_row(), **self.existing}
-
-
-def test_request_idempotency_is_bound_to_village():
-    repository = CreateRepository()
-    service = ServiceRequestService(Session(), repository)
-    payload = ServiceRequestCreate(
-        sender_phone_number="+6281234567890",
-        applicant_name="Warga Uji",
-        domicile_address="RT 03",
-        domicile_duration="2 tahun",
-        purpose="Administrasi",
-    )
-    key = UUID("66666666-6666-4666-8666-666666666666")
-
-    service.create(payload, key, UNIT_ID)
-    repository.existing = {
-        "id": REQUEST_ID,
-        "idempotency_payload_hash": repository.inserted[
-            "idempotency_payload_hash"
-        ],
-    }
-
-    with pytest.raises(DuplicateOperationError):
-        service.create(
-            payload,
-            key,
-            UUID("77777777-7777-4777-8777-777777777777"),
-        )

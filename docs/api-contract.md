@@ -774,7 +774,11 @@ channel integration; model-generated payloads cannot select a village.
 - `POST /api/v1/track` reads only the authenticated sender's `LP-*` or `REQ-*`
   ticket. Omitting the ticket returns at most five recent owned items.
 - `POST /api/v1/service-requests` creates an idempotent `residency_letter`.
-  Admin list/detail/status routes use the same village scope as REPORT.
+  Admin list/detail/status routes use the same village scope as REPORT. The
+  idempotency fingerprint includes the trusted channel account, and the
+  backend payload hash includes the resolved administrative unit. A retry can
+  replay only within the same village; reusing its key for another payload or
+  village returns `409 DUPLICATE_OPERATION`.
 - `/api/v1/knowledge/preview` and `/api/v1/knowledge/documents` support pasted
   text, Markdown, and PDF up to 10 MB. Files are stored in a private bucket.
 - `/api/v1/tools/knowledge/embedding-jobs` is the OpenClaw embedding boundary.

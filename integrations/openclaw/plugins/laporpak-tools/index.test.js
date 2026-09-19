@@ -253,14 +253,46 @@ test("REQUEST injects trusted identity and uses a stable idempotency key", async
     purpose: "Keperluan uji",
   };
 
-  await tool.execute("request-1", input);
-  await tool.execute("request-1-retry", input);
+  const created = await tool.execute("request-1", input);
+  const replayed = await tool.execute("request-1-retry", input);
+
+  const otherChannelTool = buildServiceRequestTool(
+    {
+      messageChannel: "whatsapp",
+      requesterSenderId: "6281234567890",
+      sessionId: "c5b17858-4046-4d4f-a718-6ea19c1da781",
+    },
+    async (url, options) => {
+      calls.push({ url: String(url), options });
+      return Response.json({
+        id: "72af1a52-7016-48c7-aacc-6c35417be819",
+        ticket_number: "REQ-2026-0002",
+        request_type: "residency_letter",
+        applicant_name: "Warga Uji",
+        domicile_address: "RT 03",
+        domicile_duration: "2 tahun",
+        purpose: "Keperluan uji",
+        status: "pending_review",
+        administrative_unit_id: "00000000-0000-4000-8000-000000000003",
+        created_at: "2026-09-19T00:00:00Z",
+        updated_at: "2026-09-19T00:00:00Z",
+      }, { status: 201 });
+    },
+    { ...testEnv, LAPORPAK_CHANNEL_ACCOUNT_ID: "whatsapp-other-village" },
+  );
+  await otherChannelTool.execute("request-other-village", input);
 
   assert.equal(calls[0].url, "http://localhost:8000/api/v1/service-requests");
+  assert.equal(created.details.replayed, false);
+  assert.equal(replayed.details.replayed, true);
   assert.equal(JSON.parse(calls[0].options.body).sender_phone_number, "6281234567890");
   assert.equal(
     calls[0].options.headers["Idempotency-Key"],
     calls[1].options.headers["Idempotency-Key"],
+  );
+  assert.notEqual(
+    calls[0].options.headers["Idempotency-Key"],
+    calls[2].options.headers["Idempotency-Key"],
   );
   assert.equal(calls[0].options.headers["X-Channel-Account-ID"], "whatsapp-demo");
 });
@@ -321,4 +353,29 @@ test("trusted media is isolated by session and cannot move to another draft", as
     else process.env.LAPORPAK_CHANNEL_ACCOUNT_ID = previous.channel;
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("REQUEST does not return success when persistence fails", async () => {
+  const tool = buildServiceRequestTool(
+    {
+      messageChannel: "whatsapp",
+      requesterSenderId: "6281234567890",
+      sessionId: "request-failure-session",
+    },
+    async () => Response.json(
+      { error: { code: "DATABASE_UNAVAILABLE" } },
+      { status: 503 },
+    ),
+    testEnv,
+  );
+
+  await assert.rejects(
+    tool.execute("request-failure", {
+      applicant_name: "Warga Uji",
+      domicile_address: "RT 03",
+      domicile_duration: "2 tahun",
+      purpose: "Keperluan uji",
+    }),
+    /503 DATABASE_UNAVAILABLE/,
+  );
 });

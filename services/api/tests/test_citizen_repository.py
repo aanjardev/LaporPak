@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from app.core.config import settings
-from app.db.citizen_repositories import CitizenRepository, normalized_fts_question
+from app.db.citizen_repositories import CitizenRepository
 
 
 class EmptyResult:
@@ -23,7 +23,7 @@ class CapturingSession:
         return EmptyResult()
 
 
-def test_knowledge_queries_cast_optional_service_key_to_text():
+def test_knowledge_queries_support_natural_language_fts_and_safe_filters():
     session = CapturingSession()
     repository = CitizenRepository(session)
     unit_id = UUID("00000000-0000-4000-8000-000000000002")
@@ -37,13 +37,9 @@ def test_knowledge_queries_cast_optional_service_key_to_text():
     assert session.statements[1].count("d.review_status in ('approved','demo')") == 2
     assert "coalesce(d.metadata->>'approval_status'" not in session.statements[0]
     assert session.parameters[0]["question"] == "jam kantor"
-
-
-def test_fts_normalization_drops_common_filler_words():
-    assert (
-        normalized_fts_question("Apakah jam operasional di kantor desa?")
-        == "jam operasional kantor desa"
-    )
+    assert "string_agg(quote_literal(term), ' | ')" in session.statements[0]
+    assert "string_agg(quote_literal(term), ' | ')" in session.statements[1]
+    assert "limit 1" in session.statements[0]
 
 
 def test_production_search_excludes_demo_sources(monkeypatch):
