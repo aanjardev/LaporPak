@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -8,6 +9,18 @@ import {
   buildServiceRequestTool,
   buildTrackTool,
 } from "./index.js";
+
+const manifest = JSON.parse(
+  readFileSync(new URL("./openclaw.plugin.json", import.meta.url), "utf8"),
+);
+
+test("manifest declares the REQUEST tool contract", () => {
+  assert.ok(manifest.contracts.tools.includes("laporpak_create_service_request"));
+  assert.deepEqual(manifest.toolMetadata.laporpak_create_service_request, {
+    optional: true,
+    replaySafe: true,
+  });
+});
 
 const input = {
   category: "infrastructure",
