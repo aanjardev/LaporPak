@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.db.tables import (
+    admin_accounts,
     citizens,
     service_request_status_history,
     service_request_types,
@@ -75,6 +76,36 @@ class ServiceRequestRepository:
 
     def history(self, values: Mapping[str, Any]) -> None:
         self.session.execute(insert(service_request_status_history).values(**values))
+
+    def list_history(self, request_id: UUID):
+        actor_key = func.concat("supabase:", admin_accounts.c.auth_user_id)
+        return (
+            self.session.execute(
+                select(
+                    service_request_status_history.c.old_status,
+                    service_request_status_history.c.new_status,
+                    service_request_status_history.c.actor_type,
+                    admin_accounts.c.display_name.label("actor_display_name"),
+                    service_request_status_history.c.notes.label("reason"),
+                    service_request_status_history.c.created_at,
+                )
+                .select_from(
+                    service_request_status_history.outerjoin(
+                        admin_accounts,
+                        service_request_status_history.c.actor_identifier == actor_key,
+                    )
+                )
+                .where(
+                    service_request_status_history.c.service_request_id == request_id
+                )
+                .order_by(
+                    service_request_status_history.c.created_at.asc(),
+                    service_request_status_history.c.id.asc(),
+                )
+            )
+            .mappings()
+            .all()
+        )
 
     def list(self, offset: int, limit: int, unit_ids: tuple[UUID, ...] | None):
         joined = service_requests.join(

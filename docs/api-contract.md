@@ -136,6 +136,7 @@ INVALID_REQUEST
 UNAUTHORIZED
 FORBIDDEN
 REPORT_NOT_FOUND
+SERVICE_REQUEST_NOT_FOUND
 INVALID_STATUS_TRANSITION
 DUPLICATE_OPERATION
 VALIDATION_ERROR
@@ -152,6 +153,7 @@ Suggested HTTP mapping:
 | 401 | `UNAUTHORIZED` |
 | 403 | `FORBIDDEN` |
 | 404 | `REPORT_NOT_FOUND` |
+| 404 | `SERVICE_REQUEST_NOT_FOUND` |
 | 409 | `INVALID_STATUS_TRANSITION` |
 | 409 | `DUPLICATE_OPERATION` |
 | 422 | `VALIDATION_ERROR` |
@@ -767,6 +769,67 @@ channel integration; model-generated payloads cannot select a village.
 Admin tokens are accepted only when the Supabase Auth UUID maps to an active
 `admin_accounts` row. `system_admin` is global; `village_admin` is limited by
 `admin_unit_memberships`. Out-of-scope detail/mutation returns `404`.
+
+### Admin REQUEST contract
+
+Admin endpoints require a Supabase bearer token mapped to an active
+`admin_accounts` row. `system_admin` may read every REQUEST for audit but cannot
+make an administrative decision. Only `village_admin` with membership in the
+REQUEST village may change its status. An absent or out-of-scope REQUEST uses
+`404 SERVICE_REQUEST_NOT_FOUND`.
+
+#### List REQUEST
+
+```http
+GET /api/v1/service-requests?page=1&page_size=20
+Authorization: Bearer <supabase-admin-access-token>
+```
+
+Response `200` is `{ "items": [], "page": 1, "page_size": 20, "total": 0 }`.
+Each item contains only `id`, `ticket_number`, `request_type`, `applicant_name`,
+`status`, `administrative_unit_id`, `created_at`, and `updated_at`. Address,
+domicile duration, purpose, citizen identity, phone number, internal foreign
+keys, and idempotency data are not list fields.
+
+#### REQUEST detail
+
+```http
+GET /api/v1/service-requests/{request_id}
+Authorization: Bearer <supabase-admin-access-token>
+```
+
+The detail adds `domicile_address`, `domicile_duration`, `purpose`,
+`allowed_transitions`, and `status_history`. Backend-calculated transitions are
+`["approved", "rejected"]` for a scoped village admin reading
+`pending_review`, `["completed"]` for `approved`, and `[]` for terminal states
+or a system admin.
+
+History entries contain `old_status`, `new_status`, `actor_type`, nullable
+`actor_display_name`, nullable `reason`, and `created_at`. Supabase user UUIDs,
+`actor_identifier`, and other internal identifiers are never response fields.
+Entries are ordered oldest first.
+
+#### Update REQUEST status
+
+```http
+PATCH /api/v1/service-requests/{request_id}/status
+Authorization: Bearer <supabase-village-admin-access-token>
+Content-Type: application/json
+
+{
+  "status": "approved",
+  "reason": "Data pengajuan telah diperiksa."
+}
+```
+
+`reason` is trimmed and must contain 1–1000 characters. Allowed transitions are
+`pending_review -> approved/rejected` and `approved -> completed`. Status and
+history are written atomically. Response `200` contains only `id`,
+`ticket_number`, `status`, and `updated_at`; clients then reload the detail.
+
+Errors are `401 UNAUTHORIZED`, `403 FORBIDDEN` for unauthorized decision roles,
+`404 SERVICE_REQUEST_NOT_FOUND`, `409 INVALID_STATUS_TRANSITION`, `422
+VALIDATION_ERROR`, and `503 DATABASE_UNAVAILABLE`.
 
 ---
 

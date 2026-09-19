@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import {
   requestStatuses,
+  ServiceRequestApiError,
   updateServiceRequest,
   type ServiceRequestStatus,
 } from "@/lib/service-requests";
@@ -16,7 +17,15 @@ export async function updateRequestAction(id: string, formData: FormData) {
   }
   try {
     await updateServiceRequest(id, status as ServiceRequestStatus, reason);
-  } catch {
+  } catch (error) {
+    if (error instanceof ServiceRequestApiError) {
+      if (error.status === 401) redirect("/login?reauth=1");
+      if (error.status === 403) redirect("/access-denied");
+      if (error.status === 404) redirect("/reports/requests?missing=1");
+      if (error.status === 409) {
+        redirect(`/reports/requests/${id}?error=conflict`);
+      }
+    }
     redirect(`/reports/requests/${id}?error=save`);
   }
   redirect(`/reports/requests/${id}?saved=1`);

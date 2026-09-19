@@ -14,9 +14,11 @@ from app.core.security import (
 from app.db.session import get_db_session
 from app.schemas.service_requests import (
     ServiceRequestCreate,
-    ServiceRequestItem,
+    ServiceRequestCreated,
+    ServiceRequestDetail,
     ServiceRequestList,
     ServiceRequestStatusUpdate,
+    ServiceRequestStatusUpdateResponse,
 )
 from app.services.exceptions import (
     DuplicateOperationError,
@@ -30,7 +32,7 @@ from app.services.service_requests import ServiceRequestService
 router = APIRouter(prefix="/api/v1/service-requests", tags=["Service requests"])
 
 
-@router.post("", response_model=ServiceRequestItem, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ServiceRequestCreated, status_code=status.HTTP_201_CREATED)
 def create(
     payload: ServiceRequestCreate,
     response: Response,
@@ -38,7 +40,7 @@ def create(
     idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
     channel_account_id: Annotated[str, Header(alias="X-Channel-Account-ID")],
     session: Annotated[Session, Depends(get_db_session)],
-) -> ServiceRequestItem:
+) -> ServiceRequestCreated:
     try:
         result = ServiceRequestService(session).create(
             payload, idempotency_key, resolve_channel_unit(session, channel_account_id)
@@ -93,18 +95,22 @@ def list_requests(
         ) from exc
 
 
-@router.get("/{request_id}", response_model=ServiceRequestItem)
+@router.get("/{request_id}", response_model=ServiceRequestDetail)
 def detail(
     request_id: UUID,
     caller: AdminCaller,
     session: Annotated[Session, Depends(get_db_session)],
-) -> ServiceRequestItem:
+) -> ServiceRequestDetail:
     try:
-        return ServiceRequestService(session).detail(request_id, scope(caller))
+        return ServiceRequestService(session).detail(
+            request_id,
+            scope(caller),
+            can_transition=caller.role is AdminRole.VILLAGE_ADMIN,
+        )
     except ReportNotFoundError as exc:
         raise APIError(
             status_code=404,
-            code="NOT_FOUND",
+            code="SERVICE_REQUEST_NOT_FOUND",
             message="Service request not found",
         ) from exc
     except ReportPersistenceError as exc:
@@ -115,13 +121,21 @@ def detail(
         ) from exc
 
 
-@router.patch("/{request_id}/status", response_model=ServiceRequestItem)
+@router.patch(
+    "/{request_id}/status", response_model=ServiceRequestStatusUpdateResponse
+)
 def update_status(
     request_id: UUID,
     payload: ServiceRequestStatusUpdate,
     caller: AdminCaller,
     session: Annotated[Session, Depends(get_db_session)],
-) -> ServiceRequestItem:
+) -> ServiceRequestStatusUpdateResponse:
+    if caller.role is not AdminRole.VILLAGE_ADMIN:
+        raise APIError(
+            status_code=403,
+            code="FORBIDDEN",
+            message="Village administrator role required",
+        )
     try:
         return ServiceRequestService(session).update(
             request_id, payload.status, payload.reason, caller.identifier, scope(caller)
@@ -129,7 +143,7 @@ def update_status(
     except ReportNotFoundError as exc:
         raise APIError(
             status_code=404,
-            code="NOT_FOUND",
+            code="SERVICE_REQUEST_NOT_FOUND",
             message="Service request not found",
         ) from exc
     except InvalidStatusTransitionError as exc:
