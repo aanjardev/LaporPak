@@ -236,8 +236,19 @@ service_request_types = Table(
 service_requests = Table(
     "service_requests",
     metadata,
-    Column("id", UUID(as_uuid=True), primary_key=True),
-    Column("ticket_number", Text, nullable=False, unique=True),
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "ticket_number",
+        Text,
+        nullable=False,
+        unique=True,
+        server_default=text("next_service_request_ticket_number()"),
+    ),
     Column(
         "request_type_id",
         UUID(as_uuid=True),
@@ -256,21 +267,36 @@ service_requests = Table(
         ForeignKey("public.administrative_units.id"),
         nullable=False,
     ),
-    Column("status", Text, nullable=False),
+    Column("status", Text, nullable=False, server_default=text("'pending_review'")),
     Column("applicant_name", Text, nullable=False),
     Column("domicile_address", Text, nullable=False),
     Column("domicile_duration", Text, nullable=False),
     Column("purpose", Text, nullable=False),
     Column("idempotency_key", UUID(as_uuid=True), nullable=False, unique=True),
     Column("idempotency_payload_hash", Text, nullable=False),
-    Column("created_at", DateTime(timezone=True), nullable=False),
-    Column("updated_at", DateTime(timezone=True), nullable=False),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
 )
 
 service_request_status_history = Table(
     "service_request_status_history",
     metadata,
-    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
     Column(
         "service_request_id",
         UUID(as_uuid=True),
@@ -282,7 +308,12 @@ service_request_status_history = Table(
     Column("actor_type", Text, nullable=False),
     Column("actor_identifier", Text),
     Column("notes", Text),
-    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
 )
 
 knowledge_documents = Table(

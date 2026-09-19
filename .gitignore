@@ -62,5 +62,6 @@ npm-debug.log*
 # Generated AI evaluation reports
 integrations/openclaw/eval-results.json
 integrations/openclaw/evals/eval-results.json
+integrations/openclaw/evals/ask-eval-results.json
 integrations/openclaw/evals/gap-analysis.json
 integrations/openclaw/evals/test-report.html
