@@ -19,6 +19,19 @@ from app.schemas.knowledge import (
 from app.services.exceptions import ReportNotFoundError, ReportPersistenceError
 
 
+def canonical_document_sql(alias: str | None = None) -> str:
+    prefix = f"{alias}." if alias else ""
+    return (
+        f"{prefix}administrative_unit_id is not null "
+        f"and {prefix}source_type in ('paste', 'markdown', 'pdf') "
+        f"and {prefix}content is not null "
+        f"and btrim({prefix}content) <> ''"
+    )
+
+
+CANONICAL_DOCUMENT_SQL = canonical_document_sql()
+
+
 def extract_content(
     data: bytes | None,
     pasted: str | None,
@@ -107,6 +120,7 @@ class KnowledgeService:
         filename: str | None,
         data: bytes | None,
         service_key: str | None = None,
+        source_reference: str | None = None,
     ) -> KnowledgeDocument:
         chunks = chunk_content(content)
         checksum = hashlib.sha256(content.encode()).hexdigest()
@@ -136,6 +150,11 @@ class KnowledgeService:
                                     **(
                                         {"service_key": service_key}
                                         if service_key
+                                        else {}
+                                    ),
+                                    **(
+                                        {"source_reference": source_reference}
+                                        if source_reference
                                         else {}
                                     ),
                                 }
@@ -194,14 +213,16 @@ class KnowledgeService:
             raise ReportPersistenceError("knowledge file upload") from exc
 
     def list(self, unit_ids: tuple[UUID, ...] | None) -> KnowledgeDocumentList:
-        condition = (
-            "" if unit_ids is None else "where administrative_unit_id = any(:units)"
+        unit_condition = (
+            "" if unit_ids is None else "and administrative_unit_id = any(:units)"
         )
         try:
             rows = (
                 self.session.execute(
                     text(
-                        f"select * from public.knowledge_documents {condition} order by created_at desc"
+                        f"select * from public.knowledge_documents "
+                        f"where {CANONICAL_DOCUMENT_SQL} {unit_condition} "
+                        "order by created_at desc"
                     ),
                     {"units": list(unit_ids or [])},
                 )
@@ -217,13 +238,14 @@ class KnowledgeService:
         document_id: UUID,
         unit_ids: tuple[UUID, ...] | None,
     ) -> KnowledgeDocumentDetail:
-        condition = (
+        unit_condition = (
             "" if unit_ids is None else "and administrative_unit_id = any(:units)"
         )
         row = (
             self.session.execute(
                 text(
-                    f"select * from public.knowledge_documents where id=:id {condition}"
+                    f"select * from public.knowledge_documents where id=:id "
+                    f"and {CANONICAL_DOCUMENT_SQL} {unit_condition}"
                 ),
                 {"id": document_id, "units": list(unit_ids or [])},
             )
@@ -259,7 +281,7 @@ class KnowledgeService:
             assignments.append(
                 "metadata=jsonb_set(metadata, '{service_key}', to_jsonb(cast(:service_key as text)), true)"
             )
-        condition = (
+        unit_condition = (
             "" if unit_ids is None else "and administrative_unit_id = any(:units)"
         )
         try:
@@ -268,7 +290,9 @@ class KnowledgeService:
                     return self.detail(document_id, unit_ids)
                 result = self.session.execute(
                     text(
-                        f"update public.knowledge_documents set {','.join(assignments)}, updated_at=now() where id=:id {condition}"
+                        f"update public.knowledge_documents set {','.join(assignments)}, "
+                        f"updated_at=now() where id=:id and {CANONICAL_DOCUMENT_SQL} "
+                        f"{unit_condition}"
                     ),
                     {**allowed, "id": document_id, "units": list(unit_ids or [])},
                 )
@@ -326,14 +350,16 @@ class KnowledgeService:
         document_id: UUID,
         unit_ids: tuple[UUID, ...] | None,
     ) -> None:
-        condition = (
+        unit_condition = (
             "" if unit_ids is None else "and administrative_unit_id = any(:units)"
         )
         try:
             with self.session.begin():
                 result = self.session.execute(
                     text(
-                        f"update public.knowledge_documents set is_active=false, updated_at=now() where id=:id {condition}"
+                        "update public.knowledge_documents set is_active=false, "
+                        f"updated_at=now() where id=:id and {CANONICAL_DOCUMENT_SQL} "
+                        f"{unit_condition}"
                     ),
                     {"id": document_id, "units": list(unit_ids or [])},
                 )

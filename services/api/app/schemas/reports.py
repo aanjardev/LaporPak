@@ -166,12 +166,20 @@ class ReportStatusHistory(StrictSchema):
     created_at: datetime
 
 
+class ReportAttachment(StrictSchema):
+    id: UUID
+    file_name: str | None
+    mime_type: str
+    file_size: int
+    created_at: datetime
+
+
 class ReportDetail(ReportListItem):
     citizen: ReportCitizen
     summary: str | None
     responsible_unit: dict[str, Any] | None
     ai_recommendation: dict[str, Any]
-    attachments: list[dict[str, Any]]
+    attachments: list[ReportAttachment]
     status_history: list[ReportStatusHistory]
     verified_at: datetime | None
     resolved_at: datetime | None
