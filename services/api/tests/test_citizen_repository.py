@@ -20,7 +20,7 @@ class CapturingSession:
         return EmptyResult()
 
 
-def test_knowledge_queries_cast_optional_service_key_to_text():
+def test_knowledge_queries_support_natural_language_fts_and_safe_filters():
     session = CapturingSession()
     repository = CitizenRepository(session)
     unit_id = UUID("00000000-0000-4000-8000-000000000002")
@@ -35,6 +35,9 @@ def test_knowledge_queries_cast_optional_service_key_to_text():
         "d.metadata->>'approval_status'='approved'"
     ) == 2
     assert "coalesce(d.metadata->>'approval_status'" not in session.statements[0]
+    assert "string_agg(quote_literal(term), ' | ')" in session.statements[0]
+    assert "string_agg(quote_literal(term), ' | ')" in session.statements[1]
+    assert "limit 1" in session.statements[0]
 
 
 def test_track_queries_cast_optional_ticket_parameter_to_text():
