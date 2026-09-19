@@ -740,6 +740,39 @@ Admin tokens are accepted only when the Supabase Auth UUID maps to an active
 `admin_accounts` row. `system_admin` is global; `village_admin` is limited by
 `admin_unit_memberships`. Out-of-scope detail/mutation returns `404`.
 
+### Usulan kontrak admin REQUEST untuk ditinjau Anjar (belum disahkan)
+
+Kode backend saat ini menyediakan `residency_letter` melalui endpoint berikut.
+Bagian ini mencatat bentuk yang teramati untuk fixture frontend; **bukan**
+persetujuan SOP layanan, izin menampilkan data warga nyata, atau izin melakukan
+keputusan nyata dari dashboard.
+
+- `GET /api/v1/service-requests?page=1&page_size=20` mengembalikan
+  `{ items, page, page_size, total }`; `page >= 1`, `1 <= page_size <= 100`.
+- `GET /api/v1/service-requests/{request_id}` mengembalikan satu item atau
+  `404 NOT_FOUND`, termasuk bila pengajuan di luar cakupan desa admin.
+- `PATCH /api/v1/service-requests/{request_id}/status` menerima
+  `{ "status": "approved" | "rejected" | "completed", "reason": "..." }`
+  dan mengembalikan item terbaru; alasan wajib dengan panjang 1–1000 karakter.
+  Backend saat ini menerima `pending_review → approved/rejected` dan
+  `approved → completed`; transisi lain menghasilkan `409 INVALID_STATUS_TRANSITION`.
+
+Item saat ini berisi `id` (UUID), `ticket_number`, `request_type`
+(`residency_letter`), `applicant_name`, `domicile_address`,
+`domicile_duration`, `purpose`, `status` (`pending_review`, `approved`,
+`rejected`, `completed`), `administrative_unit_id` (UUID), `created_at`, dan
+`updated_at`. GET/PATCH admin memerlukan bearer token Supabase dan pemeriksaan
+akun aktif serta cakupan desa pada FastAPI. Kegagalan layanan memakai `503
+DATABASE_UNAVAILABLE`; input tidak valid memakai `422 VALIDATION_ERROR`.
+
+**Keputusan terbuka bersama pemilik SOP, Ferdi, Anjar, dan Farel:** dokumen SOP
+Surat Keterangan Domisili yang disetujui; field minimum yang boleh dikumpulkan
+dan ditampilkan; jabatan/peran yang berwenang memutuskan; kapan pengajuan resmi;
+serta bentuk riwayat status/aktor/alasan yang aman pada respons detail. Backend
+menyimpan riwayat, tetapi respons detail saat ini belum menyertakannya.
+Frontend belum boleh mengaktifkan pembacaan atau PATCH REQUEST nyata sebelum
+keputusan tersebut ditinjau dan kontrak difinalkan.
+
 ---
 
 ## 18. Breaking Change Rule

@@ -42,12 +42,31 @@ meneruskan access token Supabase milik sesi petugas; dashboard tidak menyimpan
 secret backend dan tidak membaca tabel laporan langsung dari Supabase.
 `/access-denied` menyiapkan tampilan untuk respons `403`.
 
+## Pratinjau REQUEST Surat Keterangan Domisili
+
+SOP resmi, data yang boleh ditampilkan, dan pejabat pemberi keputusan belum
+disepakati. Untuk meninjau **UI sintetis saja**, set `REQUESTS_PREVIEW=mock` di
+`.env.local`, jalankan `npm run dev`, lalu buka `/reports/requests` setelah
+login. Pratinjau otomatis tidak tersedia pada build production. Daftar memiliki
+23 pengajuan sintetis agar halaman kedua dapat diuji; detail pertama memuat
+alamat dan tujuan yang panjang. Pilih **Setujui** atau **Tolak** dengan alasan
+untuk melihat hasil sementara. Muat ulang untuk mengembalikan fixture.
+
+Set `REQUESTS_MOCK_SCENARIO=empty`, `error`, atau `slow` untuk memeriksa state
+daftar. Set `REQUESTS_MOCK_MUTATION_SCENARIO=error`, `conflict`, atau `slow`
+untuk memeriksa keputusan gagal atau lambat; mulai ulang server setelah
+mengubah variabel. Pratinjau tidak memanggil endpoint REQUEST atau database.
+Riwayat keputusan belum ditampilkan karena respons detail FastAPI saat ini
+belum memuatnya. Integrasi data dan keputusan nyata menunggu SOP serta tinjauan
+kontrak bersama Anjar dan Farel.
+
 ## Pemeriksaan
 
 ```powershell
 npm run lint
 npx tsc --noEmit
 npm run test:reports
+npm run test:requests
 npm run test:auth
 npm run build
 ```
