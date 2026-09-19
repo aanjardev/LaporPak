@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  getServiceRequest,
+  listServiceRequests,
+  updateServiceRequest,
+} from "../lib/service-requests.ts";
+
+test("REQUEST API uses admin token and contract paths", async () => {
+  const previousUrl = process.env.NEXT_PUBLIC_API_URL;
+  process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
+  const calls = [];
+  const previous = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), init });
+    return Response.json(
+      calls.length === 1
+        ? { items: [], page: 2, page_size: 20, total: 0 }
+        : {
+            id: "11111111-1111-4111-8111-111111111111",
+            ticket_number: "REQ-2026-0001",
+            request_type: "residency_letter",
+            applicant_name: "Warga Uji",
+            domicile_address: "RT 03",
+            domicile_duration: "2 tahun",
+            purpose: "Uji",
+            status: "approved",
+            administrative_unit_id: "22222222-2222-4222-8222-222222222222",
+            created_at: "2026-09-19T00:00:00Z",
+            updated_at: "2026-09-19T00:00:00Z",
+          },
+    );
+  };
+  try {
+    await listServiceRequests(2, "admin-token");
+    await getServiceRequest("request-id", "admin-token");
+    await updateServiceRequest("request-id", "approved", "Lengkap", "admin-token");
+  } finally {
+    globalThis.fetch = previous;
+    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = previousUrl;
+  }
+
+  assert.match(calls[0].url, /service-requests\?page=2&page_size=20$/);
+  assert.match(calls[1].url, /service-requests\/request-id$/);
+  assert.match(calls[2].url, /service-requests\/request-id\/status$/);
+  assert.equal(calls[2].init.method, "PATCH");
+  assert.equal(calls[2].init.headers.Authorization, "Bearer admin-token");
+  assert.deepEqual(JSON.parse(calls[2].init.body), {
+    status: "approved",
+    reason: "Lengkap",
+  });
+});
+
+test("REQUEST API preserves controlled failure status", async () => {
+  const previousUrl = process.env.NEXT_PUBLIC_API_URL;
+  const previous = globalThis.fetch;
+  process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
+  globalThis.fetch = async () => Response.json(
+    { error: { code: "INVALID_STATUS_TRANSITION" } },
+    { status: 409 },
+  );
+  try {
+    await assert.rejects(
+      updateServiceRequest("request-id", "rejected", "Sudah berubah", "admin-token"),
+      { status: 409 },
+    );
+  } finally {
+    globalThis.fetch = previous;
+    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = previousUrl;
+  }
+});

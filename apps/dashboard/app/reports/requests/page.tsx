@@ -1,15 +1,18 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { ChevronLeft, ChevronRight, FileText } from "lucide-react";
 
 import { requireSignedIn } from "@/lib/auth";
-import { getServiceRequests, isRequestPreviewEnabled, requestStatusLabels } from "@/lib/service-requests";
+import {
+  listServiceRequests,
+  ServiceRequestApiError,
+} from "@/lib/service-requests";
+import { requestStatusLabels } from "@/lib/service-request-types";
 import { RequestUnavailable } from "./unavailable";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function RequestsPage({ searchParams }: { searchParams: SearchParams }) {
-  if (!isRequestPreviewEnabled()) notFound();
   const params = await searchParams;
   const rawPage = typeof params.page === "string" ? Number(params.page) : 1;
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
@@ -17,8 +20,14 @@ export default async function RequestsPage({ searchParams }: { searchParams: Sea
 
   let result;
   try {
-    result = await getServiceRequests(page);
-  } catch {
+    result = await listServiceRequests(page);
+  } catch (error) {
+    if (error instanceof ServiceRequestApiError && error.status === 401) {
+      redirect(`/login?reauth=1&next=${encodeURIComponent(`/reports/requests?page=${page}`)}`);
+    }
+    if (error instanceof ServiceRequestApiError && error.status === 403) {
+      redirect("/access-denied");
+    }
     return <RequestUnavailable />;
   }
   const totalPages = Math.max(1, Math.ceil(result.total / result.page_size));
@@ -28,15 +37,14 @@ export default async function RequestsPage({ searchParams }: { searchParams: Sea
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="space-y-2">
         <p className="text-sm font-semibold text-sky-800">Layanan warga / REQUEST</p>
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Pengajuan layanan</h1>
-        <p className="max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">Pratinjau antrean Surat Keterangan Domisili untuk petugas. Semua nama dan alamat di halaman ini adalah data sintetis.</p>
-        <p className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">Data simulasi · belum ada keputusan resmi</p>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Pengajuan Surat Keterangan Domisili</h1>
+        <p className="max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">Tinjau pengajuan warga dan tetapkan keputusan administratif sesuai kewenangan petugas.</p>
       </header>
 
       <section aria-label="Antrean pengajuan" className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-5 py-4">
           <h2 className="font-semibold">Surat Keterangan Domisili</h2>
-          <span className="text-sm text-slate-600">{result.total} pengajuan sintetis</span>
+          <span className="text-sm text-slate-600">{result.total} pengajuan</span>
         </div>
         {result.items.length === 0 ? (
           <div className="p-10 text-center text-sm text-slate-600"><FileText aria-hidden="true" className="mx-auto mb-3" />Belum ada pengajuan dalam antrean.</div>

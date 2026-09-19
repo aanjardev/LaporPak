@@ -57,3 +57,11 @@ class ServiceRequestList(StrictSchema):
 class ServiceRequestStatusUpdate(StrictSchema):
     status: ServiceRequestStatus
     reason: str = Field(min_length=1, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def non_blank_reason(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("reason must not be blank")
+        return value

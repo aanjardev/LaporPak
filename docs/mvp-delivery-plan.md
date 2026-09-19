@@ -25,11 +25,11 @@
 
 **Status terkini:** satu alur REPORT WhatsApp hingga verifikasi dashboard pernah
 berhasil didemokan, tetapi checklist integrasi terbaru belum seluruhnya lulus.
-Repository sudah memiliki API dan tool OpenClaw untuk ASK dan TRACK REPORT, pengelolaan
-sumber ASK di dashboard, serta API REQUEST `residency_letter`. Frontend REQUEST
-baru berupa pratinjau sintetis yang tidak memanggil API. OpenClaw belum memiliki
-tool submit REQUEST. Keberadaan route, tabel, tool, dan UI tidak membuktikan SOP
-resmi, isolasi dua desa, atau alur end-to-end telah lulus.
+Repository sudah memiliki API dan tool OpenClaw untuk ASK, TRACK REPORT/REQUEST,
+dan submit REQUEST `residency_letter`. Dashboard mengelola sumber ASK serta
+antrean, detail, dan keputusan REQUEST melalui FastAPI. Keberadaan route, tabel,
+tool, dan UI tidak membuktikan SOP resmi, isolasi dua desa, atau alur end-to-end
+telah lulus.
 
 ## 2. Urutan dan dependensi
 
@@ -51,7 +51,8 @@ bagian 7 berjalan bersama semua tahap, bukan ditunda sampai akhir.
 masih terbuka pada checklist REPORT. Setelah itu, tim memvalidasi ASK dan TRACK
 melalui kanal uji memakai sumber yang disetujui. Untuk REQUEST, tim meninjau
 kontrak teknis yang sudah ada, menetapkan SOP Surat Keterangan Domisili, data
-minimum, dan pejabat berwenang sebelum pratinjau frontend dihubungkan ke API.
+minimum, dan pejabat berwenang, lalu menguji flow WhatsApp, API, serta dashboard
+dengan data sintetis pada satu lingkungan bersama.
 
 ## 3. Tahap 0 — penutupan REPORT
 
@@ -189,10 +190,11 @@ data minimum, dan hasil yang dapat didemokan tanpa penerbitan otomatis.
 
 **Ferdi — frontend**
 
-- Pratinjau antrean, detail, pagination, dan keputusan approve/reject sudah ada
-  dengan data sintetis dan hanya aktif melalui konfigurasi development.
-- Setelah kontrak disahkan, ganti simulasi dengan API, tampilkan riwayat resmi,
-  tangani `401`/`403`/`404`/`409`/`503`, dan baca ulang hasil setelah mutation.
+- Antrean, detail, pagination, dan keputusan sudah memakai FastAPI dengan sesi
+  admin. UI menangani `401`/`403`/`404`/`409`/`422`/`503` dan memakai respons
+  mutation resmi untuk memperbarui status.
+- Tambahkan tampilan riwayat resmi setelah kontrak detail API menyediakannya.
+  Sampai SOP disahkan, uji hanya memakai pengajuan dan akun sintetis.
 - Uji tampilan ponsel/desktop dan pembatasan sesi. Jangan mengirim approval
   otomatis berdasarkan rekomendasi AI.
 
@@ -207,8 +209,9 @@ data minimum, dan hasil yang dapat didemokan tanpa penerbitan otomatis.
 
 **Farel — AI dan OpenClaw**
 
-- Siapkan flow dan tool submit REQUEST setelah SOP serta kontrak disahkan.
-  Repository belum memiliki tool OpenClaw untuk membuat pengajuan layanan.
+- Tool `laporpak_create_service_request` sudah tersedia dengan identitas kanal
+  tepercaya dan idempotency key stabil. Uji flow konfirmasi warga serta fallback
+  pada host OpenClaw; jangan aktifkan untuk data nyata sebelum SOP disahkan.
 - Jangan approve/reject, mengubah data resmi, atau mengarang hasil dokumen.
   Tangani data kurang, ketidakjelasan, pengiriman ulang, dan kegagalan API
   dengan klarifikasi/handoff.
@@ -275,8 +278,8 @@ masih berhasil.
 |---|---|---|
 | REPORT dan gerbang bersama | Berjalan; lihat checklist P0 | [Checklist](p0-integration-checklist.md) dan [bukti](p0-verification-evidence.md) |
 | ASK | API, tool, evaluasi, dan UI sumber tersedia; sumber resmi dan E2E belum disahkan | Tautkan PR dan hasil evaluasi sumber di sini |
-| TRACK | API mendukung REPORT/REQUEST; tool OpenClaw saat ini hanya menerima tiket `LP-*`; uji kepemilikan kanal nyata dan dukungan `REQ-*` masih terbuka | Tautkan PR dan uji kepemilikan tiket di sini |
-| REQUEST satu layanan | Baseline API `residency_letter` dan UI mock tersedia; SOP, riwayat detail, tool OpenClaw, dan integrasi nyata masih terbuka | Tautkan keputusan layanan, PR, dan uji approval di sini |
+| TRACK | API dan tool OpenClaw menerima tiket `LP-*`/`REQ-*`; uji kepemilikan kanal nyata masih terbuka | Tautkan PR dan uji kepemilikan tiket di sini |
+| REQUEST satu layanan | API, tool submit, dan dashboard nyata tersedia; SOP, riwayat detail, serta E2E bersama masih terbuka | Tautkan keputusan layanan, PR, dan uji approval di sini |
 | Multi-desa | Struktur scope admin/channel tersedia; isolasi dua desa belum dibuktikan | Tautkan migrasi, PR, dan uji isolasi dua desa di sini |
 
 **MVP demo siap** ketika REPORT, ASK, TRACK, REQUEST satu layanan, multi-desa,

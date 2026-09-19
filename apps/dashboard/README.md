@@ -1,6 +1,6 @@
 # Dashboard LaporPak
 
-Dashboard menggunakan Next.js, TypeScript, Tailwind CSS, dan shadcn/ui. Login petugas memakai Supabase Auth. Daftar, detail, dan keputusan petugas dapat memakai data sintetis atau FastAPI sesuai [kontrak API](../../docs/api-contract.md).
+Dashboard menggunakan Next.js, TypeScript, Tailwind CSS, dan shadcn/ui. Login petugas memakai Supabase Auth. REPORT dapat memakai data sintetis atau FastAPI; sumber ASK dan REQUEST memakai FastAPI sesuai [kontrak API](../../docs/api-contract.md).
 
 ## Menjalankan lokal
 
@@ -55,23 +55,18 @@ Gunakan data sintetis saat menguji formulir. Sumber baru belum dapat disebut
 resmi sampai pemilik konten desa memeriksa isi, versi, cakupan unit, dan status
 aktifnya. ASK warga tetap berjalan melalui WhatsApp/OpenClaw.
 
-## Pratinjau REQUEST Surat Keterangan Domisili
+## REQUEST Surat Keterangan Domisili
 
-SOP resmi, data yang boleh ditampilkan, dan pejabat pemberi keputusan belum
-disepakati. Untuk meninjau **UI sintetis saja**, set `REQUESTS_PREVIEW=mock` di
-`.env.local`, jalankan `npm run dev`, lalu buka `/reports/requests` setelah
-login. Pratinjau otomatis tidak tersedia pada build production. Daftar memiliki
-23 pengajuan sintetis agar halaman kedua dapat diuji; detail pertama memuat
-alamat dan tujuan yang panjang. Pilih **Setujui** atau **Tolak** dengan alasan
-untuk melihat hasil sementara. Muat ulang untuk mengembalikan fixture.
+Route `/reports/requests` membaca antrean dan detail dari FastAPI. Petugas dapat
+menyetujui atau menolak pengajuan `pending_review`, lalu menandai pengajuan
+`approved` sebagai `completed`. Semua keputusan memerlukan alasan dan FastAPI
+tetap menentukan apakah transisi, peran, dan cakupan desa diizinkan.
 
-Set `REQUESTS_MOCK_SCENARIO=empty`, `error`, atau `slow` untuk memeriksa state
-daftar. Set `REQUESTS_MOCK_MUTATION_SCENARIO=error`, `conflict`, atau `slow`
-untuk memeriksa keputusan gagal atau lambat; mulai ulang server setelah
-mengubah variabel. Pratinjau tidak memanggil endpoint REQUEST atau database.
-Riwayat keputusan belum ditampilkan karena respons detail FastAPI saat ini
-belum memuatnya. Integrasi data dan keputusan nyata menunggu SOP serta tinjauan
-kontrak bersama Anjar dan Farel.
+Dashboard mempertahankan alasan ketika penyimpanan gagal, mencegah kirim ganda,
+dan menampilkan respons `401`, `403`, `404`, `409`, `422`, serta kegagalan
+layanan secara aman. Riwayat keputusan sudah disimpan backend, tetapi belum
+ditampilkan karena respons detail belum memuatnya. SOP layanan dan kewenangan
+petugas tetap harus disahkan sebelum REQUEST digunakan dengan data warga nyata.
 
 ## Pemeriksaan
 

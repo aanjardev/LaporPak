@@ -1,6 +1,6 @@
 # LaporPak
 
-LaporPak adalah platform layanan publik desa berbasis WhatsApp. Target MVP mencakup ASK (tanya layanan), REPORT (laporan warga), REQUEST (pengajuan layanan), TRACK (pantau status), dan dukungan multi-desa. Fokus pengembangan pertama adalah REPORT. Dashboard memakai Supabase Auth invite-only dan kini mencakup pengelolaan REPORT, sumber ASK, serta pratinjau sintetis REQUEST.
+LaporPak adalah platform layanan publik desa berbasis WhatsApp. Target MVP mencakup ASK (tanya layanan), REPORT (laporan warga), REQUEST (pengajuan layanan), TRACK (pantau status), dan dukungan multi-desa. Fokus pengembangan pertama adalah REPORT. Dashboard memakai Supabase Auth invite-only dan kini mencakup pengelolaan REPORT, sumber ASK, serta workflow admin REQUEST.
 
 ## Dokumen acuan
 
@@ -63,5 +63,5 @@ API tersedia di `http://localhost:8000`; endpoint awalnya adalah `/health` dan d
 - Login admin memakai Supabase Auth invite-only; FastAPI memvalidasi access token untuk GET/PATCH.
 - Plugin OpenClaw dan kontrak tool REPORT tersedia; integrasi WhatsApp dasar sudah dapat menyimpan laporan dan masih dikembangkan lebih lanjut.
 - FastAPI dan plugin OpenClaw menyediakan baseline ASK serta TRACK; aktivasi nyata tetap memerlukan sumber resmi dan uji kepemilikan kanal.
-- FastAPI mempunyai baseline REQUEST `residency_letter`. UI petugas masih memakai data sintetis; SOP, riwayat detail, tool submit OpenClaw, dan integrasi nyata belum selesai.
+- FastAPI, dashboard, dan tool OpenClaw mempunyai baseline REQUEST `residency_letter`. SOP, riwayat detail, serta uji E2E bersama masih terbuka; gunakan data sintetis sampai keputusan tersebut disahkan.
 - Struktur cakupan admin, channel, knowledge, REPORT, dan REQUEST per unit sudah tersedia; isolasi dua desa belum dinyatakan lulus.

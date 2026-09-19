@@ -43,10 +43,9 @@
 
 - Plugin menyediakan REPORT, ASK, TRACK REPORT, emergency detection, similar
   report, dan resolution confirmation.
-- FastAPI dapat membaca tiket `LP-*` dan `REQ-*`, tetapi input tool OpenClaw
-  TRACK saat ini hanya menerima `LP-*`.
-- REQUEST `residency_letter` memiliki baseline API; tool submit OpenClaw belum
-  tersedia dan frontend masih memakai pratinjau sintetis.
+- FastAPI dan tool OpenClaw TRACK menerima tiket `LP-*` dan `REQ-*`.
+- REQUEST `residency_letter` memiliki API, tool submit OpenClaw, dan workflow
+  admin dashboard; SOP serta E2E bersama masih terbuka.
 - Pengujian WhatsApp REPORT, ASK, dan TRACK pernah dilaporkan berhasil oleh tim.
   Sign-off MVP tetap memerlukan bukti berisi SHA, environment, dan hasil matriks
   keamanan pada dokumen delivery/checklist.
@@ -115,9 +114,10 @@ Template atau seed sintetis tidak menjadi sumber resmi tanpa review manusia.
    tidak ditemukan melalui metadata kanal nyata.
 2. Pilih serta setujui sumber ASK resmi, lalu uji jawaban, sitasi, sumber kosong,
    dan scope desa.
-3. Tambahkan dukungan `REQ-*` pada tool TRACK setelah kontrak REQUEST disahkan.
-4. Jangan membuat tool submit REQUEST sebelum SOP, field minimum, konfirmasi
-   warga, dan kewenangan petugas disetujui.
+3. Uji submit REQUEST, retry idempotent, keputusan petugas, dan TRACK `REQ-*`
+   pada satu environment bersama dengan data sintetis.
+4. Jangan mengaktifkan REQUEST untuk data warga nyata sebelum SOP, field
+   minimum, konfirmasi warga, dan kewenangan petugas disetujui.
 5. Ukur latency p95 dan routing macro-F1 pada host yang akan dipakai demo.
 6. Uji isolasi dua desa pada REPORT, ASK, TRACK, REQUEST, dan dashboard.
 

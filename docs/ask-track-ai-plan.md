@@ -1,8 +1,8 @@
 # Rencana ASK, TRACK, dan AI Lokal LaporPak
 
-Status: baseline ASK/TRACK/REPORT telah diimplementasikan. Backend juga memiliki
-baseline teknis REQUEST `residency_letter`, sedangkan flow dan tool OpenClaw
-REQUEST belum tersedia dan frontend masih memakai pratinjau sintetis.
+Status: baseline ASK/TRACK/REPORT telah diimplementasikan. REQUEST
+`residency_letter` juga memiliki API, tool OpenClaw, dan workflow admin
+dashboard; SOP serta pengujian end-to-end bersama masih terbuka.
 Dasar: document.md yang diberikan pengguna, PRD V3, inspeksi kode lokal pada
 17 September 2026, dan rujukan di akhir dokumen. Kontrak runtime terkini tetap
 berada di `docs/api-contract.md`; dokumen ini menyimpan keputusan desain dan tahap
@@ -23,9 +23,9 @@ Asumsi awal karena desa, SOP, dan jadwal pilot belum diberikan:
   drainase. Persyaratan dan kewenangan nyata harus mengikuti SOP yang disetujui.
 - TRACK hanya laporan LaporPak milik pengirim yang terautentikasi. Bukan pelacakan
   aplikasi Dukcapil, bansos, atau instansi lain tanpa integrasi resmi.
-- REQUEST memiliki API create/admin sebagai baseline teknis, tetapi belum boleh
-  diaktifkan sebagai layanan warga sebelum SOP, data minimum, pejabat pemberi
-  keputusan, dan tool OpenClaw disahkan serta diuji.
+- REQUEST memiliki API create/admin dan tool OpenClaw sebagai baseline teknis,
+  tetapi belum boleh diaktifkan dengan data warga nyata sebelum SOP, data
+  minimum, pejabat pemberi keputusan, dan flow lengkap disahkan serta diuji.
 - Data simulasi diberi label pada setiap jawaban dan tidak diaktifkan di produksi.
 - Tidak ada fine-tuning model, voice, prediksi ETA, pengiriman notifikasi otomatis,
   atau multi-desa produksi pada rilis pertama.
@@ -127,8 +127,8 @@ FastAPI, SQL tool, Redis, workflow engine, atau service AI terpisah.
 
 Kontrak ASK/TRACK dan kewajiban foto sudah masuk baseline. Schema REPORT tetap
 terpisah dari routing ASK/REPORT/TRACK/REQUEST/UNKNOWN agar ASK tidak wajib
-mengisi field laporan. Backend mempunyai aksi submit REQUEST, tetapi OpenClaw
-belum memiliki tool submit dan layanan belum boleh aktif sebelum SOP disahkan.
+mengisi field laporan. Backend dan OpenClaw mempunyai aksi submit REQUEST;
+layanan belum boleh memakai data warga nyata sebelum SOP disahkan.
 
 Interface aktif:
 
@@ -137,7 +137,8 @@ Interface aktif:
 | POST /api/v1/ask | question, optional service_key/query_embedding → outcome, answer_blocks, sources | Internal OpenClaw |
 | POST /api/v1/track | trusted sender, optional ticket_number → checked_at, items + timeline | Internal OpenClaw + kepemilikan REPORT/REQUEST |
 | laporpak_ask | question, optional service_key | Tool tanpa argumen identitas/desa dari model |
-| laporpak_track_report | optional ticket_number `LP-*` | Plugin menyuntik identitas dari runtime WhatsApp; dukungan `REQ-*` belum aktif |
+| laporpak_track_report | optional ticket_number `LP-*` atau `REQ-*` | Plugin menyuntik identitas dari runtime WhatsApp |
+| laporpak_create_service_request | field `residency_letter` setelah konfirmasi warga | Plugin menyuntik identitas/desa dan idempotency key dari runtime tepercaya |
 
 Pertahankan X-OpenClaw-API-Key dan error envelope yang ada. Sender/session/account
 diisi adapter dari metadata kanal, bukan dipilih model. POST TRACK menghindari

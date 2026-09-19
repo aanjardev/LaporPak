@@ -1,23 +1,28 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { requireSignedIn } from "@/lib/auth";
-import { getServiceRequestById, isRequestPreviewEnabled } from "@/lib/service-requests";
+import { getServiceRequest, ServiceRequestApiError } from "@/lib/service-requests";
 import { RequestUnavailable } from "../unavailable";
 import { RequestDetailView } from "./decision-form";
 
 export default async function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  if (!isRequestPreviewEnabled()) notFound();
   const { id } = await params;
   await requireSignedIn(`/reports/requests/${encodeURIComponent(id)}`);
   let request;
   try {
-    request = await getServiceRequestById(id);
-  } catch {
+    request = await getServiceRequest(id);
+  } catch (error) {
+    if (error instanceof ServiceRequestApiError && error.status === 404) notFound();
+    if (error instanceof ServiceRequestApiError && error.status === 401) {
+      redirect(`/login?reauth=1&next=${encodeURIComponent(`/reports/requests/${id}`)}`);
+    }
+    if (error instanceof ServiceRequestApiError && error.status === 403) {
+      redirect("/access-denied");
+    }
     return <RequestUnavailable href={`/reports/requests/${encodeURIComponent(id)}`} />;
   }
-  if (!request) notFound();
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -25,9 +30,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       <header className="space-y-2">
         <p className="text-sm font-semibold text-sky-800">Layanan warga / REQUEST</p>
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Detail pengajuan</h1>
-        <p className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">Data simulasi · tidak mengubah database</p>
       </header>
-      <RequestDetailView key={request.id} initialRequest={request} />
+      <RequestDetailView key={`${request.id}:${request.updated_at}`} initialRequest={request} />
     </div>
   );
 }

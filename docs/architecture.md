@@ -78,12 +78,12 @@ Responsibility:
 - sesi admin Supabase Auth invite-only;
 - daftar, detail, dan aksi status REPORT;
 - pengelolaan sumber ASK melalui FastAPI;
-- pratinjau sintetis antrean/detail/keputusan REQUEST;
+- antrean, detail, dan keputusan REQUEST melalui FastAPI;
 - loading/error/empty state;
 - HTTP API client.
 
-Pratinjau REQUEST tidak memakai FastAPI dan hanya aktif pada development.
-Aktivasi data nyata menunggu SOP serta kontrak admin REQUEST disahkan.
+REQUEST sudah terhubung secara teknis. Penggunaan data warga nyata tetap
+menunggu SOP, field minimum, dan kewenangan petugas disahkan.
 
 Frontend tidak melakukan direct write ke Supabase PostgreSQL.
 

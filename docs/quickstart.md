@@ -108,12 +108,13 @@ curl -X POST http://localhost:8000/api/v1/ask \
 
 Gunakan data sintetis. ASK baru dianggap siap jika sumbernya telah disetujui.
 
-## 6. Pratinjau REQUEST
+## 6. REQUEST development
 
-Set `REQUESTS_PREVIEW=mock` hanya di `apps/dashboard/.env.local` untuk membuka
-`/reports/requests`. Pratinjau memakai data sintetis, tidak memanggil FastAPI,
-dan otomatis tertutup pada production build. Integrasi REQUEST nyata menunggu
-SOP dan kontrak admin disahkan.
+Setelah migration, API, dan akun admin tersedia, buka `/reports/requests` untuk
+menguji antrean, detail, serta keputusan melalui FastAPI. Tool OpenClaw
+`laporpak_create_service_request` dapat membuat pengajuan sintetis yang sudah
+dikonfirmasi warga uji. Jangan memakai data warga nyata sebelum SOP, field
+minimum, dan kewenangan petugas disahkan.
 
 ## 7. Pemeriksaan
 

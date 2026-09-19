@@ -41,8 +41,9 @@ npm run test:requests
 npm run build
 ```
 
-Tes REQUEST memastikan pratinjau tidak memakai jaringan atau database. Tes
-simulasi tidak membuktikan otorisasi FastAPI, scope desa, atau persistence.
+Tes REQUEST frontend memastikan path, token, payload, dan status error pada
+lapisan API. Tes tersebut tidak menggantikan pengujian otorisasi FastAPI,
+scope desa, persistence, atau alur WhatsApp nyata.
 
 ## OpenClaw dan evaluasi AI
 
@@ -77,7 +78,9 @@ untuk tes knowledge dan REQUEST, jalankan `npm run test:knowledge` dan
   endpoint privat telah tersedia.
 - ASK: sumber ada/kosong/gagal, sumber salah desa, dan jawaban tanpa evidence.
 - TRACK: tiket sendiri, tiket orang lain, tiket tidak ada, dan kegagalan API.
-- REQUEST: pratinjau responsif; integrasi nyata baru diuji setelah SOP disahkan.
+- REQUEST: submit sintetis dari WhatsApp, antrean/detail admin, keputusan,
+  persistence, retry, ownership TRACK, dan kegagalan layanan. Data warga nyata
+  baru boleh dipakai setelah SOP disahkan.
 - `401`, `403`, scoped `404`, `409`, `422`, dan `503` pada boundary terkait.
 
 Catat tanggal, SHA commit, lingkungan, sumber data, hasil, dan batas simulasi.

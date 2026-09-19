@@ -1,0 +1,54 @@
+{
+  "documents": [
+    {
+      "title": "Demo Jam Operasional Kantor Desa Sukamaju",
+      "administrative_unit_id": "00000000-0000-4000-8000-000000000002",
+      "source_type": "paste",
+      "source_reference": "DATA UJI — skenario demo ASK, bukan informasi operasional resmi",
+      "content": "DATA UJI. Untuk skenario demo, Kantor Desa Sukamaju melayani warga pada hari Senin sampai Jumat pukul 08.00 sampai 15.00 WIB. Informasi ini wajib diganti dan ditinjau perangkat desa sebelum digunakan untuk warga nyata.",
+      "category": "administration",
+      "service_key": "office_hours_demo",
+      "is_mandatory": true
+    },
+    {
+      "title": "Demo Persyaratan Surat Keterangan Domisili",
+      "administrative_unit_id": "00000000-0000-4000-8000-000000000002",
+      "source_type": "paste",
+      "source_reference": "DATA UJI — skenario demo REQUEST domisili, bukan SOP resmi",
+      "content": "DATA UJI. Dalam skenario demo, warga menyiapkan nama pemohon, alamat domisili, lama tinggal, dan tujuan pengajuan surat domisili. Persyaratan resmi harus dikonfirmasi kepada perangkat Desa Sukamaju sebelum layanan digunakan oleh warga nyata.",
+      "category": "administration",
+      "service_key": "residency_letter_demo",
+      "is_mandatory": true
+    },
+    {
+      "title": "Demo Alur Pengaduan Infrastruktur",
+      "administrative_unit_id": "00000000-0000-4000-8000-000000000002",
+      "source_type": "paste",
+      "source_reference": "DATA UJI — skenario demo REPORT infrastruktur, bukan SOP resmi",
+      "content": "DATA UJI. Dalam skenario demo, laporan infrastruktur memerlukan deskripsi masalah, lokasi kejadian, dan foto pendukung. Laporan yang tersimpan menunggu verifikasi petugas dan rekomendasi AI tidak menggantikan keputusan petugas.",
+      "category": "infrastructure",
+      "service_key": "infrastructure_report_demo",
+      "is_mandatory": false
+    },
+    {
+      "title": "Demo Informasi Pengelolaan Sampah",
+      "administrative_unit_id": "00000000-0000-4000-8000-000000000002",
+      "source_type": "paste",
+      "source_reference": "DATA UJI — skenario demo ASK kebersihan, bukan jadwal resmi",
+      "content": "DATA UJI. Pertanyaan mengenai pengangkutan sampah yang belum memiliki jadwal resmi harus diarahkan kepada petugas Desa Sukamaju. Sistem tidak boleh mengarang hari pengangkutan, biaya, atau nomor kontak.",
+      "category": "cleanliness",
+      "service_key": "waste_service_demo",
+      "is_mandatory": false
+    },
+    {
+      "title": "Demo Jalur Handoff ke Petugas Desa",
+      "administrative_unit_id": "00000000-0000-4000-8000-000000000002",
+      "source_type": "paste",
+      "source_reference": "DATA UJI — skenario fallback dan handoff, bukan daftar kontak resmi",
+      "content": "DATA UJI. Jika informasi layanan tidak tersedia, bertentangan, atau belum disetujui, sistem harus menyatakan bahwa informasi belum dapat dipastikan dan mengarahkan warga untuk menghubungi petugas desa melalui kanal resmi yang telah diverifikasi.",
+      "category": "administration",
+      "service_key": "human_handoff_demo",
+      "is_mandatory": true
+    }
+  ]
+}

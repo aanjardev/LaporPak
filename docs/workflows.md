@@ -612,10 +612,9 @@ FastAPI menentukan desa dari channel dan memeriksa kepemilikan citizen
 OpenClaw menyampaikan hasil tanpa mengarang progres atau ETA
 ```
 
-Nomor tiket sendiri bukan bukti kepemilikan. FastAPI dapat membaca REPORT dan
-REQUEST yang tersimpan, tetapi tool OpenClaw saat ini hanya menerima tiket
-`LP-*`. Tambahkan `REQ-*` setelah flow REQUEST disahkan. Akses selalu ditentukan
-FastAPI.
+Nomor tiket sendiri bukan bukti kepemilikan. FastAPI dan tool OpenClaw dapat
+membaca tiket REPORT `LP-*` maupun REQUEST `REQ-*`. Akses selalu ditentukan
+FastAPI dari metadata pengirim dan cakupan channel tepercaya.
 
 ---
 
@@ -629,7 +628,7 @@ pending_review
   └── rejected
 ```
 
-Flow target setelah SOP disahkan:
+Flow teknis saat ini:
 
 ```text
 Warga meminta layanan
@@ -651,11 +650,10 @@ petugas berwenang approve/reject dengan alasan
 status dan riwayat tersimpan atomik
 ```
 
-Backend create/list/detail/status sudah tersedia. Frontend saat ini hanya
-memiliki pratinjau sintetis; tidak membaca atau mengubah REQUEST nyata.
-OpenClaw belum memiliki tool submit REQUEST. Aktivasi nyata menunggu keputusan
-SOP, field yang boleh dikumpulkan/ditampilkan, pejabat berwenang, dan bentuk
-riwayat detail yang disepakati.
+Backend create/list/detail/status, tool submit OpenClaw, dan dashboard admin
+sudah tersedia. Gunakan data sintetis sampai keputusan SOP, field yang boleh
+dikumpulkan/ditampilkan, pejabat berwenang, dan bentuk riwayat detail disepakati.
+Ketersediaan teknis belum menjadi izin memproses pengajuan warga nyata.
 
 AI boleh menjelaskan dan menyiapkan data. AI tidak boleh approve, reject,
 menandai completed, atau menerbitkan dokumen resmi.

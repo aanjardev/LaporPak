@@ -428,7 +428,15 @@ Response `200`:
   "status": "pending_verification",
   "responsible_unit": null,
   "ai_recommendation": {},
-  "attachments": [],
+  "attachments": [
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "file_name": "whatsapp-image-1.jpg",
+      "mime_type": "image/jpeg",
+      "file_size": 245760,
+      "created_at": "2026-09-16T14:00:00Z"
+    }
+  ],
   "status_history": [
     {
       "old_status": null,
@@ -448,12 +456,32 @@ Response `200`:
 
 `responsible_unit` bernilai `null` bila belum ditetapkan. Jika tersedia,
 backend mengirim objek `{ "id": "<uuid>", "name": "<nama unit>" }`.
+Metadata attachment tidak pernah memuat `storage_bucket`, `storage_path`, URL
+bucket, atau metadata internal.
 
 Jika tidak ada:
 
 ```http
 404 REPORT_NOT_FOUND
 ```
+
+### Read private report attachment
+
+```http
+GET /api/v1/reports/{report_id}/attachments/{attachment_id}
+Authorization: Bearer <supabase-admin-access-token>
+```
+
+Endpoint memeriksa bahwa attachment adalah milik laporan dan bahwa admin sistem
+atau admin desa memiliki akses ke desa pemilik laporan pada setiap request.
+Respons `200` berisi bytes gambar privat, `Content-Type` sesuai metadata yang
+tersimpan, dan `Content-Disposition: inline`. Backend tidak memberikan signed
+URL atau path bucket kepada client.
+
+Laporan yang tidak ada/di luar cakupan, attachment yang tidak ada, dan
+attachment milik laporan lain semuanya menghasilkan `404 REPORT_NOT_FOUND`.
+Kegagalan membaca private storage menghasilkan `503 ATTACHMENT_UNAVAILABLE`
+tanpa membocorkan detail storage.
 
 ---
 
@@ -742,12 +770,11 @@ Admin tokens are accepted only when the Supabase Auth UUID maps to an active
 `admin_accounts` row. `system_admin` is global; `village_admin` is limited by
 `admin_unit_memberships`. Out-of-scope detail/mutation returns `404`.
 
-### Usulan kontrak admin REQUEST untuk ditinjau Anjar (belum disahkan)
+### Kontrak teknis admin REQUEST
 
-Kode backend saat ini menyediakan `residency_letter` melalui endpoint berikut.
-Bagian ini mencatat bentuk yang teramati untuk fixture frontend; **bukan**
-persetujuan SOP layanan, izin menampilkan data warga nyata, atau izin melakukan
-keputusan nyata dari dashboard.
+Backend dan dashboard menyediakan `residency_letter` melalui endpoint berikut.
+Kontrak teknis ini dipakai pada environment development dengan data sintetis;
+kontrak ini **bukan** persetujuan SOP layanan atau izin memakai data warga nyata.
 
 - `GET /api/v1/service-requests?page=1&page_size=20` mengembalikan
   `{ items, page, page_size, total }`; `page >= 1`, `1 <= page_size <= 100`.
@@ -772,8 +799,8 @@ Surat Keterangan Domisili yang disetujui; field minimum yang boleh dikumpulkan
 dan ditampilkan; jabatan/peran yang berwenang memutuskan; kapan pengajuan resmi;
 serta bentuk riwayat status/aktor/alasan yang aman pada respons detail. Backend
 menyimpan riwayat, tetapi respons detail saat ini belum menyertakannya.
-Frontend belum boleh mengaktifkan pembacaan atau PATCH REQUEST nyata sebelum
-keputusan tersebut ditinjau dan kontrak difinalkan.
+Dashboard boleh memakai endpoint tersebut untuk pengujian sintetis. Aktivasi
+layanan bagi warga nyata menunggu keputusan SOP dan tinjauan lintas role.
 
 ---
 

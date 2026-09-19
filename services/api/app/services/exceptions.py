@@ -36,6 +36,11 @@ class InvalidAttachmentError(ReportServiceError):
         self.message = message
 
 
+class AttachmentUnavailableError(ReportServiceError):
+    def __init__(self) -> None:
+        super().__init__("Report attachment is unavailable")
+
+
 class InvalidStatusTransitionError(ReportServiceError):
     def __init__(self, old_status: str, new_status: str) -> None:
         super().__init__(f"Invalid status transition: {old_status} -> {new_status}")

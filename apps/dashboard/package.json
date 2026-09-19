@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:reports": "node --experimental-strip-types --test tests/reports.test.mjs",
-    "test:requests": "node --experimental-strip-types --test tests/requests.test.mjs",
     "test:knowledge": "node --experimental-strip-types --test tests/knowledge.test.mjs",
+    "test:requests": "node --experimental-strip-types --test tests/service-requests.test.mjs",
     "test:auth": "node --experimental-strip-types --test tests/auth.test.mjs"
   },
   "dependencies": {

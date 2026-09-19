@@ -118,7 +118,7 @@ node gap-tracker.js --stats
 | REPORT flow | ⚠️ | Pernah lulus manual; bukti matriks terbaru tetap di checklist P0 |
 | ASK flow | ⚠️ | Pernah lulus manual; sumber resmi dan bukti scope masih terbuka |
 | TRACK flow | ⚠️ | Pernah lulus manual untuk REPORT; ownership matrix dan `REQ-*` masih terbuka |
-| REQUEST flow | ⬜ | Tool submit OpenClaw dan SOP belum tersedia |
+| REQUEST flow | ⚠️ | Tool submit tersedia; SOP dan E2E bersama belum disahkan |
 | Multi-turn | ⬜ | Manual test |
 
 ### Security Tests
