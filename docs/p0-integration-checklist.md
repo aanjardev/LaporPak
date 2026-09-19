@@ -20,7 +20,31 @@
 - [ ] REQUEST belum dibuktikan melalui WhatsApp/OpenClaw host nyata dan dua
   desa belum dibuat pada environment bersama; test otomatis tidak menggantikan
   gerbang integrasi tersebut.
-- [ ] Endpoint foto privat belum diuji dengan object Supabase Storage nyata.
+- [x] Endpoint foto privat diuji melalui proxy Next.js dengan dua object
+  Supabase Storage nyata. Keduanya hanya termuat pada sesi admin dan permintaan
+  tanpa sesi ditolak `401`.
+
+## Putaran penutupan REPORT 2026-09-19
+
+- [x] Pada commit `40faf2f`, `LP-2026-0010` diverifikasi, dimulai
+  penanganannya, diteruskan, lalu diselesaikan. Status, waktu, alasan, dan lima
+  entri riwayat tetap sama setelah reload.
+- [x] Pada commit yang sama, `LP-2026-0011` ditolak dengan alasan uji. Status
+  dan dua entri riwayat tetap sama setelah reload.
+- [x] Foto privat kedua laporan berhasil dibaca melalui route Next.js lokal;
+  URL browser tetap same-origin dan permintaan tanpa sesi ke route Next.js
+  maupun endpoint FastAPI ditolak `401`.
+- [x] Detail UUID yang tidak ada menampilkan halaman laporan tidak ditemukan.
+  Detail serta galeri tidak memiliki overflow horizontal pada viewport 390 px
+  dan 1280 px, dan tidak ada error/warning pada console browser.
+- [ ] TRACK pada FastAPI nyata masih gagal `503 DATABASE_UNAVAILABLE`.
+  Diagnosis read-only menemukan PostgreSQL `AmbiguousParameter: could not
+  determine data type of parameter $3` pada kondisi nullable `:ticket is null`
+  di `CitizenRepository.track_reports()`. Anjar perlu memperbaiki query dan
+  menambahkan regression test sebelum REPORT ditutup.
+- [ ] `403` akun terautentikasi tanpa izin dan scoped `404` lintas desa masih
+  memerlukan akun/unit uji kedua pada lingkungan bersama. Coverage otomatis
+  sudah lulus, tetapi belum menggantikan uji runtime ini.
 
 Dokumen ini mengatur pelaksanaan dan bukti uji. Kebutuhan P0 ada di
 [project-context.md](project-context.md), bentuk data dan respons di
@@ -56,9 +80,9 @@ harus dibuat di dokumen sumber tersebut, bukan di checklist ini.
 
 ### Ferdi — frontend (`apps/dashboard/`)
 
-- [ ] Aktifkan `REPORTS_DATA_SOURCE=api` secara lokal. Masuk dengan akun undangan;
+- [x] Aktifkan `REPORTS_DATA_SOURCE=api` secara lokal. Masuk dengan akun undangan;
   pastikan daftar, pencarian, filter, pagination, dan detail memakai data API.
-- [ ] Verifikasi dan tolak dua laporan uji yang berbeda dengan alasan. Setelah
+- [x] Verifikasi dan tolak dua laporan uji yang berbeda dengan alasan. Setelah
   reload, cocokkan status, waktu, dan riwayat yang tampil dengan respons API.
 - [ ] Periksa logout, akses tanpa sesi, serta respons GET/PATCH `401`, `403`,
   `404`, `409`, dan kegagalan layanan pada UI. Catat mana yang diuji dengan API
@@ -112,8 +136,8 @@ perbaikan bila gagal. Gunakan nomor tiket uji dan bukti yang sudah disamarkan.
 | Lokasi atau data wajib belum lengkap | OpenClaw meminta klarifikasi; FastAPI menolak payload belum lengkap; tidak ada tiket palsu | Farel, Anjar | [ ] |
 | Pesan di luar REPORT atau output AI tidak valid | Tidak ada pemanggilan tool create dan tidak ada laporan baru | Farel, Anjar | [ ] |
 | Konfirmasi atau event terkirim ulang | Satu draf menghasilkan satu tiket; retry mengembalikan tiket yang sama | Farel, Anjar | [ ] |
-| Verifikasi dan penolakan petugas | Dua keputusan pada laporan berbeda tersimpan dengan alasan dan riwayat resmi | Ferdi, Anjar | [ ] |
-| Sesi tidak ada atau token ditolak | GET/PATCH ditolak `401`; dashboard meminta login ulang | Ferdi, Anjar | [ ] |
+| Verifikasi dan penolakan petugas | Dua keputusan pada laporan berbeda tersimpan dengan alasan dan riwayat resmi | Ferdi, Anjar | [x] |
+| Sesi tidak ada atau token ditolak | GET/PATCH ditolak `401`; dashboard meminta login ulang | Ferdi, Anjar | [x] |
 | Admin tidak berizin atau laporan di luar cakupan | API memberi `403` atau `404` sesuai kontrak; dashboard tidak menampilkan data terlarang | Anjar, Ferdi | [ ] |
 | Transisi status tidak sah | API memberi `409`; status dan riwayat resmi tidak berubah; UI meminta reload | Anjar, Ferdi | [ ] |
 | Gemini, API, atau database gagal | Tidak ada klaim tiket/status berhasil tanpa persistence; pengguna menerima pesan gagal yang jelas | Farel, Anjar, Ferdi | [ ] |
