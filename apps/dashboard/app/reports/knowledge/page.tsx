@@ -25,6 +25,13 @@ const processingLabels: Record<string, string> = {
   failed: "Pemrosesan gagal",
 };
 
+const reviewLabels = {
+  draft: "Draf",
+  demo: "Data uji",
+  approved: "Disetujui",
+  rejected: "Ditolak",
+} as const;
+
 export default async function KnowledgePage({ searchParams }: { searchParams: SearchParams }) {
   await requireSignedIn("/reports/knowledge");
   const params = await searchParams;
@@ -61,7 +68,7 @@ export default async function KnowledgePage({ searchParams }: { searchParams: Se
         ) : (
           <div className="divide-y divide-border">{documents.map((document) => (
             <article key={document.id} className="group relative flex min-w-0 flex-wrap items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-background focus-within:bg-background">
-              <div className="min-w-0 flex-1"><Link aria-label={`Buka detail sumber ${document.title}`} className="break-all font-semibold text-brand after:absolute after:inset-0 after:z-10 after:content-[''] group-hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`/reports/knowledge/${document.id}`}>{document.title}</Link><p className="mt-1 text-xs leading-5 text-muted-foreground">{categoryLabels[document.category ?? "custom"] ?? document.category ?? "Lainnya"} · {processingLabels[document.processing_status] ?? document.processing_status} · {document.is_active ? "aktif" : "nonaktif"}</p></div>
+              <div className="min-w-0 flex-1"><Link aria-label={`Buka detail sumber ${document.title}`} className="break-all font-semibold text-brand after:absolute after:inset-0 after:z-10 after:content-[''] group-hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" href={`/reports/knowledge/${document.id}`}>{document.title}</Link><p className="mt-1 text-xs leading-5 text-muted-foreground">{categoryLabels[document.category ?? "custom"] ?? document.category ?? "Lainnya"} · {processingLabels[document.processing_status] ?? document.processing_status} · {document.is_active ? "aktif" : "nonaktif"}</p><span className="mt-2 inline-flex rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">{reviewLabels[document.review_status]}</span></div>
               {document.is_active && <DeactivateKnowledgeForm id={document.id} />}
             </article>
           ))}</div>

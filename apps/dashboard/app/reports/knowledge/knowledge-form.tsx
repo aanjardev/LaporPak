@@ -3,7 +3,11 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { deactivateKnowledgeAction, type KnowledgeFormState } from "./actions";
+import {
+  deactivateKnowledgeAction,
+  type KnowledgeFormState,
+  reviewKnowledgeAction,
+} from "./actions";
 
 type Values = {
   title: string;
@@ -79,4 +83,43 @@ export function DeactivateKnowledgeForm({ id }: { id: string }) {
 function DeactivateButton() {
   const { pending } = useFormStatus();
   return <button type="submit" disabled={pending} className="min-h-11 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-800 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-wait disabled:opacity-60">{pending ? "Menonaktifkan…" : "Nonaktifkan"}</button>;
+}
+
+export function KnowledgeReviewForm({
+  id,
+  transitions,
+}: {
+  id: string;
+  transitions: Array<"draft" | "demo" | "approved" | "rejected">;
+}) {
+  const [state, action, pending] = useActionState(
+    reviewKnowledgeAction.bind(null, id),
+    { message: null },
+  );
+  const options = transitions.filter(
+    (status): status is "approved" | "rejected" =>
+      status === "approved" || status === "rejected",
+  );
+  if (options.length === 0) return null;
+  return (
+    <form action={action} className="grid gap-4 ui-panel p-5">
+      <h2 className="font-semibold text-foreground">Keputusan review</h2>
+      <label className="grid gap-1.5 text-sm font-medium">
+        Status
+        <select name="status" required className="ui-control px-3 font-normal">
+          {options.map((status) => (
+            <option key={status} value={status}>{status === "approved" ? "Setujui" : "Tolak / cabut persetujuan"}</option>
+          ))}
+        </select>
+      </label>
+      <label className="grid gap-1.5 text-sm font-medium">
+        Alasan
+        <textarea name="reason" required minLength={1} maxLength={1000} rows={4} className="ui-control p-3 font-normal" />
+      </label>
+      {state.message && <p role="alert" className="ui-alert-error p-3 text-sm text-rose-900">{state.message}</p>}
+      <button disabled={pending} className="ui-primary justify-self-start">
+        {pending ? "Menyimpan…" : "Simpan keputusan"}
+      </button>
+    </form>
+  );
 }

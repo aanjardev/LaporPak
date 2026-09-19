@@ -55,10 +55,12 @@ class KnowledgeSource(StrictSchema):
     chunk_id: UUID
     title: str
     source_url: str | None
+    review_status: str
 
 
 class AskResponse(StrictSchema):
     outcome: str
+    trust_level: str | None
     answer_blocks: list[str]
     sources: list[KnowledgeSource]
 
@@ -68,7 +70,9 @@ class EmergencyDetectionRequest(StrictSchema):
 
 
 class SimilarReportsRequest(StrictSchema):
-    category: str = Field(pattern=r"^(infrastructure|public_facility|cleanliness|security|social|administration|other)$")
+    category: str = Field(
+        pattern=r"^(infrastructure|public_facility|cleanliness|security|social|administration|other)$"
+    )
     location_text: str | None = Field(default=None, max_length=500)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)

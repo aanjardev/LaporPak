@@ -12,6 +12,7 @@ const ALLOWED_ATTACHMENT_MIME_TYPES = new Set([
 ]);
 const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
 const MEDIA_TTL_MS = 30 * 60 * 1000;
+const MAX_MEDIA_SENDERS = 1000;
 const recentMediaBySender = new Map();
 
 const parameters = {
@@ -83,10 +84,35 @@ function stableJson(value) {
   return JSON.stringify(value);
 }
 
-async function trustedAttachments(context) {
-  const media = recentMediaBySender.get(senderKey(context.requesterSenderId)) ?? [];
+function mediaCacheKey(channelAccountId, sender, sessionId) {
+  return `${channelAccountId}:${senderKey(sender)}:${sessionId ?? "no-session"}`;
+}
+
+function pruneMediaCache(now = Date.now()) {
+  for (const [key, media] of recentMediaBySender) {
+    const fresh = media.filter((item) => now - item.receivedAt <= MEDIA_TTL_MS);
+    if (fresh.length) recentMediaBySender.set(key, fresh);
+    else recentMediaBySender.delete(key);
+  }
+  while (recentMediaBySender.size > MAX_MEDIA_SENDERS) {
+    recentMediaBySender.delete(recentMediaBySender.keys().next().value);
+  }
+}
+
+async function trustedAttachments(context, env = process.env) {
+  const { channelAccountId } = backendConfig(env);
+  pruneMediaCache();
+  const media = recentMediaBySender.get(
+    mediaCacheKey(
+      channelAccountId,
+      context.requesterSenderId,
+      context.sessionId ?? null,
+    ),
+  ) ?? [];
   const freshMedia = media.filter(
-    (item) => Date.now() - item.receivedAt <= MEDIA_TTL_MS,
+    (item) =>
+      Date.now() - item.receivedAt <= MEDIA_TTL_MS &&
+      (!item.sessionId || !context.sessionId || item.sessionId === context.sessionId),
   );
   const attachments = [];
   for (const [index, item] of freshMedia.slice(0, 3).entries()) {
@@ -100,6 +126,7 @@ async function trustedAttachments(context) {
       filename: `whatsapp-image-${index + 1}.${basename(item.path).split(".").pop() ?? "bin"}`,
       size: data.length,
       sourceId: item.messageId ?? item.path,
+      _cacheItem: item,
     });
   }
   return attachments;
@@ -157,6 +184,39 @@ async function responseJson(response) {
   }
 }
 
+async function geminiEmbedding(
+  text,
+  taskType,
+  fetchImpl = globalThis.fetch,
+  env = process.env,
+) {
+  const apiKey = env.GEMINI_API_KEY?.trim();
+  if (!apiKey) return null;
+  const model = env.GEMINI_EMBEDDING_MODEL?.trim() || "gemini-embedding-001";
+  const response = await fetchImpl(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:embedContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: `models/${model}`,
+        content: { parts: [{ text }] },
+        taskType,
+        outputDimensionality: 768,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    },
+  );
+  const result = await responseJson(response);
+  if (!response.ok || !Array.isArray(result?.embedding?.values)) {
+    throw new Error(`Gemini embedding failed (${response.status})`);
+  }
+  if (result.embedding.values.length !== 768) {
+    throw new Error("Gemini embedding must contain exactly 768 values");
+  }
+  return result.embedding.values;
+}
+
 export function buildCreateReportTool(
   context,
   fetchImpl = globalThis.fetch,
@@ -180,15 +240,24 @@ export function buildCreateReportTool(
         throw new Error("Report location is incomplete");
       }
 
-      const attachments = await attachmentProvider(context);
+      const attachments = await attachmentProvider(context, env);
       if (attachments.length === 0) {
         throw new Error("No trusted WhatsApp photo is available; ask the citizen to send it again");
       }
       const reportDraftId = uuidFromFingerprint(stableJson({
+        channelAccountId,
         sender: senderKey(context.requesterSenderId),
         sessionId: context.sessionId ?? null,
+        report: input,
         media: attachments.map((attachment) => attachment.sourceId),
       }));
+      if (attachments.some(
+        (attachment) =>
+          attachment._cacheItem?.consumedBy &&
+          attachment._cacheItem.consumedBy !== reportDraftId,
+      )) {
+        throw new Error("Trusted photo was already used by another report draft");
+      }
 
       const body = {
         sender_phone_number: context.requesterSenderId,
@@ -202,7 +271,11 @@ export function buildCreateReportTool(
           confidence: input.confidence,
           summary: input.summary ?? null,
         },
-        attachments: attachments.map(({ sourceId: _sourceId, ...attachment }) => attachment),
+        attachments: attachments.map(({
+          sourceId: _sourceId,
+          _cacheItem: _internal,
+          ...attachment
+        }) => attachment),
       };
       if (context.sessionId && UUID_PATTERN.test(context.sessionId)) {
         body.conversation_id = context.sessionId;
@@ -225,7 +298,9 @@ export function buildCreateReportTool(
         throw new Error(`LaporPak API rejected the report (${response.status} ${code})`);
       }
 
-      recentMediaBySender.delete(senderKey(context.requesterSenderId));
+      for (const attachment of attachments) {
+        if (attachment._cacheItem) attachment._cacheItem.consumedBy = reportDraftId;
+      }
 
       const details = {
         id: result.id,
@@ -259,10 +334,20 @@ export function buildAskTool(context, fetchImpl = globalThis.fetch, env = proces
     },
     async execute(_toolCallId, input) {
       requireWhatsappContext(context, "laporpak_ask");
+      const queryEmbedding = await geminiEmbedding(
+        input.question,
+        "RETRIEVAL_QUERY",
+        fetchImpl,
+        env,
+      );
       const { result } = await callBackend(fetchImpl, env, "/api/v1/ask", {
         question: input.question,
         service_key: input.service_key ?? null,
+        query_embedding: queryEmbedding,
       });
+      if (result.trust_level === "demo") {
+        result.notice = "DATA SIMULASI — bukan informasi operasional resmi.";
+      }
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
         details: result,
@@ -490,7 +575,15 @@ export default {
   description: "ASK, REPORT, TRACK, and citizen support tools through the FastAPI boundary.",
   register(api) {
     api.on("message_received", (event) => {
-      const key = senderKey(event.senderId ?? event.from);
+      pruneMediaCache();
+      const channelAccountId = process.env.LAPORPAK_CHANNEL_ACCOUNT_ID?.trim();
+      const key = channelAccountId
+        ? mediaCacheKey(
+            channelAccountId,
+            event.senderId ?? event.from,
+            event.sessionId ?? null,
+          )
+        : "";
       const media = (event.media ?? [])
         .filter(
           (item) =>
@@ -501,6 +594,8 @@ export default {
           mimeType: item.contentType,
           messageId: item.messageId ?? event.messageId,
           receivedAt: Date.now(),
+          sessionId: event.sessionId ?? null,
+          consumedBy: null,
         }));
       if (key && media.length > 0) {
         recentMediaBySender.set(key, media);

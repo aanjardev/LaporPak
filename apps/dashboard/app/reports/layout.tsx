@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { LogOut } from "lucide-react";
+import { Building2, LogOut } from "lucide-react";
+
 import { logoutAction } from "@/app/auth-actions";
-import { ReportsNav } from "@/components/reports-nav";
 import { BrandLogo } from "@/components/brand-logo";
 import { MobileNavigation } from "@/components/mobile-navigation";
+import { ReportsNav } from "@/components/reports-nav";
+import { VillageSelector } from "@/components/village-selector";
 
 export default function ReportsLayout({ children }: { children: React.ReactNode }) {
   const isMock = process.env.REPORTS_DATA_SOURCE !== "api";
@@ -13,7 +15,13 @@ export default function ReportsLayout({ children }: { children: React.ReactNode 
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col overflow-y-auto bg-brand px-5 py-6 text-white lg:flex">
         <Link href="/reports" className="block rounded-md bg-card p-3 focus-visible:outline-primary"><BrandLogo /></Link>
         <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/65">Administrasi desa</p>
+        <VillageSelector className="mt-4 text-foreground" />
         <ReportsNav showKnowledge={!isMock} />
+        <div className="mt-4 border-t border-white/15 pt-4">
+          <Link href="/admin/villages" className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm text-white/85 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+            <Building2 aria-hidden="true" size={18} /> Manajemen Desa
+          </Link>
+        </div>
         <div className="mt-auto border-t border-white/15 pt-5 text-xs leading-5 text-white/70">Portal pelayanan dan<br />pengaduan warga desa</div>
       </aside>
       <div className="min-w-0 lg:pl-64">

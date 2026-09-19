@@ -3,6 +3,8 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+
 
 class CitizenRepository:
     def __init__(self, session: Session) -> None:
@@ -70,10 +72,15 @@ class CitizenRepository:
         unit_id: UUID,
         service_key: str | None,
     ) -> list[dict]:
+        review_filter = (
+            "d.review_status in ('approved','demo')"
+            if settings.app_env == "development"
+            else "d.review_status='approved'"
+        )
         if embedding is None:
             return list(
                 self.session.execute(
-                    text("""
+                    text(rf"""
                 with query as (
                   select to_tsquery(
                     'simple',
@@ -89,19 +96,24 @@ class CitizenRepository:
                   )
                 )
                 select d.id document_id, c.id chunk_id, d.title, d.source_url,
-                       c.content
+                       c.content, d.review_status
                 from public.knowledge_chunks c
                 join public.knowledge_documents d on d.id=c.document_id
                 cross join query q
                 where d.administrative_unit_id=:unit
                   and d.is_active
                   and d.processing_status in ('pending', 'processing', 'ready')
-                  and d.metadata->>'approval_status'='approved'
+                  and {review_filter}
                   and (cast(:service_key as text) is null or
                        coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text))
                   and q.value is not null
-                  and c.search_vector @@ q.value
-                order by ts_rank_cd(c.search_vector, q.value) desc
+                  and to_tsvector(
+                    'simple', coalesce(d.title,'') || ' ' || c.content
+                  ) @@ q.value
+                order by ts_rank_cd(
+                  to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content),
+                  q.value
+                ) desc
                 limit 1
             """),
                     {
@@ -116,7 +128,7 @@ class CitizenRepository:
         vector = "[" + ",".join(str(value) for value in embedding) + "]"
         return list(
             self.session.execute(
-                text("""
+                text(rf"""
             with query as (
               select to_tsquery(
                 'simple',
@@ -131,26 +143,33 @@ class CitizenRepository:
                 'dan', 'atau', 'di', 'ke', 'dari', 'untuk', 'dengan'
               )
             ), fts as (
-              select c.id, row_number() over(order by ts_rank_cd(c.search_vector, q.value) desc) rank
+              select c.id, row_number() over(order by ts_rank_cd(
+                to_tsvector('simple', coalesce(d.title,'') || ' ' || c.content),
+                q.value
+              ) desc) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
               cross join query q
               where d.administrative_unit_id=:unit and d.is_active
                 and d.processing_status in ('pending', 'processing', 'ready')
-                and d.metadata->>'approval_status'='approved'
+                and {review_filter}
                 and (cast(:service_key as text) is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text))
-                and q.value is not null and c.search_vector @@ q.value limit 20
+                and q.value is not null
+                and to_tsvector(
+                  'simple', coalesce(d.title,'') || ' ' || c.content
+                ) @@ q.value limit 20
             ), semantic as (
               select c.id, row_number() over(order by c.embedding <=> cast(:embedding as vector)) rank
               from public.knowledge_chunks c join public.knowledge_documents d on d.id=c.document_id
               where d.administrative_unit_id=:unit and d.is_active and d.processing_status='ready'
-                and d.metadata->>'approval_status'='approved'
+                and {review_filter}
                 and c.embedding is not null
                 and (cast(:service_key as text) is null or coalesce(c.metadata->>'service_key', d.metadata->>'service_key')=cast(:service_key as text)) limit 20
             ), ranked as (
               select coalesce(f.id,s.id) id, coalesce(1.0/(60+f.rank),0)+coalesce(1.0/(60+s.rank),0) score
               from fts f full join semantic s on s.id=f.id
             )
-            select d.id document_id, c.id chunk_id, d.title, d.source_url, c.content
+            select d.id document_id, c.id chunk_id, d.title, d.source_url,
+                   c.content, d.review_status
             from ranked r join public.knowledge_chunks c on c.id=r.id
             join public.knowledge_documents d on d.id=c.document_id
             order by r.score desc limit 5

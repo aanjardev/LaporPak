@@ -98,7 +98,7 @@ def find_similar_reports(
                 select count(*)
                 from public.reports r
                 join public.report_categories rc on rc.id = r.category_id
-                where {' and '.join(filters)}
+                where {" and ".join(filters)}
                 """
             ),
             params,
@@ -171,7 +171,7 @@ def confirm_resolution(
             if report["status"] != "resolved":
                 raise APIError(
                     status_code=409,
-                    code="INVALID_STATUS",
+                    code="INVALID_STATUS_TRANSITION",
                     message="Report must be resolved before confirmation",
                 )
             session.execute(

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Path
 from sqlalchemy.orm import Session
 
 from app.core.security import OpenClawCaller, resolve_channel_unit
@@ -46,7 +46,7 @@ def check_similar_reports_endpoint(
 
 @router.post("/confirm-resolution/{ticket_number}")
 def confirm_resolution_endpoint(
-    ticket_number: str,
+    ticket_number: Annotated[str, Path(pattern=r"^LP-\d{4}-\d{4,}$")],
     payload: ResolutionConfirmationRequest,
     _caller: OpenClawCaller,
     channel_account_id: Annotated[str, Header(alias="X-Channel-Account-ID")],

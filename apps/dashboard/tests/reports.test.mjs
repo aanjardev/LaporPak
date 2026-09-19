@@ -39,8 +39,8 @@ test("mock daftar dan detail mengikuti alur laporan", async () => {
     name: "Unit Infrastruktur Desa",
   });
   assert.deepEqual(detail?.attachments, [
-    { id: "9a0d1245-4e4e-40be-bbba-000000000001", file_name: "foto-jalan-rusak.png", mime_type: "image/png" },
-    { id: "9a0d1245-4e4e-40be-bbba-000000000002", file_name: "foto-kondisi-sekitar.png", mime_type: "image/png" },
+    { id: "9a0d1245-4e4e-40be-bbba-000000000001", file_name: "foto-jalan-rusak.png", mime_type: "image/png", file_size: 1024, created_at: "2026-09-16T08:30:00.000Z" },
+    { id: "9a0d1245-4e4e-40be-bbba-000000000002", file_name: "foto-kondisi-sekitar.png", mime_type: "image/png", file_size: 2048, created_at: "2026-09-16T08:30:00.000Z" },
   ]);
   assert.equal(await getReportById("unknown"), null);
 });
@@ -69,7 +69,7 @@ test("mode API meneruskan token foto dan membuang path Storage dari detail", asy
     assert.equal(request.headers.authorization, "Bearer test-token");
     if (request.url === `/api/v1/reports/${reportId}`) {
       response.setHeader("Content-Type", "application/json");
-      response.end(JSON.stringify({ attachments: [{ id: attachmentId, file_name: "foto.png", mime_type: "image/png", storage_path: "internal/private/path", storage_bucket: "report-attachments" }] }));
+      response.end(JSON.stringify({ attachments: [{ id: attachmentId, file_name: "foto.png", mime_type: "image/png", file_size: 4096, created_at: "2026-09-19T00:00:00Z", storage_path: "internal/private/path", storage_bucket: "report-attachments" }] }));
       return;
     }
     assert.equal(request.url, `/api/v1/reports/${reportId}/attachments/${attachmentId}`);
@@ -86,7 +86,7 @@ test("mode API meneruskan token foto dan membuang path Storage dari detail", asy
     process.env.REPORTS_DATA_SOURCE = "api";
     process.env.NEXT_PUBLIC_API_URL = `http://127.0.0.1:${server.address().port}`;
     const detail = await getReportById(reportId, "test-token");
-    assert.deepEqual(detail.attachments, [{ id: attachmentId, file_name: "foto.png", mime_type: "image/png" }]);
+    assert.deepEqual(detail.attachments, [{ id: attachmentId, file_name: "foto.png", mime_type: "image/png", file_size: 4096, created_at: "2026-09-19T00:00:00Z" }]);
     const image = await getReportAttachment(reportId, attachmentId, "test-token");
     assert.equal(image.status, 200);
     assert.equal(image.headers.get("Content-Type"), "image/png");

@@ -1,6 +1,6 @@
 # LaporPak — API & Data Contract
 
-> **Contract version:** `0.2.0`  
+> **Contract version:** `0.3.0`
 > **Status:** Day 1 baseline  
 > **Base API:** `/api/v1`
 
@@ -137,6 +137,9 @@ UNAUTHORIZED
 FORBIDDEN
 REPORT_NOT_FOUND
 SERVICE_REQUEST_NOT_FOUND
+KNOWLEDGE_DOCUMENT_NOT_FOUND
+TICKET_NOT_FOUND
+ATTACHMENT_UNAVAILABLE
 INVALID_STATUS_TRANSITION
 DUPLICATE_OPERATION
 VALIDATION_ERROR
@@ -154,10 +157,13 @@ Suggested HTTP mapping:
 | 403 | `FORBIDDEN` |
 | 404 | `REPORT_NOT_FOUND` |
 | 404 | `SERVICE_REQUEST_NOT_FOUND` |
+| 404 | `KNOWLEDGE_DOCUMENT_NOT_FOUND` |
+| 404 | `TICKET_NOT_FOUND` |
 | 409 | `INVALID_STATUS_TRANSITION` |
 | 409 | `DUPLICATE_OPERATION` |
 | 422 | `VALIDATION_ERROR` |
 | 503 | `DATABASE_UNAVAILABLE` |
+| 503 | `ATTACHMENT_UNAVAILABLE` |
 | 503 | `AI_UNAVAILABLE` |
 | 500 | `INTERNAL_ERROR` |
 
@@ -415,7 +421,6 @@ Response `200`:
   "id": "72af1a52-7016-48c7-aacc-6c35417be819",
   "ticket_number": "LP-2026-0001",
   "citizen": {
-    "id": "5c242fc6-77a8-4fa7-a12f-a67bbc75839b",
     "display_name": "Warga"
   },
   "category": "infrastructure",
@@ -444,11 +449,12 @@ Response `200`:
       "old_status": null,
       "new_status": "pending_verification",
       "actor_type": "system",
-      "actor_identifier": null,
+      "actor_display_name": null,
       "notes": "Report created",
       "created_at": "2026-09-16T14:00:00Z"
     }
   ],
+  "allowed_transitions": ["verified", "rejected"],
   "verified_at": null,
   "resolved_at": null,
   "created_at": "2026-09-16T14:00:00Z",
@@ -460,6 +466,9 @@ Response `200`:
 backend mengirim objek `{ "id": "<uuid>", "name": "<nama unit>" }`.
 Metadata attachment tidak pernah memuat `storage_bucket`, `storage_path`, URL
 bucket, atau metadata internal.
+Riwayat hanya mengekspos nama aktor yang aman; UUID warga, UUID akun Supabase,
+dan `actor_identifier` mentah bukan bagian dari response. Dashboard hanya boleh
+menawarkan aksi status dari `allowed_transitions` yang dihitung backend.
 
 Jika tidak ada:
 
@@ -746,6 +755,14 @@ Do not embed binary/base64 ke `reports` JSON.
   `/api/v1/confirm-resolution/{ticket_number}` adalah advisory/support flow;
   endpoint tersebut tidak dapat mengubah status resmi laporan.
 
+TRACK mengembalikan `404 TICKET_NOT_FOUND` untuk tiket yang tidak ada, milik
+pengirim lain, atau berasal dari desa lain, serta `503 DATABASE_UNAVAILABLE`
+untuk kegagalan database. Konfirmasi penyelesaian mengembalikan
+`404 REPORT_NOT_FOUND` bila ownership/scope tidak cocok,
+`409 INVALID_STATUS_TRANSITION` sebelum laporan berstatus `resolved`,
+`422 VALIDATION_ERROR` untuk input tidak valid, dan
+`503 DATABASE_UNAVAILABLE` untuk kegagalan persistence.
+
 ---
 
 ## 17. Production Backend Extensions
@@ -771,6 +788,60 @@ channel integration; model-generated payloads cannot select a village.
 - `POST /api/v1/ask` performs village-scoped FTS/vector retrieval and returns
   evidence blocks and source IDs. Gemini response generation remains in
   OpenClaw.
+
+### Knowledge review and ASK trust
+
+Canonical knowledge documents use `review_status`:
+
+```text
+draft | demo | approved | rejected
+```
+
+The five quarantined legacy rows have no canonical village/source/content and
+remain excluded from list, detail, mutation, retrieval, and embedding. New
+dashboard documents always start as `draft`. Metadata such as
+`metadata.approval_status` is not an approval authority.
+
+List and detail responses include `review_status`, nullable
+`reviewer_display_name`, `reviewed_at`, `review_reason`, and backend-calculated
+`allowed_review_transitions`. Detail also includes ordered `review_history`
+entries with `old_status`, `new_status`, `actor_type`, nullable
+`actor_display_name`, `reason`, and `created_at`. Raw actor UUIDs are never
+response fields.
+
+Only a scoped `village_admin` may decide a review:
+
+```http
+PATCH /api/v1/knowledge/documents/{document_id}/review
+Authorization: Bearer <supabase-village-admin-access-token>
+Content-Type: application/json
+
+{
+  "status": "approved",
+  "reason": "Sumber telah diperiksa oleh perangkat desa."
+}
+```
+
+The request accepts only `approved` or `rejected`; reason is trimmed and must
+contain 1–1000 characters. A system admin is read-only (`403 FORBIDDEN`), while
+an absent, legacy, or out-of-scope document returns
+`404 KNOWLEDGE_DOCUMENT_NOT_FOUND`. Repeating the current state returns
+`409 INVALID_STATUS_TRANSITION`. Editing content resets the document to
+`draft`, clears its current reviewer fields, rebuilds chunks, and requires a
+new approval before embedding/retrieval.
+
+Production ASK and embedding queues read only `approved` sources. Development
+may additionally read manifest-controlled `demo` sources. ASK responses expose
+`trust_level: "approved" | "demo" | null` and each source's `review_status`.
+OpenClaw must visibly label `demo` results as simulated data and must not
+present them as official information. Search remains scoped by village,
+service key, active flag, and review status; FTS uses ranked OR terms and may be
+combined with 768-dimensional semantic ranking.
+
+Embedding jobs use `gemini-embedding-001`, `outputDimensionality=768`,
+`RETRIEVAL_DOCUMENT` for chunks, and `RETRIEVAL_QUERY` for citizen questions.
+Gemini credentials remain on the OpenClaw host. Failed jobs call `/fail` and do
+not make a document `ready`.
 
 Admin tokens are accepted only when the Supabase Auth UUID maps to an active
 `admin_accounts` row. `system_admin` is global; `village_admin` is limited by

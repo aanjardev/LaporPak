@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "embeddings:drain": "node embedding-worker.js"
   },
   "openclaw": {
     "extensions": [
@@ -16,6 +17,6 @@
     }
   },
   "engines": {
-    "node": ">=24.15.0"
+    "node": ">=24.16.0"
   }
 }

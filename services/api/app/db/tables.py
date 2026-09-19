@@ -341,8 +341,38 @@ knowledge_documents = Table(
     Column("processing_status", Text, nullable=False),
     Column("checksum", Text),
     Column("failure_message", Text),
+    Column("review_status", Text),
+    Column(
+        "reviewed_by_admin_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.admin_accounts.id"),
+    ),
+    Column("reviewed_at", DateTime(timezone=True)),
+    Column("review_reason", Text),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
+)
+
+knowledge_review_history = Table(
+    "knowledge_review_history",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "document_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.knowledge_documents.id"),
+        nullable=False,
+    ),
+    Column("old_status", Text),
+    Column("new_status", Text, nullable=False),
+    Column("actor_type", Text, nullable=False),
+    Column(
+        "admin_account_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.admin_accounts.id"),
+    ),
+    Column("reason", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
 )
 
 knowledge_chunks = Table(
@@ -421,4 +451,25 @@ report_status_history = Table(
         nullable=False,
         server_default=text("now()"),
     ),
+)
+
+admin_invitations = Table(
+    "admin_invitations",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column("email", Text, nullable=False),
+    Column("role", Text, nullable=False),
+    Column("village_id", UUID(as_uuid=True), ForeignKey("public.administrative_units.id")),
+    Column("token", Text, nullable=False, unique=True),
+    Column("status", Text, nullable=False, server_default=text("'pending'")),
+    Column("invited_by", Text),
+    Column("invited_at", DateTime(timezone=True), nullable=False),
+    Column("expires_at", DateTime(timezone=True)),
+    Column("accepted_at", DateTime(timezone=True)),
+    Column("revoked_at", DateTime(timezone=True)),
 )

@@ -8,6 +8,7 @@ from sqlalchemy.engine import RowMapping
 from sqlalchemy.orm import Session
 
 from app.db.tables import (
+    admin_accounts,
     administrative_units,
     citizens,
     report_attachments,
@@ -81,9 +82,7 @@ class ReportRepository:
 
     def insert_attachment(self, values: Mapping[str, Any]) -> RowMapping:
         statement = (
-            insert(report_attachments)
-            .values(**values)
-            .returning(*report_attachments.c)
+            insert(report_attachments).values(**values).returning(*report_attachments.c)
         )
         return self.session.execute(statement).mappings().one()
 
@@ -194,8 +193,22 @@ class ReportRepository:
         return self.session.execute(statement).mappings().one_or_none()
 
     def list_status_history(self, report_id: UUID) -> list[RowMapping]:
+        actor_key = func.concat("supabase:", admin_accounts.c.auth_user_id)
         statement = (
-            select(report_status_history)
+            select(
+                report_status_history.c.old_status,
+                report_status_history.c.new_status,
+                report_status_history.c.actor_type,
+                admin_accounts.c.display_name.label("actor_display_name"),
+                report_status_history.c.notes,
+                report_status_history.c.created_at,
+            )
+            .select_from(
+                report_status_history.outerjoin(
+                    admin_accounts,
+                    report_status_history.c.actor_identifier == actor_key,
+                )
+            )
             .where(report_status_history.c.report_id == report_id)
             .order_by(
                 report_status_history.c.created_at.asc(),
