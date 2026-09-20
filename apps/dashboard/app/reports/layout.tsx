@@ -13,14 +13,14 @@ export default async function ReportsLayout({ children }: { children: React.Reac
   const admin = await getCurrentAdmin();
   if (!admin) redirect("/onboarding");
   if (admin.role === "system_admin") redirect("/admin");
-  const village = admin.villages[0];
+  const village = admin.villages.find((item) => item.is_active && item.activation_status === "approved") ?? admin.villages[0];
   if (!village) redirect("/onboarding");
   const isMock = process.env.REPORTS_DATA_SOURCE !== "api";
   return (
     <div className="min-h-screen bg-background text-foreground">
       <a href="#konten-utama" className="sr-only rounded-md bg-card px-4 py-3 focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60]">Lewati ke konten</a>
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col overflow-y-auto bg-brand px-5 py-6 text-white lg:flex">
-        <Link href="/reports" className="block rounded-md bg-card p-3 focus-visible:outline-primary"><BrandLogo /></Link>
+        <Link href="/reports/dashboard" className="block rounded-md bg-card p-3 focus-visible:outline-primary"><BrandLogo /></Link>
         <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/65">Administrasi desa</p>
         <div className="mt-4 rounded-lg border border-white/15 px-3 py-3"><p className="truncate text-sm font-semibold">{village.name}</p><p className="mt-1 text-xs text-white/65">{village.activation_status === "approved" ? "Desa aktif" : "Menunggu aktivasi"}</p></div>
         <ReportsNav showKnowledge={!isMock} />

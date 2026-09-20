@@ -5,5 +5,5 @@ export default async function Home() {
   await requireSignedIn("/");
   const admin = await getCurrentAdmin();
   if (!admin) redirect("/onboarding");
-  redirect(admin.role === "system_admin" ? "/admin" : admin.villages.length ? "/reports" : "/onboarding");
+  redirect(admin.role === "system_admin" ? "/admin" : admin.villages.length ? "/reports/dashboard" : "/onboarding");
 }
