@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot, CheckCircle2, FileText, LoaderCircle, MessageCircle, RefreshCw, Save, Send,
   Smartphone, Unplug, UserRound,
@@ -14,11 +14,15 @@ import {
   uploadVillageLogo,
   type VillageAIPersonality, type VillageMetadata, type WhatsAppChannelInfo,
 } from "@/lib/villages";
+import { InlineFeedback, PendingButton, SlowStatus, useToast } from "@/components/action-feedback";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 const input = "ui-control mt-1.5 px-3";
 
 export function SettingsForm({ admin, village }: { admin: AdminMe; village: AdminVillage }) {
-  const metadata = village.metadata as Partial<VillageMetadata>;
+  const toast = useToast();
+  const [metadata, setMetadata] = useState(village.metadata as Partial<VillageMetadata>);
+  const [villageName, setVillageName] = useState(village.name);
   const personality = metadata.ai_personality || {} as VillageAIPersonality;
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -32,12 +36,27 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
   const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
   const [logo, setLogo] = useState<File | null>(null);
   const [logoRevision, setLogoRevision] = useState(0);
-  const hasStoredLogo = Boolean(metadata.has_logo || metadata.logo_file_name);
+  const [hasStoredLogo, setHasStoredLogo] = useState(Boolean(metadata.has_logo || metadata.logo_file_name));
+  const [dirty, setDirty] = useState(false);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+  const [activationStatus, setActivationStatus] = useState(village.activation_status);
+  const errorRef = useRef<HTMLDivElement>(null);
   const selectedLogoUrl = useMemo(() => logo ? URL.createObjectURL(logo) : null, [logo]);
 
   useEffect(() => () => {
     if (selectedLogoUrl) URL.revokeObjectURL(selectedLogoUrl);
   }, [selectedLogoUrl]);
+
+  useEffect(() => {
+    const guard = (event: BeforeUnloadEvent) => {
+      if (!dirty) return;
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", guard);
+    return () => window.removeEventListener("beforeunload", guard);
+  }, [dirty]);
+
+  useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
 
   const refreshWhatsApp = useCallback(async () => {
     setWaLoading(true);
@@ -67,18 +86,33 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
 
   useEffect(() => {
     if (!qr) return;
-    const timer = window.setInterval(() => {
-      getWhatsAppStatus(village.id).then((status) => {
+    let active = true;
+    let timer: number;
+    async function poll() {
+      if (!active) return;
+      if (document.visibilityState === "hidden") { timer = window.setTimeout(poll, 3_000); return; }
+      if (qrExpiresAt && Date.now() >= new Date(qrExpiresAt).getTime()) {
+        setQr(null);
+        setWaError("QR telah kedaluwarsa. Tampilkan QR baru untuk melanjutkan.");
+        return;
+      }
+      try {
+        const status = await getWhatsAppStatus(village.id);
+        if (!active) return;
         setWa(status);
         if (status.is_connected) {
           setQr(null);
           setQrExpiresAt(null);
           setNotice("WhatsApp terhubung dan chatbot siap menerima pesan.");
+          toast({ kind: "success", title: "WhatsApp terhubung", detail: "Chatbot siap menerima pesan warga." });
+          return;
         }
-      }).catch(() => undefined);
-    }, 3_000);
-    return () => window.clearInterval(timer);
-  }, [qr, village.id]);
+      } catch { /* Status manual tetap tersedia bila satu polling gagal. */ }
+      if (active) timer = window.setTimeout(poll, 3_000);
+    }
+    timer = window.setTimeout(poll, 3_000);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [qr, qrExpiresAt, toast, village.id]);
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setNotice(""); setError("");
@@ -103,27 +137,44 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
       document_official_name: String(data.document_official_name),
       document_official_title: String(data.document_official_title),
     };
+    let accountSaved = false;
+    let profileSaved = false;
     try {
       await updateMe({ display_name: String(data.display_name), contact_phone: String(data.contact_phone) });
-      await updateVillage(village.id, { name: String(data.village_name), metadata: nextMetadata });
+      accountSaved = true;
+      const savedVillage = await updateVillage(village.id, { name: String(data.village_name), metadata: nextMetadata });
+      profileSaved = true;
+      setVillageName(savedVillage.name);
+      setMetadata(savedVillage.metadata);
       if (logo) {
-        await uploadVillageLogo(village.id, logo);
+        try {
+          const logoVillage = await uploadVillageLogo(village.id, logo);
+          setMetadata(logoVillage.metadata);
+          setHasStoredLogo(true);
+        } catch (reason) {
+          setError(`Profil tersimpan. Logo belum berhasil diunggah. ${reason instanceof Error ? reason.message : "Coba unggah kembali."}`);
+          toast({ kind: "warning", title: "Sebagian pengaturan tersimpan", detail: "Profil tersimpan, tetapi logo masih perlu diunggah." });
+          return;
+        }
         setLogo(null);
         setLogoRevision(Date.now());
         const input = form.elements.namedItem("logo");
         if (input instanceof HTMLInputElement) input.value = "";
       }
       setNotice("Pengaturan berhasil disimpan.");
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan"); }
+      setDirty(false);
+      toast({ kind: "success", title: "Pengaturan tersimpan", detail: "Profil dan pratinjau sudah diperbarui." });
+    } catch (reason) {
+      const prefix = profileSaved ? "Profil tersimpan. " : accountSaved ? "Akun tersimpan. Profil desa belum berhasil disimpan. " : "";
+      setError(`${prefix}${reason instanceof Error ? reason.message : "Pengaturan gagal disimpan"}`);
+    }
     finally { setSaving(false); }
   }
 
   async function pair() {
     setPairing(true); setNotice(""); setError(""); setWaError(""); setQr(null);
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 90_000);
     try {
-      const result = await startWhatsAppPairing(village.id, controller.signal);
+      const result = await startWhatsAppPairing(village.id);
       setQr(result.qr_data_url || null);
       setQrExpiresAt(result.expires_at || null);
       setWa((current) => ({
@@ -134,11 +185,8 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
       }));
       setNotice(result.message);
     } catch (reason) {
-      setError(reason instanceof DOMException && reason.name === "AbortError"
-        ? "Gateway belum menyelesaikan persiapan QR dalam 90 detik. Coba lagi; provisioning yang sudah selesai akan digunakan ulang."
-        : reason instanceof Error ? reason.message : "QR WhatsApp gagal dibuat");
+      setError(reason instanceof Error ? reason.message : "QR WhatsApp gagal dibuat");
     } finally {
-      window.clearTimeout(timeout);
       setPairing(false);
     }
   }
@@ -150,22 +198,32 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
       setQr(null); setQrExpiresAt(null);
       setWa((current) => ({ ...current, is_connected: false, status: "disconnected" }));
       setNotice("Koneksi WhatsApp berhasil diputuskan.");
+      setDisconnectOpen(false);
+      toast({ kind: "success", title: "WhatsApp diputuskan", detail: "Pesan warga tidak akan diproses sampai perangkat ditautkan lagi." });
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Koneksi gagal diputuskan"); }
     finally { setPairing(false); }
   }
 
   return <div className="space-y-6">
-    {(notice || error) && <p role="status" className={`${error ? "ui-alert-error text-rose-900" : "ui-alert-success text-emerald-900"} border px-4 py-3 text-sm`}>{error || notice}</p>}
-    <form onSubmit={save} className="space-y-6">
+    {error && <div ref={errorRef} tabIndex={-1}><InlineFeedback kind="error" title="Pengaturan belum tersimpan sepenuhnya" detail={error} /></div>}
+    {!error && notice && <InlineFeedback kind="success" title={notice} />}
+    <form onSubmit={save} onChange={(event) => {
+      setDirty(true);
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return;
+      if (target.name === "village_name") setVillageName(target.value);
+      const keys: Record<string, keyof VillageMetadata> = { regency_type: "regency_type", regency: "regency", district: "district", address: "address", postal_code: "postal_code" };
+      if (keys[target.name]) setMetadata((current) => ({ ...current, [keys[target.name]]: target.value }));
+    }} className="space-y-6">
       <section className="ui-panel p-5 sm:p-6"><Header icon={UserRound} title="Akun" description="Identitas penanggung jawab desa." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Field label="Nama penanggung jawab" name="display_name" value={admin.display_name} required />
         <Field label="Email terverifikasi" name="email" value={admin.email} disabled />
         <Field label="Kontak penanggung jawab" name="contact_phone" value={admin.contact_phone} required />
-        <div><span className="text-sm font-semibold">Kata sandi</span><Link href="/set-password" className="ui-control mt-1.5 flex items-center px-3 text-sm font-semibold text-brand">Ubah kata sandi</Link></div>
+        <div><span className="text-sm font-semibold">Kata sandi</span><Link href="/set-password" onClick={(event) => { if (dirty && !window.confirm("Perubahan belum disimpan. Tinggalkan halaman?")) event.preventDefault(); }} className="ui-control mt-1.5 flex items-center px-3 text-sm font-semibold text-brand">Ubah kata sandi</Link></div>
       </div></section>
 
       <section className="ui-panel p-5 sm:p-6"><Header icon={CheckCircle2} title="Profil Desa" description="Data wajib untuk aktivasi dan kop dokumen laporan." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <Field label="Nama desa" name="village_name" value={village.name} required /><Field label="Kode desa" name="village_code" value={metadata.village_code} required />
+        <Field label="Nama desa" name="village_name" value={villageName} required /><Field label="Kode desa" name="village_code" value={metadata.village_code} required />
         <Field label="Provinsi" name="province" value={metadata.province} required />
         <label className="block text-sm font-semibold">Jenis wilayah<span className="ml-1 text-rose-600">*</span><select name="regency_type" defaultValue={metadata.regency_type || "Kabupaten"} required className={`${input}`}><option>Kabupaten</option><option>Kota</option></select></label>
         <Field label="Nama kabupaten/kota" name="regency" value={metadata.regency} required />
@@ -173,10 +231,10 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
         <Field label="Email layanan" name="service_email" value={metadata.contact_email} /><Field label="Jam pelayanan" name="office_hours" value={metadata.office_hours} required />
         <Field label="Alamat kantor" name="address" value={metadata.address} required /><Field label="Kode pos" name="postal_code" value={metadata.postal_code} required />
         <Field label="Nama penanggung jawab dokumen" name="document_official_name" value={metadata.document_official_name} required /><Field label="Jabatan" name="document_official_title" value={metadata.document_official_title || "Kepala Desa"} required />
-        <label className="block text-sm font-semibold sm:col-span-2">Logo resmi desa<span className="ml-1 text-rose-600">*</span><input name="logo" type="file" accept="image/png,image/jpeg" required={!hasStoredLogo} onChange={(event) => { const file = event.target.files?.[0] || null; if (file && file.size > 2 * 1024 * 1024) { setError("Logo maksimal 2 MB."); event.target.value = ""; setLogo(null); return; } setError(""); setLogo(file); }} className="mt-1.5 block w-full rounded-md border border-input bg-card px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:font-semibold" /><span className="mt-1 block text-xs font-normal text-muted-foreground">PNG/JPEG maksimal 2 MB. {logo?.name || metadata.logo_file_name || "Belum ada logo"}</span></label>
+        <label className="block text-sm font-semibold sm:col-span-2">Logo resmi desa<span className="ml-1 text-rose-600">*</span><input name="logo" type="file" accept="image/png,image/jpeg" required={!hasStoredLogo} onChange={(event) => { const file = event.target.files?.[0] || null; if (file && !["image/png", "image/jpeg"].includes(file.type)) { setError("Logo harus berupa PNG atau JPEG."); event.target.value = ""; setLogo(null); return; } if (file && file.size > 2 * 1024 * 1024) { setError("Logo maksimal 2 MB."); event.target.value = ""; setLogo(null); return; } setError(""); setLogo(file); }} className="mt-1.5 block min-h-11 w-full rounded-md border border-input bg-card px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:font-semibold" /><span className="mt-1 block text-xs font-normal text-muted-foreground">PNG/JPEG maksimal 2 MB. {logo?.name || metadata.logo_file_name || "Belum ada logo"}</span>{logo && <span role="status" className="mt-1 block text-xs font-medium text-brand">Logo siap diunggah saat pengaturan disimpan.</span>}</label>
       </div></section>
 
-      <section className="ui-panel overflow-hidden"><div className="border-b border-border p-5 sm:p-6"><Header icon={FileText} title="Pratinjau Kop Dokumen" description="Format akhir mengikuti data profil yang tersimpan." /></div><div className="bg-white p-6 font-serif text-slate-950 sm:p-8"><div className="grid grid-cols-[72px_minmax(0,1fr)_72px] items-center gap-4"><div className="flex size-[72px] items-center justify-center">{selectedLogoUrl || hasStoredLogo ? <Image unoptimized src={selectedLogoUrl || `/api/villages/${village.id}/logo?v=${logoRevision}`} alt={`Logo ${village.name}`} width={72} height={72} className="size-[72px] object-contain" /> : <span className="text-xs text-slate-400">Logo desa</span>}</div><div className="text-center"><p className="text-lg font-bold">PEMERINTAH {(metadata.regency_type || "KABUPATEN").toUpperCase()} {(metadata.regency || "...").toUpperCase()}</p><p className="text-lg font-bold">KECAMATAN {(metadata.district || "...").toUpperCase()}</p><p className="text-xl font-bold">KANTOR DESA {village.name.toUpperCase()}</p><p className="mt-1 text-sm">Alamat: {metadata.address || "..."} {metadata.postal_code ? `Kode Pos ${metadata.postal_code}` : ""}</p></div><div aria-hidden="true" /></div><div className="mt-3 border-b-2 border-slate-900" /></div></section>
+      <section className="ui-panel overflow-hidden"><div className="border-b border-border p-5 sm:p-6"><Header icon={FileText} title="Pratinjau Kop Dokumen" description={dirty ? "Pratinjau memuat perubahan yang belum disimpan." : "Pratinjau sesuai data profil tersimpan."} /></div><div className="bg-white p-6 font-serif text-slate-950 sm:p-8"><div className="grid grid-cols-[72px_minmax(0,1fr)_72px] items-center gap-4"><div className="flex size-[72px] items-center justify-center">{selectedLogoUrl || hasStoredLogo ? <Image unoptimized src={selectedLogoUrl || `/api/villages/${village.id}/logo?v=${logoRevision}`} alt={`Logo ${villageName}`} width={72} height={72} className="size-[72px] object-contain" /> : <span className="text-xs text-slate-400">Logo desa</span>}</div><div className="text-center"><p className="text-lg font-bold">PEMERINTAH {(metadata.regency_type || "KABUPATEN").toUpperCase()} {(metadata.regency || "...").toUpperCase()}</p><p className="text-lg font-bold">KECAMATAN {(metadata.district || "...").toUpperCase()}</p><p className="text-xl font-bold">KANTOR DESA {villageName.toUpperCase()}</p><p className="mt-1 text-sm">Alamat: {metadata.address || "..."} {metadata.postal_code ? `Kode Pos ${metadata.postal_code}` : ""}</p></div><div aria-hidden="true" /></div><div className="mt-3 border-b-2 border-slate-900" /></div></section>
 
       <section className="ui-panel p-5 sm:p-6"><Header icon={Bot} title="Personalisasi AI" description="Personalisasi hanya berlaku untuk desa ini; guardrail tetap sama." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Field label="Nama asisten" name="ai_name" value={personality.name || "LaporPak"} required /><Field label="Emoji" name="ai_emoji" value={personality.emoji || "📋"} />
@@ -186,7 +244,7 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
         <input type="hidden" name="whatsapp_business_name" value={metadata.whatsapp_business_name || village.name} />
       </div></section>
 
-      <button disabled={saving} className="ui-primary gap-2"><Save size={17} />{saving ? "Menyimpan…" : "Simpan semua pengaturan"}</button>
+      <div className="flex flex-wrap items-center gap-3"><PendingButton pending={saving} pendingLabel="Menyimpan pengaturan…" disabled={!dirty}><Save size={17} />Simpan semua pengaturan</PendingButton><span role="status" className={`text-sm ${dirty ? "font-semibold text-amber-800" : "text-muted-foreground"}`}>{dirty ? "Ada perubahan yang belum disimpan." : "Semua perubahan sudah tersimpan."}</span></div><SlowStatus active={saving} />
     </form>
 
     <section className="ui-panel overflow-hidden">
@@ -205,7 +263,7 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
               {pairing ? <><LoaderCircle className="animate-spin" size={17} />Menyiapkan QR…</> : <><RefreshCw size={17} />{wa?.is_connected ? "Sambungkan ulang" : "Tampilkan QR"}</>}
             </button>
             <button type="button" onClick={() => void refreshWhatsApp()} disabled={pairing || waLoading} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-input bg-card px-4 text-sm font-semibold text-brand hover:bg-muted disabled:opacity-60"><RefreshCw size={16} />Periksa status</button>
-            {wa?.is_connected && <button type="button" onClick={() => void disconnect()} disabled={pairing} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-rose-200 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-50"><Unplug size={16} />Putuskan</button>}
+            {wa?.is_connected && <button type="button" onClick={() => setDisconnectOpen(true)} disabled={pairing} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-rose-200 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-50"><Unplug size={16} />Putuskan</button>}
           </div>
           {pairing && <p className="mt-3 text-xs leading-5 text-muted-foreground">OpenClaw sedang menyiapkan akun kanal dan QR. Setup pertama dapat lebih lama; jangan menutup halaman.</p>}
         </div>
@@ -215,7 +273,8 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
       </div>
     </section>
 
-    {village.activation_status !== "approved" && <section className="ui-alert-warning border p-5"><h2 className="font-bold text-amber-950">Aktivasi desa</h2><p className="mt-2 text-sm text-amber-900">Status: {village.activation_status.replaceAll("_", " ")}{village.activation_review_reason ? ` — ${village.activation_review_reason}` : ""}</p><button type="button" disabled={activating || village.activation_status === "pending_review"} onClick={async () => { setActivating(true); try { await submitActivation(village.id); setNotice("Pengajuan aktivasi dikirim."); } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengajuan gagal"); } finally { setActivating(false); } }} className="ui-primary mt-4 gap-2"><Send size={16} />{activating ? "Mengirim…" : "Ajukan aktivasi"}</button></section>}
+    {activationStatus !== "approved" && <section className="ui-alert-warning border p-5"><h2 className="font-bold text-amber-950">Aktivasi desa</h2><p className="mt-2 text-sm text-amber-900">Status: {activationStatus.replaceAll("_", " ")}{village.activation_review_reason ? ` — ${village.activation_review_reason}` : ""}</p><PendingButton type="button" pending={activating} pendingLabel="Mengirim pengajuan…" disabled={activationStatus === "pending_review"} onClick={async () => { setActivating(true); setError(""); try { const result = await submitActivation(village.id); setActivationStatus(result.activation_status); setNotice("Pengajuan aktivasi dikirim."); toast({ kind: "success", title: "Pengajuan aktivasi dikirim" }); } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengajuan gagal"); } finally { setActivating(false); } }} className="ui-primary mt-4 gap-2"><Send size={16} />Ajukan aktivasi</PendingButton></section>}
+    <ConfirmationDialog open={disconnectOpen} onOpenChange={setDisconnectOpen} title="Putuskan WhatsApp desa?" description="Chatbot berhenti menerima pesan warga sampai perangkat ditautkan kembali." confirmLabel="Putuskan WhatsApp" tone="danger" pending={pairing} onConfirm={disconnect} />
   </div>;
 }
 

@@ -11,6 +11,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ vil
     const token = await getAdminAccessToken();
     const response = await fetch(`${API_BASE_URL}/api/v1/villages/${villageId}/logo`, {
       cache: "no-store",
+      signal: AbortSignal.timeout(60_000),
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok || !response.body) {

@@ -26,6 +26,7 @@ async function request<T>(
     {
       ...init,
       cache: "no-store",
+      signal: init?.signal ?? AbortSignal.timeout(init?.method && init.method !== "GET" ? 30_000 : 15_000),
       headers: {
         ...init?.headers,
         Authorization: `Bearer ${accessToken ?? await (await import("./auth.ts")).getAdminAccessToken()}`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -8,6 +8,7 @@ import {
   type KnowledgeFormState,
   reviewKnowledgeAction,
 } from "./actions";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 
 type Values = {
   title: string;
@@ -72,10 +73,14 @@ export function KnowledgeForm({ action, initialValues, mode }: Props) {
 }
 
 export function DeactivateKnowledgeForm({ id }: { id: string }) {
+  const [open, setOpen] = useState(false);
+  const confirmed = useRef(false);
+  const form = useRef<HTMLFormElement>(null);
   return (
-    <form action={deactivateKnowledgeAction} className="relative z-20">
+    <form ref={form} action={deactivateKnowledgeAction} onSubmit={(event) => { if (!confirmed.current) { event.preventDefault(); setOpen(true); } else { confirmed.current = false; } }} className="relative z-20">
       <input type="hidden" name="id" value={id} />
       <DeactivateButton />
+      <ConfirmationDialog open={open} onOpenChange={setOpen} title="Nonaktifkan sumber ASK?" description="Sumber ini tidak lagi dipakai untuk menjawab warga. Isinya tetap tersimpan dan dapat diaudit." confirmLabel="Nonaktifkan sumber" tone="danger" onConfirm={() => { confirmed.current = true; setOpen(false); form.current?.requestSubmit(); }} />
     </form>
   );
 }

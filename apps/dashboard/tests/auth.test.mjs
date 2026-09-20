@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { apiFetch } from "../lib/admin.ts";
+import { ApiRequestError, apiFetch, requestTimeoutFor } from "../lib/admin.ts";
 import { safeReturnPath } from "../lib/safe-return-path.ts";
 
 test("tujuan login hanya boleh menuju portal lokal sesuai role", () => {
@@ -53,6 +53,27 @@ test("API client menggabungkan GET identik yang masih berjalan", async () => {
     assert.deepEqual(first, { ok: true });
     assert.deepEqual(second, { ok: true });
     assert.equal(calls, 1);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("API client memakai tenggat berbeda sesuai jenis operasi", () => {
+  assert.equal(requestTimeoutFor("GET"), 15_000);
+  assert.equal(requestTimeoutFor("PATCH", "{}"), 30_000);
+  assert.equal(requestTimeoutFor("POST", new FormData()), 60_000);
+});
+
+test("API client tidak meneruskan pesan mentah server", async () => {
+  const originalFetch = global.fetch;
+  global.fetch = async (url) => url === "/api/auth/token"
+    ? Response.json({ token: "test-token" })
+    : Response.json({ error: { code: "private_detail", message: "rahasia internal" } }, { status: 500 });
+  try {
+    await assert.rejects(
+      apiFetch("/api/v1/test-safe-error", { method: "POST", body: "{}" }),
+      (error) => error instanceof ApiRequestError && !error.message.includes("rahasia internal") && error.outcomeUnknown === false,
+    );
   } finally {
     global.fetch = originalFetch;
   }

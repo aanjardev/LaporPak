@@ -54,6 +54,7 @@ async function request<T>(path: string, token: string, init?: RequestInit): Prom
   const response = await fetch(endpoint(path), {
     ...init,
     cache: "no-store",
+    signal: init?.signal ?? AbortSignal.timeout(init?.body instanceof FormData ? 60_000 : init?.method && init.method !== "GET" ? 30_000 : 15_000),
     headers: {
       ...init?.headers,
       Authorization: `Bearer ${token}`,

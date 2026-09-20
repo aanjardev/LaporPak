@@ -12,8 +12,8 @@ export type ReportDocument = {
   created_at: string;
 };
 
-export const getReportDocuments = (reportId: string) =>
-  apiFetch<{ items: ReportDocument[] }>(`/api/v1/reports/${reportId}/documents`);
+export const getReportDocuments = (reportId: string, signal?: AbortSignal) =>
+  apiFetch<{ items: ReportDocument[] }>(`/api/v1/reports/${reportId}/documents`, { signal });
 
 export const createReceiptDocument = (reportId: string) =>
   apiFetch<ReportDocument>(`/api/v1/reports/${reportId}/documents/receipt`, { method: "POST" });

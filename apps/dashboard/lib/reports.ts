@@ -277,6 +277,7 @@ async function apiRequest<T>(
   const response = await fetch(new URL(path, `${baseUrl.replace(/\/+$/, "")}/`), {
     ...init,
     cache: "no-store",
+    signal: init.signal ?? AbortSignal.timeout(init.method && init.method !== "GET" ? 30_000 : 15_000),
     headers: {
       ...init.headers,
       Authorization: `Bearer ${token}`,
@@ -385,6 +386,7 @@ export async function getReportAttachment(
       `${baseUrl.replace(/\/+$/, "")}/`,
     ), {
       cache: "no-store",
+      signal: AbortSignal.timeout(60_000),
       headers: { Authorization: `Bearer ${accessToken}` },
     });
   }

@@ -9,7 +9,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ rep
   if (!uuid.test(reportId) || !uuid.test(documentId)) return new Response(null, { status: 404, headers: privateHeaders });
   try {
     const token = await getAdminAccessToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/reports/${reportId}/documents/${documentId}/download`, { cache: "no-store", headers: { Authorization: `Bearer ${token}` } });
+    const response = await fetch(`${API_BASE_URL}/api/v1/reports/${reportId}/documents/${documentId}/download`, { cache: "no-store", signal: AbortSignal.timeout(60_000), headers: { Authorization: `Bearer ${token}` } });
     if (!response.ok || !response.body) return new Response(null, { status: [401, 403, 404].includes(response.status) ? response.status : 503, headers: privateHeaders });
     return new Response(response.body, { headers: { ...privateHeaders, "Content-Type": "application/pdf", "Content-Disposition": "attachment; filename=laporan.pdf" } });
   } catch { return new Response(null, { status: 503, headers: privateHeaders }); }

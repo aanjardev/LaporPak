@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { setPasswordAction } from "@/app/auth-actions";
+import { PendingButton, SlowStatus } from "@/components/action-feedback";
 
 export function PasswordForm() {
   const [state, action, pending] = useActionState(setPasswordAction, { message: "" });
@@ -17,9 +18,8 @@ export function PasswordForm() {
         <input id="confirmation" name="confirmation" type="password" autoComplete="new-password" required disabled={pending} className="ui-control px-3 disabled:bg-muted" />
       </div>
       {state.message && <p role="alert" className="ui-alert-error px-3 py-2 text-sm text-rose-900">{state.message}</p>}
-      <button type="submit" disabled={pending} className="ui-primary w-full disabled:cursor-not-allowed disabled:bg-slate-400">
-        {pending ? "Menyimpan kata sandi…" : "Simpan kata sandi"}
-      </button>
+      <PendingButton type="submit" pending={pending} pendingLabel="Menyimpan kata sandi…" className="ui-primary w-full disabled:cursor-not-allowed disabled:bg-slate-400">Simpan kata sandi</PendingButton>
+      <SlowStatus active={pending} />
     </form>
   );
 }

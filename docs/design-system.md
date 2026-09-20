@@ -1315,3 +1315,28 @@ tetap pada garis atas dan tombol utama. Form tetap pada panel putih solid.
 Pola dibuat dengan SVG dekoratif lokal, `aria-hidden`, tanpa animasi, request
 gambar, atau JavaScript client tambahan. Pengecualian dekoratif ini khusus
 halaman auth; dashboard operasional tetap menggunakan permukaan sederhana.
+
+## Feedback tindakan
+
+Setiap tindakan memperlihatkan keadaan sedang diproses, berhasil, gagal, atau
+perlu diperiksa kembali dengan langkah berikutnya yang jelas.
+
+- Tombol mengubah label dan terkunci selama request yang sama berjalan.
+- Setelah delapan detik tampilkan `Masih diproses…`; jangan membuat persentase
+  jika backend tidak menyediakan progress.
+- Toast sukses tampil lima detik, dapat ditutup, maksimal tiga, dan berhenti
+  menghitung waktu saat mendapat hover atau fokus. Kesalahan penting tetap
+  terlihat dekat tindakan.
+- Gunakan `role="status"` untuk informasi biasa dan `role="alert"` untuk
+  kesalahan yang perlu perhatian. Hindari pengumuman ganda.
+- Timeout mutasi berarti hasil belum diketahui. Periksa resource terbaru dan
+  jangan mengulang mutasi secara otomatis.
+- Pertahankan data terakhir saat refresh gagal dan tandai bahwa tampilannya
+  mungkin belum mutakhir.
+- Keputusan administratif, pencabutan dokumen, penonaktifan knowledge, dan
+  pemutusan WhatsApp memakai dialog yang menyebut objek dan konsekuensinya.
+
+Tenggat standar adalah 15 detik untuk pembacaan, 30 detik untuk mutasi, 60
+detik untuk upload/download, dan 90 detik untuk QR. Polling berjalan satu
+request pada satu waktu, dijeda saat tab tersembunyi, lalu berhenti setelah dua
+menit dan menyediakan pemeriksaan manual.

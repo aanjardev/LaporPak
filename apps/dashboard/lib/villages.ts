@@ -68,6 +68,6 @@ export const uploadVillageLogo = (villageId: string, file: File) => {
 export const getWhatsAppStatus = (villageId: string, signal?: AbortSignal) =>
   apiFetch<WhatsAppChannelInfo>(`/api/v1/villages/${villageId}/whatsapp/status`, { signal });
 export const startWhatsAppPairing = (villageId: string, signal?: AbortSignal) =>
-  apiFetch<WhatsAppPairingResponse>(`/api/v1/villages/${villageId}/whatsapp/pairing`, { method: "POST", signal });
+  apiFetch<WhatsAppPairingResponse>(`/api/v1/villages/${villageId}/whatsapp/pairing`, { method: "POST", signal }, 90_000);
 export const disconnectWhatsApp = (villageId: string) =>
   apiFetch<void>(`/api/v1/villages/${villageId}/whatsapp`, { method: "DELETE" });

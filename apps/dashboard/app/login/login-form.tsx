@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { loginAction } from "@/app/auth-actions";
 import Link from "next/link";
+import { PendingButton, SlowStatus } from "@/components/action-feedback";
 
 export function LoginForm({ next, configured }: { next: string; configured: boolean }) {
   const [state, action, pending] = useActionState(loginAction, { message: "" });
@@ -20,9 +21,8 @@ export function LoginForm({ next, configured }: { next: string; configured: bool
       </div>
       {state.message && <p role="alert" className="ui-alert-error px-3 py-2 text-sm text-rose-900">{state.message}</p>}
       {!configured && <p role="alert" className="ui-alert-warning px-3 py-2 text-sm text-amber-900">Login belum dikonfigurasi. Hubungi pengelola sistem.</p>}
-      <button type="submit" disabled={!configured || pending} className="ui-primary w-full disabled:cursor-not-allowed disabled:bg-slate-400">
-        {pending ? "Sedang masuk…" : "Masuk"}
-      </button>
+      <PendingButton type="submit" pending={pending} pendingLabel="Sedang masuk…" disabled={!configured} className="ui-primary w-full disabled:cursor-not-allowed disabled:bg-slate-400">Masuk</PendingButton>
+      <SlowStatus active={pending}>Masih memeriksa akun…</SlowStatus>
       <p className="text-center text-sm text-muted-foreground">Belum memiliki akun? <Link href="/signup" className="font-semibold text-brand underline-offset-4 hover:underline">Daftar Admin Desa</Link></p>
     </form>
   );

@@ -29,6 +29,7 @@ export async function getCurrentAdmin(): Promise<AdminMe | null> {
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/admin/me`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
   if (response.status === 403 || response.status === 404) return null;
   if (!response.ok) throw new Error("Profil admin tidak dapat dimuat");

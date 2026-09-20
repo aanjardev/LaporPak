@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { onboardVillage } from "@/lib/admin";
+import { PendingButton, SlowStatus } from "@/components/action-feedback";
 
 const fields = [
   ["display_name", "Nama penanggung jawab"], ["contact_phone", "Kontak penanggung jawab"],
@@ -28,6 +29,6 @@ export function OnboardingForm() {
       {label}<input name={name} required={name !== "contact_email"} className="ui-control mt-1.5 px-3" />
     </label>)}
     {error && <p role="alert" className="ui-alert-error px-3 py-2 text-sm sm:col-span-2">{error}</p>}
-    <button disabled={pending} className="ui-primary sm:col-span-2">{pending ? "Menyimpan…" : "Buat profil desa"}</button>
+    <div className="sm:col-span-2"><PendingButton pending={pending} pendingLabel="Menyimpan profil…" className="ui-primary w-full">Buat profil desa</PendingButton><div className="mt-2"><SlowStatus active={pending} /></div></div>
   </form>;
 }

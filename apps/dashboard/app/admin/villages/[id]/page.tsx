@@ -8,17 +8,28 @@ import {
 } from "lucide-react";
 import { decideActivation } from "@/lib/admin";
 import { getVillage, type VillageDetail } from "@/lib/villages";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { InlineFeedback, useToast } from "@/components/action-feedback";
 
 export default function SuperAdminVillagePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const toast = useToast();
   const [village, setVillage] = useState<VillageDetail | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [decision, setDecision] = useState<"approved" | "changes_requested" | null>(null);
   useEffect(() => { getVillage(id).then(setVillage).catch((cause) => setError(cause.message)); }, [id]);
   async function decide(status: "approved" | "changes_requested") {
     setPending(true); setError("");
-    try { await decideActivation(id, status, reason); setVillage(await getVillage(id)); setReason(""); }
+    try {
+      const saved = await decideActivation(id, status, reason);
+      setDecision(null);
+      try { setVillage(await getVillage(id)); }
+      catch { setVillage((current) => current ? { ...current, activation_status: saved.activation_status } : current); setError("Keputusan tersimpan. Tampilan lengkap belum berhasil diperbarui; gunakan muat ulang sebelum tindakan lain."); }
+      setReason("");
+      toast({ kind: "success", title: status === "approved" ? "Desa disetujui" : "Pengajuan dikembalikan", detail: `${village?.name || "Desa"} telah diperbarui.` });
+    }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Keputusan gagal"); }
     finally { setPending(false); }
   }
@@ -29,7 +40,7 @@ export default function SuperAdminVillagePage({ params }: { params: Promise<{ id
   return <div className="mx-auto max-w-7xl space-y-7">
     <Link href="/admin/villages" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand hover:underline"><ArrowLeft size={16} />Kembali ke monitoring</Link>
     <header className="ui-panel overflow-hidden"><div className="h-1.5 bg-primary" /><div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-7"><div className="flex gap-4"><span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-brand text-white"><Building2 size={24} /></span><div><p className="text-xs font-bold uppercase tracking-[.12em] text-brand">Detail operasional desa</p><h1 className="mt-2 text-2xl font-bold sm:text-3xl">{village.name}</h1><p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground"><span>{m.village_code || "Kode belum diisi"}</span><span>•</span><span>{m.district || "Kecamatan belum diisi"}, {m.regency || "Kabupaten belum diisi"}</span></p></div></div><ActivationBadge value={village.activation_status} /></div></header>
-    {error && <p className="ui-alert-error border px-4 py-3 text-sm text-rose-900">{error}</p>}
+    {error && <InlineFeedback kind="error" title="Data belum sepenuhnya diperbarui" detail={error} action={<button type="button" onClick={() => window.location.reload()} className="min-h-11 font-semibold underline underline-offset-4">Muat ulang</button>} />}
 
     <section aria-label="Ringkasan layanan" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Metric icon={FileText} label="Total REPORT" value={village.stats.total_reports} detail={`${village.stats.pending_reports} masih berjalan`} />
@@ -49,8 +60,9 @@ export default function SuperAdminVillagePage({ params }: { params: Promise<{ id
       </div>
     </div>
 
-    {village.activation_status === "pending_review" && <section className="ui-panel border-l-4 border-l-primary p-5 sm:p-6"><h2 className="text-lg font-bold">Keputusan aktivasi</h2><p className="mt-2 text-sm text-muted-foreground">Persetujuan membuka layanan operasional desa. Pengembalian wajib menyertakan alasan yang jelas.</p><textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Tuliskan alasan jika pengajuan perlu dikembalikan…" className="ui-control mt-5 min-h-28 p-3" /><div className="mt-4 flex flex-wrap gap-3"><button disabled={pending} onClick={() => decide("approved")} className="ui-primary gap-2"><CheckCircle2 size={17} />{pending ? "Memproses…" : "Setujui desa"}</button><button disabled={pending || reason.trim().length < 3} onClick={() => decide("changes_requested")} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-rose-200 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"><XCircle size={17} />Kembalikan untuk perbaikan</button></div></section>}
+    {village.activation_status === "pending_review" && <section className="ui-panel border-l-4 border-l-primary p-5 sm:p-6"><h2 className="text-lg font-bold">Keputusan aktivasi</h2><p className="mt-2 text-sm text-muted-foreground">Persetujuan membuka layanan operasional desa. Pengembalian wajib menyertakan alasan yang jelas.</p><textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Tuliskan alasan jika pengajuan perlu dikembalikan…" className="ui-control mt-5 min-h-28 p-3" /><div className="mt-4 flex flex-wrap gap-3"><button disabled={pending} onClick={() => setDecision("approved")} className="ui-primary gap-2"><CheckCircle2 size={17} />Setujui desa</button><button disabled={pending || reason.trim().length < 3} onClick={() => setDecision("changes_requested")} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-rose-200 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"><XCircle size={17} />Kembalikan untuk perbaikan</button></div></section>}
     {village.activation_review_reason && village.activation_status === "changes_requested" && <section className="ui-alert-warning border p-5"><h2 className="font-bold text-amber-950">Catatan pemeriksaan</h2><p className="mt-2 text-sm text-amber-900">{village.activation_review_reason}</p></section>}
+    <ConfirmationDialog open={decision !== null} onOpenChange={(open) => { if (!open) setDecision(null); }} title={decision === "approved" ? `Aktifkan ${village.name}?` : `Kembalikan pengajuan ${village.name}?`} description={decision === "approved" ? "Layanan operasional desa akan dibuka setelah persetujuan tersimpan." : "Admin desa akan melihat alasan dan dapat memperbaiki profil sebelum mengajukan kembali."} confirmLabel={decision === "approved" ? "Setujui dan aktifkan" : "Kembalikan pengajuan"} tone={decision === "changes_requested" ? "danger" : "default"} pending={pending} onConfirm={() => { if (decision) return decide(decision); }} />
   </div>;
 }
 

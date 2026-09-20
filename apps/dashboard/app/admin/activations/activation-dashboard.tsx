@@ -20,7 +20,7 @@ export function ActivationDashboard() {
   }, []);
   return <div className="mx-auto max-w-7xl space-y-7">
     <header className="ui-page-header flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[.12em] text-brand">Persetujuan layanan</p><h1 className="mt-2">Aktivasi Desa</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Periksa kelengkapan profil dan kesiapan layanan sebelum desa diaktifkan.</p></div><button onClick={() => void load()} disabled={loading} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-input bg-card px-4 text-sm font-semibold text-brand hover:bg-muted"><RefreshCw className={loading ? "animate-spin" : ""} size={16} />Perbarui</button></header>
-    {error && <div className="ui-alert-error border px-4 py-3 text-sm text-rose-900">{error}</div>}
+    {error && <div role="alert" className="ui-alert-error border px-4 py-3 text-sm text-rose-900"><strong>Pembaruan gagal.</strong> {items.length ? "Data terakhir tetap ditampilkan. " : ""}{error}</div>}
     <section className="ui-panel overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6"><div><h2 className="font-bold">Pengajuan menunggu pemeriksaan</h2><p className="mt-1 text-xs text-muted-foreground">Urutan terbaru ditampilkan lebih dahulu.</p></div><span className="ui-badge bg-amber-50 text-amber-800 ring-amber-200">{items.length} menunggu</span></div>
       <div className="hidden grid-cols-[minmax(0,1fr)_170px_150px_130px] gap-4 bg-muted/60 px-6 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground md:grid"><span>Desa</span><span>Pengajuan</span><span>Kelengkapan</span><span>Aksi</span></div>

@@ -9,6 +9,8 @@ import { saveReportDecision } from "@/app/reports/[id]/actions";
 import { categoryLabels, formatLocation, formatReportDate, StatusBadge, statusLabels, urgencyLabels } from "@/components/report-display";
 import type { ReportAttachment, ReportDetail, ReportStatus } from "@/lib/reports";
 import { ReportDocumentsPanel } from "@/components/report-documents-panel";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { SlowStatus, useToast } from "@/components/action-feedback";
 
 function ReportPhoto({ attachment, reportId, ticketNumber, index, isMock }: {
   attachment: ReportAttachment;
@@ -58,11 +60,15 @@ function ReportPhoto({ attachment, reportId, ticketNumber, index, isMock }: {
 
 export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { initialReport: ReportDetail; actionsEnabled: boolean; isMock: boolean }) {
   const router = useRouter();
+  const toast = useToast();
   const [report, setReport] = useState(initialReport);
   const [decision, setDecision] = useState<ReportStatus | "">("");
   const [reason, setReason] = useState("");
   const [state, setState] = useState<"idle" | "saving" | "success" | "saved_unavailable" | "conflict" | "error">("idle");
   const saving = useRef(false);
+  const confirmed = useRef(false);
+  const decisionForm = useRef<HTMLFormElement>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const availableActions = report.allowed_transitions;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -72,6 +78,8 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
       setState("error");
       return;
     }
+    if (!confirmed.current) { setConfirmOpen(true); return; }
+    confirmed.current = false;
 
     saving.current = true;
     setState("saving");
@@ -117,6 +125,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
       setDecision("");
       setReason("");
       setState("success");
+      toast({ kind: "success", title: "Keputusan laporan tersimpan", detail: `Status ${report.ticket_number} sudah diperbarui.` });
     } catch {
       setState("error");
     } finally {
@@ -191,7 +200,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
             <section aria-labelledby="keputusan-petugas" className="scroll-mt-4 ui-panel p-5">
               <h2 id="keputusan-petugas" className="text-base font-semibold">Aksi petugas</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">Periksa laporan dan pilih langkah penanganan berikutnya.</p>
-              <form onSubmit={handleSubmit} className="mt-5 space-y-4" aria-busy={state === "saving"}>
+              <form ref={decisionForm} onSubmit={handleSubmit} className="mt-5 space-y-4" aria-busy={state === "saving"}>
                 <fieldset disabled={state === "saving"} className="space-y-4">
                   <legend className="text-sm font-semibold">Pilih tindakan</legend>
                   <div className="mt-2 space-y-2">
@@ -205,6 +214,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
                 </fieldset>
               </form>
               {state === "saving" && <p role="status" className="mt-3 text-sm text-muted-foreground">Tindakan sedang disimpan…</p>}
+              <SlowStatus active={state === "saving"} />
               {state === "error" && <p role="alert" className="mt-3 text-sm text-rose-800">Tindakan belum tersimpan. Periksa pilihan dan alasan, lalu coba lagi.</p>}
               {isMock && <p className="mt-3 text-xs leading-5 text-amber-900">Simulasi: perubahan hanya terlihat sampai halaman dimuat ulang.</p>}
             </section>
@@ -215,6 +225,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
           <p className="rounded-lg border border-border bg-muted p-4 text-sm leading-6 text-brand">Ringkasan dan urgensi membantu petugas meninjau laporan. Keputusan penanganan tetap dilakukan oleh petugas berwenang.</p>
         </aside>
       </div>
+      <ConfirmationDialog open={confirmOpen} onOpenChange={setConfirmOpen} title={`Konfirmasi tindakan untuk ${report.ticket_number}`} description={`Status akan diubah menjadi ${decision ? statusLabels[decision] : "status yang dipilih"}. Catatan keputusan akan masuk ke riwayat resmi.`} confirmLabel="Simpan keputusan" pending={state === "saving"} tone={decision === "rejected" ? "danger" : "default"} onConfirm={() => { confirmed.current = true; setConfirmOpen(false); decisionForm.current?.requestSubmit(); }} />
     </div>
   );
 }

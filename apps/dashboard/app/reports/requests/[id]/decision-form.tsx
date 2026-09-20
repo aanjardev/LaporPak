@@ -10,6 +10,8 @@ import {
   type ServiceRequestDecisionStatus,
 } from "@/lib/service-request-types";
 import { saveRequestDecision } from "./actions";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { SlowStatus, useToast } from "@/components/action-feedback";
 
 function dateLabel(value: string) {
   return new Date(value).toLocaleString("id-ID", {
@@ -36,6 +38,7 @@ const decisionLabels: Record<ServiceRequestDecisionStatus, string> = {
 
 export function RequestDetailView({ initialRequest }: { initialRequest: ServiceRequest }) {
   const router = useRouter();
+  const toast = useToast();
   const request = initialRequest;
   const [decision, setDecision] = useState<ServiceRequestDecision["status"]>(
     initialRequest.allowed_transitions[0] ?? "approved",
@@ -47,6 +50,9 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
     text: string;
   } | null>(null);
   const submitting = useRef(false);
+  const confirmed = useRef(false);
+  const decisionForm = useRef<HTMLFormElement>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,6 +62,8 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
       setMessage({ kind: "error", text: "Alasan wajib diisi, maksimal 1000 karakter." });
       return;
     }
+    if (!confirmed.current) { setConfirmOpen(true); return; }
+    confirmed.current = false;
     submitting.current = true;
     setPending(true);
     setMessage(null);
@@ -71,6 +79,7 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
           text: `Keputusan berhasil disimpan: ${requestStatusLabels[result.item.status]}.`,
         });
         router.refresh();
+        toast({ kind: "success", title: "Keputusan pengajuan tersimpan", detail: `${request.ticket_number} diperbarui menjadi ${requestStatusLabels[result.item.status]}.` });
       } else {
         setMessage({
           kind: "error",
@@ -152,7 +161,7 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Keputusan akan disimpan sebagai status resmi beserta alasan petugas.
           </p>
-          <form onSubmit={submit} className="mt-5 space-y-5">
+          <form ref={decisionForm} onSubmit={submit} className="mt-5 space-y-5">
             <fieldset disabled={pending} className="space-y-3">
               <legend className="text-sm font-semibold">Pilih keputusan</legend>
               <div className="flex flex-wrap gap-4">
@@ -192,6 +201,7 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
               </p>
             )}
             {pending && <p role="status" className="text-sm text-muted-foreground">Menyimpan keputusan…</p>}
+            <SlowStatus active={pending} />
             <button
               type="submit"
               disabled={pending}
@@ -207,6 +217,7 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
           {message.text}
         </p>
       )}
+      <ConfirmationDialog open={confirmOpen} onOpenChange={setConfirmOpen} title={`Konfirmasi keputusan ${request.ticket_number}`} description={`Pengajuan akan diubah menjadi ${requestStatusLabels[decision]}. Alasan akan disimpan dalam riwayat resmi.`} confirmLabel="Simpan keputusan" tone={decision === "rejected" ? "danger" : "default"} pending={pending} onConfirm={() => { confirmed.current = true; setConfirmOpen(false); decisionForm.current?.requestSubmit(); }} />
     </div>
   );
 }

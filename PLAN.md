@@ -59,3 +59,21 @@ status gateway, lint/build frontend, dan pytest/Ruff backend harus lulus.
   atau file PDF.
 - Tahap ini hanya berlaku untuk REPORT. QR diberi label "Verifikasi dokumen
   digital LaporPak" dan bukan tanda tangan elektronik tersertifikasi.
+
+## UX feedback tindakan
+
+Tahap ini memakai komponen bersama tanpa notification center atau tabel baru:
+
+1. API client bertipe dengan tenggat, pemulihan token satu kali, dan pesan aman
+   untuk kegagalan umum.
+2. Toast, pesan inline, indikator proses lambat, dan dialog konfirmasi yang
+   dapat dipakai ulang.
+3. Penyimpanan profil menjelaskan hasil akun, profil, dan logo secara terpisah
+   serta menjaga perubahan yang belum disimpan.
+4. PDF membedakan render dan pengiriman WhatsApp, polling berhenti setelah dua
+   menit, serta revisi/pencabutan memakai dialog beralasan.
+5. Keputusan REPORT, REQUEST, aktivasi, pemutusan WhatsApp, dan penonaktifan
+   knowledge meminta konfirmasi sebelum mutasi.
+
+Keberhasilan hanya diumumkan setelah backend mengonfirmasi. Kegagalan refresh
+setelah mutasi mengarahkan pengguna memuat data terbaru tanpa submit ulang.

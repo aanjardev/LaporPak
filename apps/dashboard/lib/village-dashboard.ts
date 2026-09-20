@@ -140,7 +140,7 @@ export async function getVillageDashboard(village: { id: string; name: string },
   try {
     const url = new URL(`/api/v1/villages/${encodeURIComponent(village.id)}/dashboard`, baseUrl);
     url.searchParams.set("days", String(days));
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(10000) });
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store", signal: AbortSignal.timeout(15_000) });
     if (!response.ok) {
       let code: string | null = null;
       try {
