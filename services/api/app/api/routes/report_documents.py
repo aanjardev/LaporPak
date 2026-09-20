@@ -58,6 +58,24 @@ def list_report_documents(
         raise _not_found(exc) from exc
 
 
+@router.post("/reports/{report_id}/documents/receipt", response_model=ReportDocument)
+def ensure_report_receipt(
+    report_id: UUID,
+    background_tasks: BackgroundTasks,
+    caller: AdminCaller,
+    session: SessionDep,
+) -> ReportDocument:
+    require_village_operator(caller)
+    try:
+        result = ReportDocumentService(session).ensure_receipt(
+            report_id, operator_scope(caller), caller.identifier
+        )
+    except ReportNotFoundError as exc:
+        raise _not_found(exc) from exc
+    background_tasks.add_task(process_pending_document_jobs)
+    return result
+
+
 @router.get("/reports/{report_id}/documents/{document_id}/download")
 def download_report_document(
     report_id: UUID,

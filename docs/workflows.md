@@ -714,6 +714,9 @@ Password tidak ditulis ke Git, migration, seed, atau dokumentasi.
    not retried automatically. Admin Desa can retry a failed job.
 6. Revisions create a new immutable version; replacement and revocation retain
    the previous audit record.
+7. For a REPORT created before document issuance was deployed, Admin Desa can
+   request the initial receipt from the report detail. The operation is
+   idempotent and reuses an existing receipt when retried.
 
 An incomplete letterhead never blocks ticket creation. The document job fails
 with a visible profile-completion task and can be retried after the profile is

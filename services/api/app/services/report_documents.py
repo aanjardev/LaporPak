@@ -420,6 +420,60 @@ class ReportDocumentService:
             row["storage_bucket"], row["storage_path"]
         ), "application/pdf"
 
+    def ensure_receipt(
+        self, report_id: UUID, unit_ids: tuple[UUID, ...], actor: str
+    ) -> ReportDocument:
+        with self.session.begin():
+            report_exists = self.session.execute(
+                select(reports.c.id)
+                .where(
+                    reports.c.id == report_id,
+                    reports.c.administrative_unit_id.in_(unit_ids),
+                )
+                .with_for_update()
+            ).scalar_one_or_none()
+            if report_exists is None:
+                raise ReportNotFoundError(report_id)
+            existing = (
+                self.session.execute(
+                    select(report_documents)
+                    .where(
+                        report_documents.c.report_id == report_id,
+                        report_documents.c.document_type
+                        == ReportDocumentType.RECEIPT.value,
+                    )
+                    .order_by(report_documents.c.version.desc())
+                )
+                .mappings()
+                .first()
+            )
+            if existing is not None:
+                return _document_model(existing)
+            document = (
+                self.session.execute(
+                    insert(report_documents)
+                    .values(
+                        report_id=report_id,
+                        document_type=ReportDocumentType.RECEIPT.value,
+                        version=1,
+                        issued_by=actor,
+                    )
+                    .returning(*report_documents.c)
+                )
+                .mappings()
+                .one()
+            )
+            self.session.execute(
+                insert(report_document_jobs).values(document_id=document["id"])
+            )
+            self._audit(
+                document["id"],
+                "queued",
+                actor,
+                "Initial receipt requested for an existing report",
+            )
+        return _document_model(document)
+
     def request_citizen_delivery(
         self,
         *,

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createReceiptDocument,
   getReportDocuments,
   retryReportDocument,
   reviseReportDocument,
@@ -30,6 +31,7 @@ test("dashboard memakai endpoint dokumen dan menjaga unggahan logo sebagai multi
   };
   try {
     await getReportDocuments(reportId);
+    await createReceiptDocument(reportId);
     await retryReportDocument(reportId, documentId);
     await reviseReportDocument(reportId, "receipt", "Koreksi lokasi");
     await revokeReportDocument(reportId, documentId, "Dokumen salah");
@@ -38,13 +40,14 @@ test("dashboard memakai endpoint dokumen dan menjaga unggahan logo sebagai multi
       new File([new Uint8Array([137, 80, 78, 71])], "logo.png", { type: "image/png" }),
     );
 
-    assert.equal(requests.length, 5);
+    assert.equal(requests.length, 6);
     assert.ok(requests.every(({ options }) => options.headers.Authorization === "Bearer admin-token"));
-    assert.match(requests[1].url, /\/retry$/);
-    assert.deepEqual(JSON.parse(requests[2].options.body), { document_type: "receipt", reason: "Koreksi lokasi" });
-    assert.match(requests[3].url, /\/revoke$/);
-    assert.ok(requests[4].options.body instanceof FormData);
-    assert.equal(requests[4].options.headers["Content-Type"], undefined);
+    assert.match(requests[1].url, /\/documents\/receipt$/);
+    assert.match(requests[2].url, /\/retry$/);
+    assert.deepEqual(JSON.parse(requests[3].options.body), { document_type: "receipt", reason: "Koreksi lokasi" });
+    assert.match(requests[4].url, /\/revoke$/);
+    assert.ok(requests[5].options.body instanceof FormData);
+    assert.equal(requests[5].options.headers["Content-Type"], undefined);
   } finally {
     global.fetch = originalFetch;
   }

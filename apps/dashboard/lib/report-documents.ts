@@ -15,6 +15,9 @@ export type ReportDocument = {
 export const getReportDocuments = (reportId: string) =>
   apiFetch<{ items: ReportDocument[] }>(`/api/v1/reports/${reportId}/documents`);
 
+export const createReceiptDocument = (reportId: string) =>
+  apiFetch<ReportDocument>(`/api/v1/reports/${reportId}/documents/receipt`, { method: "POST" });
+
 export const retryReportDocument = (reportId: string, documentId: string) =>
   apiFetch<ReportDocument>(`/api/v1/reports/${reportId}/documents/${documentId}/retry`, { method: "POST" });
 

@@ -970,6 +970,7 @@ All admin routes below require a Supabase bearer token for an authorized
 POST /api/v1/villages/{village_id}/logo
 GET  /api/v1/villages/{village_id}/logo
 GET  /api/v1/reports/{report_id}/documents
+POST /api/v1/reports/{report_id}/documents/receipt
 GET  /api/v1/reports/{report_id}/documents/{document_id}/download
 POST /api/v1/reports/{report_id}/documents/{document_id}/retry
 POST /api/v1/reports/{report_id}/documents/revisions
@@ -979,7 +980,9 @@ GET  /api/v1/verify/{verification_token}
 ```
 
 Logo upload is `multipart/form-data`, accepts a validated PNG or JPEG up to
-2 MB, and stores it in private Storage. Revision payload is
+2 MB, and stores it in private Storage. `POST .../documents/receipt`
+idempotently creates version 1 for a REPORT that predates automatic document
+issuance, or returns the existing receipt document. Revision payload is
 `{"document_type":"receipt|verified","reason":"..."}`; revoke uses
 `{"reason":"..."}`. The public verification response contains only
 `valid`, ticket number, document type, version, village name, issue time,
