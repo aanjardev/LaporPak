@@ -11,7 +11,11 @@ from app.core.security import (
     operator_scope,
     require_village_operator,
 )
-from app.services.openclaw_gateway import OpenClawGateway, _json_output
+from app.services.openclaw_gateway import (
+    OpenClawGateway,
+    _clear_status_cache,
+    _json_output,
+)
 
 UNIT_ID = UUID("00000000-0000-4000-8000-000000000002")
 
@@ -94,3 +98,32 @@ def test_whatsapp_binding_moves_exact_account_to_village_agent(monkeypatch, tmp_
         "whatsapp:default",
         "--json",
     ) in calls
+
+
+def test_openclaw_status_snapshot_is_reused_for_concurrent_dashboard_reads(
+    monkeypatch, tmp_path
+):
+    cli = tmp_path / "openclaw.exe"
+    cli.write_text("")
+    gateway = OpenClawGateway(str(cli))
+    calls = []
+
+    def fake_run(*args, **_kwargs):
+        calls.append(args)
+        return (
+            '{"gatewayReachable":true,"channelAccounts":{"whatsapp":'
+            '[{"accountId":"default","connected":true,"linked":true}]},'
+            '"channelDefaultAccountId":{"whatsapp":"default"},'
+            '"channels":{"whatsapp":{"self":{"e164":"+62000"}}}}'
+        )
+
+    _clear_status_cache()
+    monkeypatch.setattr(gateway, "_run", fake_run)
+
+    first, default_id = gateway.whatsapp_statuses()
+    second, _ = gateway.whatsapp_statuses()
+
+    assert default_id == "default"
+    assert first == second
+    assert len(calls) == 1
+    _clear_status_cache()

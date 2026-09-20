@@ -11,6 +11,7 @@ export async function POST() {
       );
     }
 
+    await supabase.auth.getClaims();
     const session = (await supabase.auth.getSession()).data.session;
     if (!session?.access_token) {
       return NextResponse.json(
@@ -19,7 +20,10 @@ export async function POST() {
       );
     }
 
-    return NextResponse.json({ token: session.access_token });
+    return NextResponse.json(
+      { token: session.access_token },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch {
     return NextResponse.json(
       { error: "Failed to get token" },

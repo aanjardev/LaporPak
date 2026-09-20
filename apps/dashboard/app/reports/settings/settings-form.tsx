@@ -2,8 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Bot, CheckCircle2, MessageCircle, Save, Send, UserRound } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Bot, CheckCircle2, LoaderCircle, MessageCircle, RefreshCw, Save, Send,
+  Smartphone, Unplug, UserRound,
+} from "lucide-react";
 import type { AdminMe, AdminVillage } from "@/lib/admin";
 import { submitActivation, updateMe } from "@/lib/admin";
 import {
@@ -18,14 +21,43 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
   const personality = metadata.ai_personality || {} as VillageAIPersonality;
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [pending, setPending] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [pairing, setPairing] = useState(false);
+  const [activating, setActivating] = useState(false);
   const [wa, setWa] = useState<WhatsAppChannelInfo | null>(null);
+  const [waLoading, setWaLoading] = useState(true);
+  const [waError, setWaError] = useState("");
   const [qr, setQr] = useState<string | null>(null);
+  const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
 
-  useEffect(() => { getWhatsAppStatus(village.id).then(setWa).catch((reason) => setError(reason.message)); }, [village.id]);
+  const refreshWhatsApp = useCallback(async () => {
+    setWaLoading(true);
+    setWaError("");
+    try {
+      const status = await getWhatsAppStatus(village.id);
+      setWa(status);
+      if (status.is_connected) {
+        setQr(null);
+        setQrExpiresAt(null);
+      }
+    } catch (reason) {
+      setWaError(reason instanceof Error ? reason.message : "Status WhatsApp tidak dapat diperiksa");
+    } finally {
+      setWaLoading(false);
+    }
+  }, [village.id]);
+
+  useEffect(() => {
+    let active = true;
+    getWhatsAppStatus(village.id)
+      .then((status) => { if (active) setWa(status); })
+      .catch((reason) => { if (active) setWaError(reason instanceof Error ? reason.message : "Status WhatsApp tidak dapat diperiksa"); })
+      .finally(() => { if (active) setWaLoading(false); });
+    return () => { active = false; };
+  }, [village.id]);
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setPending(true); setNotice(""); setError("");
+    event.preventDefault(); setSaving(true); setNotice(""); setError("");
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
     const nextMetadata: VillageMetadata = {
       ai_personality: {
@@ -47,27 +79,56 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
       await updateVillage(village.id, { name: String(data.village_name), metadata: nextMetadata });
       setNotice("Pengaturan berhasil disimpan.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan"); }
-    finally { setPending(false); }
+    finally { setSaving(false); }
   }
 
   async function pair() {
-    setPending(true); setError("");
-    try { const result = await startWhatsAppPairing(village.id); setQr(result.qr_data_url || null); setNotice(result.message); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Pairing gagal"); }
-    finally { setPending(false); }
+    setPairing(true); setNotice(""); setError(""); setWaError(""); setQr(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 90_000);
+    try {
+      const result = await startWhatsAppPairing(village.id, controller.signal);
+      setQr(result.qr_data_url || null);
+      setQrExpiresAt(result.expires_at || null);
+      setWa((current) => ({
+        ...current,
+        is_connected: result.connected,
+        status: result.status,
+        message: result.message,
+      }));
+      setNotice(result.message);
+    } catch (reason) {
+      setError(reason instanceof DOMException && reason.name === "AbortError"
+        ? "Gateway belum menyelesaikan persiapan QR dalam 90 detik. Coba lagi; provisioning yang sudah selesai akan digunakan ulang."
+        : reason instanceof Error ? reason.message : "QR WhatsApp gagal dibuat");
+    } finally {
+      window.clearTimeout(timeout);
+      setPairing(false);
+    }
+  }
+
+  async function disconnect() {
+    setPairing(true); setError("");
+    try {
+      await disconnectWhatsApp(village.id);
+      setQr(null); setQrExpiresAt(null);
+      setWa((current) => ({ ...current, is_connected: false, status: "disconnected" }));
+      setNotice("Koneksi WhatsApp berhasil diputuskan.");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Koneksi gagal diputuskan"); }
+    finally { setPairing(false); }
   }
 
   return <div className="space-y-6">
-    {(notice || error) && <p role="status" className={`${error ? "ui-alert-error" : "border-emerald-200 bg-emerald-50 text-emerald-900"} rounded-lg border px-4 py-3 text-sm`}>{error || notice}</p>}
+    {(notice || error) && <p role="status" className={`${error ? "ui-alert-error text-rose-900" : "ui-alert-success text-emerald-900"} border px-4 py-3 text-sm`}>{error || notice}</p>}
     <form onSubmit={save} className="space-y-6">
-      <section className="rounded-xl border border-border bg-card p-5 sm:p-6"><Header icon={UserRound} title="Akun" description="Identitas penanggung jawab desa." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <section className="ui-panel p-5 sm:p-6"><Header icon={UserRound} title="Akun" description="Identitas penanggung jawab desa." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Field label="Nama penanggung jawab" name="display_name" value={admin.display_name} required />
         <Field label="Email terverifikasi" name="email" value={admin.email} disabled />
         <Field label="Kontak penanggung jawab" name="contact_phone" value={admin.contact_phone} required />
         <div><span className="text-sm font-semibold">Kata sandi</span><Link href="/set-password" className="ui-control mt-1.5 flex items-center px-3 text-sm font-semibold text-brand">Ubah kata sandi</Link></div>
       </div></section>
 
-      <section className="rounded-xl border border-border bg-card p-5 sm:p-6"><Header icon={CheckCircle2} title="Profil Desa" description="Data wajib untuk pengajuan aktivasi." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <section className="ui-panel p-5 sm:p-6"><Header icon={CheckCircle2} title="Profil Desa" description="Data wajib untuk pengajuan aktivasi." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Field label="Nama desa" name="village_name" value={village.name} required /><Field label="Kode desa" name="village_code" value={metadata.village_code} required />
         <Field label="Provinsi" name="province" value={metadata.province} required /><Field label="Kabupaten/Kota" name="regency" value={metadata.regency} required />
         <Field label="Kecamatan" name="district" value={metadata.district} required /><Field label="Kontak layanan" name="service_phone" value={metadata.contact_phone} required />
@@ -75,28 +136,46 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
         <Field label="Alamat kantor" name="address" value={metadata.address} required wide />
       </div></section>
 
-      <section className="rounded-xl border border-border bg-card p-5 sm:p-6"><Header icon={Bot} title="Personalisasi AI" description="Personalisasi hanya berlaku untuk desa ini; guardrail tetap sama." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <section className="ui-panel p-5 sm:p-6"><Header icon={Bot} title="Personalisasi AI" description="Personalisasi hanya berlaku untuk desa ini; guardrail tetap sama." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Field label="Nama asisten" name="ai_name" value={personality.name || "LaporPak"} required /><Field label="Emoji" name="ai_emoji" value={personality.emoji || "📋"} />
         <Field label="Gaya bahasa" name="ai_tone" value={personality.tone || "santai dan familiar seperti tetangga"} required /><Field label="Karakter" name="ai_vibe" value={personality.vibe || "Tegas dan membantu"} required />
         <Field label="Sapaan" name="welcome_message" value={personality.welcome_message || "Selamat datang! Saya siap membantu Anda."} required wide />
-        <label className="flex items-center gap-3 text-sm font-semibold sm:col-span-2"><input type="checkbox" name="is_ai_enabled" defaultChecked={metadata.is_ai_enabled !== false} className="size-4" /> Asisten AI aktif</label>
+        <label className="flex min-h-11 items-center gap-3 text-sm font-semibold sm:col-span-2"><input type="checkbox" name="is_ai_enabled" defaultChecked={metadata.is_ai_enabled !== false} className="size-4" /> Asisten AI aktif</label>
         <input type="hidden" name="whatsapp_business_name" value={metadata.whatsapp_business_name || village.name} />
       </div></section>
 
-      <button disabled={pending} className="ui-primary gap-2"><Save size={17} />{pending ? "Menyimpan…" : "Simpan semua pengaturan"}</button>
+      <button disabled={saving} className="ui-primary gap-2"><Save size={17} />{saving ? "Menyimpan…" : "Simpan semua pengaturan"}</button>
     </form>
 
-    <section className="rounded-xl border border-border bg-card p-5 sm:p-6"><Header icon={MessageCircle} title="WhatsApp" description="Status selalu diperiksa langsung dari gateway OpenClaw." />
-      <div className="mt-5 flex flex-wrap items-center gap-3"><span className={`rounded-full px-3 py-1 text-xs font-semibold ${wa?.is_connected ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>{wa?.is_connected ? `Terhubung ${wa.phone_number || ""}` : "Belum terhubung"}</span>
-        <button type="button" onClick={pair} disabled={pending} className="ui-primary">{wa?.is_connected ? "Sambungkan ulang" : "Tampilkan QR"}</button>
-        {wa?.is_connected && <button type="button" onClick={async () => { await disconnectWhatsApp(village.id); setWa({ ...wa, is_connected: false, status: "disconnected" }); }} className="ui-secondary">Putuskan</button>}
+    <section className="ui-panel overflow-hidden">
+      <div className="border-b border-border p-5 sm:p-6"><Header icon={MessageCircle} title="WhatsApp" description="Status berasal langsung dari gateway OpenClaw, bukan dari konfigurasi tersimpan." /></div>
+      <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div>
+          <div className="flex items-center gap-3">
+            <span className={`flex size-11 items-center justify-center rounded-md ${wa?.is_connected ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
+              {waLoading ? <LoaderCircle className="animate-spin" size={20} /> : <Smartphone size={20} />}
+            </span>
+            <div><p className="text-sm font-bold">{waLoading ? "Memeriksa gateway…" : wa?.is_connected ? "WhatsApp terhubung" : "WhatsApp belum terhubung"}</p><p className="mt-1 text-xs text-muted-foreground">{wa?.phone_number || wa?.message || "Gunakan QR untuk menautkan perangkat desa."}</p></div>
+          </div>
+          {waError && <div className="ui-alert-warning mt-4 border px-4 py-3 text-sm text-amber-900"><p>{waError}</p><button type="button" onClick={() => void refreshWhatsApp()} className="mt-2 font-semibold underline underline-offset-4">Coba periksa lagi</button></div>}
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button type="button" onClick={pair} disabled={pairing || waLoading} className="ui-primary">
+              {pairing ? <><LoaderCircle className="animate-spin" size={17} />Menyiapkan QR…</> : <><RefreshCw size={17} />{wa?.is_connected ? "Sambungkan ulang" : "Tampilkan QR"}</>}
+            </button>
+            <button type="button" onClick={() => void refreshWhatsApp()} disabled={pairing || waLoading} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-input bg-card px-4 text-sm font-semibold text-brand hover:bg-muted disabled:opacity-60"><RefreshCw size={16} />Periksa status</button>
+            {wa?.is_connected && <button type="button" onClick={() => void disconnect()} disabled={pairing} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-rose-200 px-4 text-sm font-semibold text-rose-700 hover:bg-rose-50"><Unplug size={16} />Putuskan</button>}
+          </div>
+          {pairing && <p className="mt-3 text-xs leading-5 text-muted-foreground">OpenClaw sedang menyiapkan akun kanal dan QR. Setup pertama dapat lebih lama; jangan menutup halaman.</p>}
+        </div>
+        <div className="flex min-h-64 items-center justify-center rounded-lg border border-dashed border-input bg-muted/40 p-4">
+          {qr ? <div className="text-center"><Image unoptimized src={qr} alt="QR pairing WhatsApp" width={240} height={240} className="mx-auto bg-white" /><p className="mt-3 text-xs text-muted-foreground">Pindai dari WhatsApp → Perangkat tertaut.</p>{qrExpiresAt && <p className="mt-1 text-[11px] text-muted-foreground">QR berlaku sampai {new Date(qrExpiresAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}.</p>}</div> : <div className="max-w-56 text-center text-muted-foreground"><MessageCircle className="mx-auto" size={32} /><p className="mt-3 text-sm">QR akan tampil di area ini setelah gateway siap.</p></div>}
+        </div>
       </div>
-      {qr && <div className="mt-5 inline-block rounded-xl border border-border bg-white p-4"><Image unoptimized src={qr} alt="QR pairing WhatsApp" width={260} height={260} /><p className="mt-2 max-w-[260px] text-center text-xs text-muted-foreground">QR bersifat sementara. Pindai dari menu Perangkat tertaut.</p></div>}
     </section>
 
-    {village.activation_status !== "approved" && <section className="rounded-xl border border-amber-200 bg-amber-50 p-5"><h2 className="font-bold text-amber-950">Aktivasi desa</h2><p className="mt-2 text-sm text-amber-900">Status: {village.activation_status.replaceAll("_", " ")}{village.activation_review_reason ? ` — ${village.activation_review_reason}` : ""}</p><button type="button" disabled={pending || village.activation_status === "pending_review"} onClick={async () => { try { await submitActivation(village.id); setNotice("Pengajuan aktivasi dikirim."); } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengajuan gagal"); } }} className="ui-primary mt-4 gap-2"><Send size={16} />Ajukan aktivasi</button></section>}
+    {village.activation_status !== "approved" && <section className="ui-alert-warning border p-5"><h2 className="font-bold text-amber-950">Aktivasi desa</h2><p className="mt-2 text-sm text-amber-900">Status: {village.activation_status.replaceAll("_", " ")}{village.activation_review_reason ? ` — ${village.activation_review_reason}` : ""}</p><button type="button" disabled={activating || village.activation_status === "pending_review"} onClick={async () => { setActivating(true); try { await submitActivation(village.id); setNotice("Pengajuan aktivasi dikirim."); } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengajuan gagal"); } finally { setActivating(false); } }} className="ui-primary mt-4 gap-2"><Send size={16} />{activating ? "Mengirim…" : "Ajukan aktivasi"}</button></section>}
   </div>;
 }
 
-function Header({ icon: Icon, title, description }: { icon: typeof UserRound; title: string; description: string }) { return <div className="flex gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand text-white"><Icon size={19} /></div><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div></div>; }
-function Field({ label, name, value, required, disabled, wide }: { label: string; name: string; value?: string; required?: boolean; disabled?: boolean; wide?: boolean }) { return <label className={`block text-sm font-semibold ${wide ? "sm:col-span-2" : ""}`}>{label}<input name={name} defaultValue={value || ""} required={required} disabled={disabled} className={`${input} disabled:bg-muted`} /></label>; }
+function Header({ icon: Icon, title, description }: { icon: typeof UserRound; title: string; description: string }) { return <div className="flex gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-brand text-white"><Icon size={19} /></div><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div></div>; }
+function Field({ label, name, value, required, disabled, wide }: { label: string; name: string; value?: string; required?: boolean; disabled?: boolean; wide?: boolean }) { return <label className={`block text-sm font-semibold ${wide ? "sm:col-span-2" : ""}`}>{label}{required && <span className="ml-1 text-rose-600">*</span>}<input name={name} defaultValue={value || ""} required={required} disabled={disabled} className={`${input} disabled:bg-muted`} /></label>; }
