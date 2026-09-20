@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
 import { Menu, X } from "lucide-react";
@@ -18,7 +19,7 @@ export function MobileNavigation({ showKnowledge, accountName, villageName }: { 
             <Dialog.Title className="text-sm font-semibold">Navigasi LaporPak</Dialog.Title>
             <Dialog.Close aria-label="Tutup navigasi" className="inline-flex size-11 shrink-0 items-center justify-center rounded-md hover:bg-white/10 focus-visible:outline-primary"><X size={21} /></Dialog.Close>
           </div>
-          <div className="mt-4 rounded-md bg-card p-3"><BrandLogo /></div>
+          <Link href="/reports/dashboard" onClick={() => setOpen(false)} className="mt-4 rounded-md bg-card p-3"><BrandLogo /></Link>
           <div className="mt-4 rounded-lg border border-white/15 px-3 py-3"><p className="text-sm font-semibold">{accountName}</p><p className="mt-1 text-xs text-white/65">{villageName}</p></div>
           <ReportsNav showKnowledge={showKnowledge} onNavigate={() => setOpen(false)} />
           <p className="mt-auto pt-8 text-xs leading-5 text-white/70">Portal pelayanan dan pengaduan desa</p>

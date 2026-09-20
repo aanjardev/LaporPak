@@ -91,7 +91,7 @@ Panduan visual ada di [docs/design-system.md](../../docs/design-system.md).
 Auth, REPORT, REQUEST, dan ASK memakai Plus Jakarta Sans, sidebar navy,
 aksen kuning, token semantik Tailwind, dan kontrol minimal 44 px.
 Navigasi di bawah 1024 px memakai dialog Base UI (Escape, focus trap, dan
-pengembalian fokus ditangani komponen). Halaman awal tetap `/reports`.
+pengembalian fokus ditangani komponen). Beranda Admin Desa berada pada `/reports/dashboard`; daftar laporan tetap pada `/reports`.
 
 Logo berasal dari aset tim; turunan lokal ada di `public/brand/` dan
 `app/icon.png`/`app/favicon.ico`. Wordmark memakai `next/image`; foto laporan
@@ -102,3 +102,27 @@ Audit UI 19 September 2026: pengguna mengonfirmasi tampilan 390/768/1280 px,
 menu ponsel/Escape, navigasi, dan tidak adanya overflow aman. Koneksi browser
 agent mengalami timeout CDP; hasil manual ini tidak menggantikan pengujian
 ulang login, logout, penyimpanan aksi, atau izin backend pada environment nyata.
+
+## Dashboard Analitik Admin Desa
+
+Beranda Admin Desa berada pada `/reports/dashboard`; `/reports` tetap daftar
+laporan. Super Admin tetap menggunakan `/admin`. Kontrak endpoint dan bukti
+integrasi ada di `../../docs/village-analytics-dashboard.md`.
+
+Untuk pratinjau lokal, gunakan `REPORTS_DATA_SOURCE=mock` di `.env.local`,
+lalu restart `npm run dev` bila environment belum dimuat ulang. Login dan
+profil admin desa aktif tetap wajib; mock bukan pengganti otorisasi.
+
+- `/reports/dashboard?days=7` (juga 30 atau 90): contoh berisi data.
+- `/reports/dashboard?scenario=empty`: semua angka nol.
+- `/reports/dashboard?scenario=slow`: respons tertunda 1,5 detik.
+- `/reports/dashboard?scenario=error`: kegagalan layanan.
+
+Skenario hanya bekerja pada mode mock development. Mock ditutup saat production.
+Antrean mock tidak membuka ID sintetis pada endpoint detail nyata. Pada mode API,
+antrean menautkan detail REPORT/REQUEST/ASK. Integrasi API/database development
+sudah diuji; tidak ada fallback mock ketika API gagal. Environment lokal pengguna
+tidak perlu diganti ke mock untuk integrasi API.
+
+Jalankan `npm run test:dashboard` untuk kontrak, periode WIB, nol, pemetaan
+tautan, status HTTP, jaringan gagal, dan isolasi mode data.
