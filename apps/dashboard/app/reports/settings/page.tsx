@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentAdmin } from "@/lib/auth";
 import { SettingsForm } from "./settings-form";
 
+export const dynamic = "force-dynamic";
+
 export default async function SettingsPage() {
   const admin = await getCurrentAdmin();
   if (!admin || admin.role !== "village_admin") redirect("/");
