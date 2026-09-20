@@ -22,6 +22,7 @@ class Settings(BaseSettings):
 
     openclaw_api_url: str = ""
     openclaw_api_key: SecretStr | None = None
+    openclaw_cli_path: str = "openclaw"
     dashboard_admin_unit_id: UUID | None = None
     knowledge_storage_bucket: str = "knowledge-files"
     knowledge_max_upload_bytes: int = 10 * 1024 * 1024

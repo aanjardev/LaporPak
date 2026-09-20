@@ -44,6 +44,22 @@ export async function loginAction(_state: AuthState, formData: FormData): Promis
   redirect(safeReturnPath(formData.get("next")));
 }
 
+export async function signupAction(_state: AuthState, formData: FormData): Promise<AuthState> {
+  const email = formData.get("email");
+  const password = formData.get("password");
+  const confirmation = formData.get("confirmation");
+  if (typeof email !== "string" || typeof password !== "string" || typeof confirmation !== "string") {
+    return { message: "Isi seluruh data pendaftaran." };
+  }
+  if (password !== confirmation) return { message: "Konfirmasi kata sandi tidak cocok." };
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { message: "Pendaftaran belum dikonfigurasi." };
+  const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+  if (error) return { message: "Pendaftaran gagal. Periksa email dan kekuatan kata sandi." };
+  if (data.session) redirect("/onboarding");
+  return { message: "Periksa email Anda untuk verifikasi, lalu masuk." };
+}
+
 export async function acceptInvitationAction(_state: AuthState, formData: FormData): Promise<AuthState> {
   const tokenHash = formData.get("token_hash");
   if (typeof tokenHash !== "string" || !tokenHash) {
@@ -85,7 +101,7 @@ export async function setPasswordAction(_state: AuthState, formData: FormData): 
     return { message: "Layanan kata sandi belum tersedia. Coba lagi nanti." };
   }
 
-  redirect("/reports");
+  redirect("/");
 }
 
 export async function logoutAction() {

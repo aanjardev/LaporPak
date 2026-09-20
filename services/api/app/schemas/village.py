@@ -55,6 +55,11 @@ class VillageMetadata(StrictSchema):
     contact_phone: str | None = None
     contact_email: str | None = None
     address: str | None = None
+    village_code: str | None = None
+    province: str | None = None
+    regency: str | None = None
+    district: str | None = None
+    office_hours: str | None = None
 
 
 # ============================================================================
@@ -78,7 +83,7 @@ class VillageCreate(StrictSchema):
     @field_validator("level")
     @classmethod
     def validate_level(cls, value: str) -> str:
-        allowed = {"village", "district", "city", "province"}
+        allowed = {"village", "subdistrict", "regency", "agency", "other"}
         if value.lower() not in allowed:
             raise ValueError(f"level must be one of: {', '.join(allowed)}")
         return value.lower()
@@ -127,6 +132,11 @@ class VillageMetadataResponse(StrictSchema):
     contact_phone: str | None
     contact_email: str | None
     address: str | None
+    village_code: str | None
+    province: str | None
+    regency: str | None
+    district: str | None
+    office_hours: str | None
 
 
 class VillageResponse(StrictSchema):
@@ -138,6 +148,10 @@ class VillageResponse(StrictSchema):
     parent_id: UUID | None
     metadata: VillageMetadataResponse
     is_active: bool
+    activation_status: str
+    activation_requested_at: datetime | None
+    activation_reviewed_at: datetime | None
+    activation_review_reason: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -159,6 +173,8 @@ class VillageStats(StrictSchema):
     pending_requests: int = 0
     knowledge_documents: int = 0
     whatsapp_connected: bool = False
+    report_status_counts: dict[str, int] = Field(default_factory=dict)
+    request_status_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class VillageDetailResponse(StrictSchema):
@@ -170,6 +186,10 @@ class VillageDetailResponse(StrictSchema):
     parent_id: UUID | None
     metadata: VillageMetadataResponse
     is_active: bool
+    activation_status: str
+    activation_requested_at: datetime | None
+    activation_reviewed_at: datetime | None
+    activation_review_reason: str | None
     created_at: datetime
     updated_at: datetime
     stats: VillageStats
@@ -187,6 +207,16 @@ class WhatsAppChannelInfo(StrictSchema):
     is_connected: bool = False
     connected_at: datetime | None = None
     last_message_at: datetime | None = None
+    status: str = "disconnected"
+    message: str | None = None
+
+
+class WhatsAppPairingResponse(StrictSchema):
+    status: str
+    connected: bool = False
+    qr_data_url: str | None = None
+    expires_at: datetime | None = None
+    message: str
 
 
 class VillageChannelResponse(StrictSchema):

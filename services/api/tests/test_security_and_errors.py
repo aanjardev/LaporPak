@@ -74,7 +74,11 @@ def configure_tokens(monkeypatch):
         if headers["Authorization"] == "Bearer admin-token":
             return httpx.Response(
                 200,
-                json={"id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"},
+                json={
+                    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                    "email": "admin@example.com",
+                    "email_confirmed_at": "2026-09-20T00:00:00Z",
+                },
             )
         return httpx.Response(401, json={"message": "invalid token"})
 

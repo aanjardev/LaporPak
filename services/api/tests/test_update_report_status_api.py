@@ -43,6 +43,11 @@ class FakeStatusService:
 @pytest.fixture
 def auth_tokens(monkeypatch):
     monkeypatch.setattr(settings, "allow_legacy_admin_fallback", True)
+    monkeypatch.setattr(
+        settings,
+        "dashboard_admin_unit_id",
+        UUID("00000000-0000-4000-8000-000000000002"),
+    )
     monkeypatch.setattr(settings, "openclaw_api_key", SecretStr("openclaw-token"))
 
     def verify(token):
@@ -123,6 +128,7 @@ def test_authenticated_patch_ends_auth_transaction_before_write(monkeypatch):
                         "role": "village_admin",
                     }
                 ),
+                Result([unit_id]),
                 Result([unit_id]),
             ]
             self.transaction_active = False

@@ -11,6 +11,7 @@
 integrations/openclaw/workspace/memory/
 integrations/openclaw/workspace/*.session.*
 integrations/openclaw/workspace/DREAMS.md
+integrations/openclaw/workspaces/
 
 !**/.env.example
 

@@ -1,218 +1,74 @@
-/**
- * Admin invitation API client for multi-desa support.
- */
-
-import { getBrowserAccessToken } from "./supabase/browser";
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function getToken(): Promise<string> {
-  const response = await fetch('/api/auth/token', {
-    method: 'POST',
-    credentials: 'include',
-  });
-  if (!response.ok) {
-    throw new Error('Failed to get auth token');
-  }
-  const data = await response.json();
-  return data.token;
+  const response = await fetch("/api/auth/token", { method: "POST", credentials: "include" });
+  if (!response.ok) throw new Error("Sesi admin tidak tersedia");
+  return (await response.json()).token;
 }
 
-async function apiFetch<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const token = await getBrowserAccessToken();
-
+export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const token = await getToken();
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...options.headers },
   });
-
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: "Request failed" }));
-    throw new Error(error.message || `API error: ${response.status}`);
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error?.message || body?.message || "Permintaan gagal");
   }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json();
+  return response.status === 204 ? (undefined as T) : response.json();
 }
-
-// ============================================================================
-// Types
-// ============================================================================
 
 export type AdminRole = "system_admin" | "village_admin";
 
-export interface AdminInvitation {
+export interface AdminVillage {
   id: string;
-  email: string;
-  role: AdminRole;
-  village_id?: string;
-  village_name?: string;
-  status: "pending" | "accepted" | "expired" | "revoked";
-  invited_by?: string;
-  invited_at: string;
-  expires_at?: string;
-  accepted_at?: string;
-}
-
-export interface AdminInvitationListResponse {
-  items: AdminInvitation[];
-  total: number;
-}
-
-export interface AdminAccount {
-  id: string;
-  email?: string;
-  display_name?: string;
-  role: AdminRole;
-  villages: Array<{ id: string; name: string }>;
+  name: string;
+  level: string;
+  metadata: Record<string, unknown>;
   is_active: boolean;
-  created_at: string;
+  activation_status: "draft" | "pending_review" | "changes_requested" | "approved";
+  activation_requested_at?: string;
+  activation_reviewed_at?: string;
+  activation_review_reason?: string;
 }
 
-export interface AdminAccountListResponse {
-  items: AdminAccount[];
-  total: number;
-}
-
-// ============================================================================
-// Invitation API Functions
-// ============================================================================
-
-/**
- * Create an invitation for a new admin.
- */
-export async function createInvitation(data: {
+export interface AdminMe {
+  id: string;
+  auth_user_id: string;
   email: string;
+  email_verified: boolean;
+  display_name?: string;
+  contact_phone?: string;
   role: AdminRole;
-  village_id?: string;
-}): Promise<AdminInvitation> {
-  return apiFetch<AdminInvitation>("/api/v1/admin/invitations", {
-    method: "POST",
-    body: JSON.stringify(data),
+  role_label: string;
+  villages: AdminVillage[];
+}
+
+export interface VillageMonitoring extends AdminVillage {
+  profile_complete: boolean;
+  whatsapp_connected: boolean;
+  total_reports: number;
+  report_status_counts: Record<string, number>;
+  total_requests: number;
+  request_status_counts: Record<string, number>;
+  knowledge_documents: number;
+}
+
+export interface VillageMonitoringResponse { items: VillageMonitoring[]; total: number }
+
+export const getMe = () => apiFetch<AdminMe>("/api/v1/admin/me");
+export const updateMe = (data: { display_name?: string; contact_phone?: string }) =>
+  apiFetch<AdminMe>("/api/v1/admin/me", { method: "PATCH", body: JSON.stringify(data) });
+export const submitActivation = (villageId: string) =>
+  apiFetch<AdminVillage>(`/api/v1/admin/villages/${villageId}/activation-submission`, { method: "POST" });
+export const getActivationQueue = () =>
+  apiFetch<VillageMonitoringResponse>("/api/v1/admin/activation-queue");
+export const getMonitoring = () =>
+  apiFetch<VillageMonitoringResponse>("/api/v1/admin/monitoring");
+export const decideActivation = (villageId: string, status: "approved" | "changes_requested", reason?: string) =>
+  apiFetch<AdminVillage>(`/api/v1/admin/villages/${villageId}/activation`, {
+    method: "PATCH", body: JSON.stringify({ status, reason: reason || null }),
   });
-}
-
-/**
- * List admin invitations.
- */
-export async function getInvitations(params?: {
-  page?: number;
-  page_size?: number;
-  status?: string;
-  role?: AdminRole;
-  village_id?: string;
-}): Promise<AdminInvitationListResponse> {
-  const searchParams = new URLSearchParams();
-  if (params?.page) searchParams.set("page", params.page.toString());
-  if (params?.page_size) searchParams.set("page_size", params.page_size.toString());
-  if (params?.status) searchParams.set("status_filter", params.status);
-  if (params?.role) searchParams.set("role", params.role);
-  if (params?.village_id) searchParams.set("village_id", params.village_id);
-
-  const query = searchParams.toString();
-  return apiFetch<AdminInvitationListResponse>(`/api/v1/admin/invitations${query ? `?${query}` : ""}`);
-}
-
-/**
- * Revoke an invitation.
- */
-export async function revokeInvitation(invitationId: string): Promise<void> {
-  return apiFetch<void>(`/api/v1/admin/invitations/${invitationId}`, {
-    method: "DELETE",
-  });
-}
-
-/**
- * Resend an invitation.
- */
-export async function resendInvitation(invitationId: string): Promise<AdminInvitation> {
-  return apiFetch<AdminInvitation>(`/api/v1/admin/invitations/${invitationId}/resend`, {
-    method: "POST",
-  });
-}
-
-// ============================================================================
-// Admin Account API Functions
-// ============================================================================
-
-/**
- * List admin accounts.
- */
-export async function getAdminAccounts(params?: {
-  page?: number;
-  page_size?: number;
-  role?: AdminRole;
-  is_active?: boolean;
-  search?: string;
-}): Promise<AdminAccountListResponse> {
-  const searchParams = new URLSearchParams();
-  if (params?.page) searchParams.set("page", params.page.toString());
-  if (params?.page_size) searchParams.set("page_size", params.page_size.toString());
-  if (params?.role) searchParams.set("role", params.role);
-  if (params?.is_active !== undefined) searchParams.set("is_active", params.is_active.toString());
-  if (params?.search) searchParams.set("search", params.search);
-
-  const query = searchParams.toString();
-  return apiFetch<AdminAccountListResponse>(`/api/v1/admin/accounts${query ? `?${query}` : ""}`);
-}
-
-/**
- * Update an admin account.
- */
-export async function updateAdminAccount(
-  accountId: string,
-  data: {
-    display_name?: string;
-    is_active?: boolean;
-    role?: AdminRole;
-  }
-): Promise<AdminAccount> {
-  return apiFetch<AdminAccount>(`/api/v1/admin/accounts/${accountId}`, {
-    method: "PATCH",
-    body: JSON.stringify(data),
-  });
-}
-
-// ============================================================================
-// Village-Admin Membership API Functions
-// ============================================================================
-
-/**
- * Assign an admin to a village.
- */
-export async function assignAdminToVillage(
-  villageId: string,
-  adminId: string
-): Promise<{
-  message: string;
-  admin_id: string;
-  village_id: string;
-  village_name: string;
-}> {
-  return apiFetch(`/api/v1/admin/villages/${villageId}/admins`, {
-    method: "POST",
-    body: JSON.stringify({ admin_id: adminId }),
-  });
-}
-
-/**
- * Remove an admin from a village.
- */
-export async function removeAdminFromVillage(
-  villageId: string,
-  adminId: string
-): Promise<void> {
-  return apiFetch<void>(`/api/v1/admin/villages/${villageId}/admins/${adminId}`, {
-    method: "DELETE",
-  });
-}
+export const onboardVillage = (data: Record<string, string>) =>
+  apiFetch<AdminMe>("/api/v1/admin/onboarding", { method: "POST", body: JSON.stringify(data) });

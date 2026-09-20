@@ -662,3 +662,40 @@ Retry dengan key, payload, dan desa yang sama mengembalikan tiket lama. Key
 yang sama dengan payload atau desa berbeda menghasilkan
 `409 DUPLICATE_OPERATION`. Pengujian demo hanya memakai data sintetis dan
 selalu menyebutkan bahwa tiket bukan surat resmi.
+
+---
+
+## 23. Onboarding dan aktivasi desa
+
+```text
+verifikasi email Supabase
+  ↓
+buat akun village_admin + administrative_unit + membership secara atomik
+  ↓
+lengkapi akun dan profil desa
+  ↓
+submit aktivasi
+  ↓
+system_admin menilai profil agregat
+  ├── approved → desa menjadi scope operasional
+  └── changes_requested → admin desa memperbaiki dan submit ulang
+```
+
+Sebelum `approved`, Admin Desa hanya dapat membuka akun, profil, serta
+persiapan WhatsApp. Create/read/mutation REPORT, REQUEST, dan knowledge gagal
+tertutup. Super Admin tidak dapat memakai endpoint operasional desa.
+
+Status WhatsApp berasal dari gateway OpenClaw. QR yang kedaluwarsa diminta
+ulang, kegagalan gateway tidak mengaktifkan channel, dan satu account ID tidak
+boleh dipakai dua desa.
+
+Super Admin tidak dibuat lewat UI. Operator server menetapkan
+`SUPERADMIN_EMAIL`, `SUPERADMIN_PASSWORD`, dan opsional
+`SUPERADMIN_DISPLAY_NAME` pada environment lokal, lalu menjalankan:
+
+```powershell
+cd services/api
+uv run python -m app.db.provision_super_admin
+```
+
+Password tidak ditulis ke Git, migration, seed, atau dokumentasi.

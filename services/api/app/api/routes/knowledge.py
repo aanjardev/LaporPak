@@ -8,7 +8,12 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.errors import APIError
-from app.core.security import AdminCaller, AdminRole, OpenClawCaller
+from app.core.security import (
+    AdminCaller,
+    OpenClawCaller,
+    operator_scope,
+    require_village_operator,
+)
 from app.db.session import get_db_session
 from app.schemas.knowledge import (
     EmbeddingComplete,
@@ -61,29 +66,24 @@ async def read_source(file: UploadFile | None, pasted_content: str | None):
 
 
 def unit_scope(caller):
-    return None if caller.role is AdminRole.SYSTEM_ADMIN else caller.unit_ids
+    require_village_operator(caller)
+    return operator_scope(caller)
 
 
 def choose_unit(caller, requested: UUID | None) -> UUID:
-    if caller.role is AdminRole.SYSTEM_ADMIN:
-        if requested is None:
-            raise APIError(
-                status_code=422,
-                code="VALIDATION_ERROR",
-                message="administrative_unit_id is required for system admin",
-            )
-        return requested
-    if requested is not None and requested not in caller.unit_ids:
+    units = unit_scope(caller)
+    if requested is not None and requested not in units:
         raise APIError(
             status_code=403,
             code="FORBIDDEN",
             message="Village is outside admin scope",
         )
-    return requested or caller.unit_ids[0]
+    return requested or units[0]
 
 
 def can_review(caller) -> bool:
-    return caller.role is AdminRole.VILLAGE_ADMIN
+    require_village_operator(caller)
+    return caller.admin_account_id is not None
 
 
 def embedding_review_sql(alias: str | None = None) -> str:
@@ -95,10 +95,11 @@ def embedding_review_sql(alias: str | None = None) -> str:
 
 @router.post("/preview", response_model=KnowledgePreview)
 async def preview(
-    _caller: AdminCaller,
+    caller: AdminCaller,
     file: Annotated[UploadFile | None, File()] = None,
     pasted_content: Annotated[str | None, Form()] = None,
 ) -> KnowledgePreview:
+    require_village_operator(caller)
     _, content, source_type = await read_source(file, pasted_content)
     chunks = chunk_content(content)
     return KnowledgePreview(
@@ -224,18 +225,13 @@ def review_document(
     caller: AdminCaller,
     session: Annotated[Session, Depends(get_db_session)],
 ) -> KnowledgeDocumentDetail:
-    if caller.role is not AdminRole.VILLAGE_ADMIN or caller.admin_account_id is None:
-        raise APIError(
-            status_code=403,
-            code="FORBIDDEN",
-            message="Village administrator role required",
-        )
+    require_village_operator(caller)
     try:
         return KnowledgeService(session).review(
             document_id,
             payload.status,
             payload.reason,
-            caller.unit_ids,
+            operator_scope(caller),
             caller.admin_account_id,
         )
     except ReportNotFoundError as exc:

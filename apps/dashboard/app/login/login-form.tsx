@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { loginAction } from "@/app/auth-actions";
+import Link from "next/link";
 
 export function LoginForm({ next, configured }: { next: string; configured: boolean }) {
   const [state, action, pending] = useActionState(loginAction, { message: "" });
@@ -22,6 +23,7 @@ export function LoginForm({ next, configured }: { next: string; configured: bool
       <button type="submit" disabled={!configured || pending} className="ui-primary w-full disabled:cursor-not-allowed disabled:bg-slate-400">
         {pending ? "Sedang masuk…" : "Masuk"}
       </button>
+      <p className="text-center text-sm text-muted-foreground">Belum memiliki akun? <Link href="/signup" className="font-semibold text-brand underline-offset-4 hover:underline">Daftar Admin Desa</Link></p>
     </form>
   );
 }

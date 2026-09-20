@@ -36,7 +36,11 @@ def migrations() -> list[Migration]:
             Migration(
                 version=int(match.group(1)),
                 path=path,
-                checksum=hashlib.sha256(path.read_bytes()).hexdigest(),
+                # Git may check SQL out as CRLF on Windows. The migration
+                # content is unchanged, so keep the ledger checksum portable.
+                checksum=hashlib.sha256(
+                    path.read_text(encoding="utf-8").replace("\r\n", "\n").encode()
+                ).hexdigest(),
             )
         )
     return sorted(result, key=lambda item: item.version)
@@ -66,7 +70,8 @@ def verify_checksums(known: list[Migration], recorded) -> None:
             raise RuntimeError(
                 f"Recorded migration {version:04d} is missing or renamed"
             )
-        if migration.checksum != checksum:
+        raw_checksum = hashlib.sha256(migration.path.read_bytes()).hexdigest()
+        if migration.checksum != checksum and raw_checksum != checksum:
             raise RuntimeError(f"Checksum changed for applied migration {filename}")
 
 

@@ -83,8 +83,8 @@ class FakeReadReportService:
             total=1,
         )
 
-    def get_report_detail(self, report_id):
-        self.detail_calls.append(report_id)
+    def get_report_detail(self, report_id, unit_ids):
+        self.detail_calls.append((report_id, unit_ids))
         if self.error is not None:
             raise self.error
         return report_detail()
@@ -99,6 +99,11 @@ class FakeReadReportService:
 @pytest.fixture
 def auth_tokens(monkeypatch):
     monkeypatch.setattr(settings, "allow_legacy_admin_fallback", True)
+    monkeypatch.setattr(
+        settings,
+        "dashboard_admin_unit_id",
+        UUID("00000000-0000-4000-8000-000000000002"),
+    )
     monkeypatch.setattr(settings, "openclaw_api_key", SecretStr("openclaw-token"))
 
     def verify(token):
@@ -219,7 +224,13 @@ def test_attachment_endpoint_returns_private_image(auth_tokens):
     assert response.content == b"image-bytes"
     assert response.headers["content-type"] == "image/jpeg"
     assert response.headers["content-disposition"] == "inline"
-    assert service.attachment_calls == [(REPORT_ID, attachment_id, None)]
+    assert service.attachment_calls == [
+        (
+            REPORT_ID,
+            attachment_id,
+            (UUID("00000000-0000-4000-8000-000000000002"),),
+        )
+    ]
 
 
 def test_attachment_endpoint_hides_missing_or_out_of_scope_attachment(auth_tokens):

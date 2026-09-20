@@ -1,45 +1,39 @@
-"""WhatsApp setup API routes for multi-desa support."""
+"""Village-owned WhatsApp pairing backed by the OpenClaw gateway."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import APIError
 from app.core.security import AdminCaller, AdminRole
 from app.db.session import get_db_session
 from app.db.tables import administrative_units, channel_integrations
-from app.schemas.village import WhatsAppChannelInfo
+from app.schemas.village import WhatsAppChannelInfo, WhatsAppPairingResponse
+from app.services.openclaw_gateway import OpenClawGateway, OpenClawGatewayError
+from app.services.openclaw_workspace import get_openclaw_workspace_service
 
 router = APIRouter(prefix="/api/v1/villages", tags=["WhatsApp Setup"])
-
-
 SessionDep = Annotated[Session, Depends(get_db_session)]
 
 
-def require_admin_access(caller: AdminCaller, village_id: UUID) -> AdminCaller:
-    """Require admin access to village."""
-    if caller.role == AdminRole.VILLAGE_ADMIN and village_id not in caller.unit_ids:
+def _require_owner(caller: AdminCaller, village_id: UUID) -> None:
+    if caller.role is not AdminRole.VILLAGE_ADMIN or village_id not in caller.unit_ids:
         raise APIError(
             status_code=403,
             code="FORBIDDEN",
-            message="You don't have access to this village",
+            message="Village administrator membership required",
         )
-    return caller
 
 
-def get_village_or_404(session: Session, village_id: UUID) -> dict:
-    """Get village by ID or raise 404."""
+def _village(session: Session, village_id: UUID) -> dict:
     row = session.execute(
-        select(administrative_units).where(
-            administrative_units.c.id == village_id,
-            administrative_units.c.is_active.is_(True),
-        )
+        select(administrative_units).where(administrative_units.c.id == village_id)
     ).mappings().one_or_none()
-
     if row is None:
         raise APIError(
             status_code=404,
@@ -49,13 +43,101 @@ def get_village_or_404(session: Session, village_id: UUID) -> dict:
     return dict(row)
 
 
-def check_whatsapp_webhook_configured() -> bool:
-    """Check if WhatsApp webhook is properly configured."""
-    from app.core.config import settings
-    return bool(
-        settings.whatsapp_access_token
-        and settings.whatsapp_phone_number_id
-        and settings.whatsapp_verify_token
+def _channel(session: Session, village_id: UUID):
+    return session.execute(
+        select(channel_integrations).where(
+            channel_integrations.c.administrative_unit_id == village_id,
+            channel_integrations.c.channel == "whatsapp",
+        )
+    ).mappings().one_or_none()
+
+
+def _gateway() -> OpenClawGateway:
+    try:
+        return OpenClawGateway()
+    except OpenClawGatewayError as exc:
+        raise APIError(
+            status_code=503,
+            code="OPENCLAW_UNAVAILABLE",
+            message="WhatsApp gateway is unavailable",
+        ) from exc
+
+
+def _gateway_error() -> APIError:
+    return APIError(
+        status_code=503,
+        code="OPENCLAW_UNAVAILABLE",
+        message="WhatsApp gateway operation failed",
+    )
+
+
+@router.post(
+    "/{village_id}/whatsapp/pairing",
+    response_model=WhatsAppPairingResponse,
+)
+def start_pairing(
+    village_id: UUID, caller: AdminCaller, session: SessionDep
+) -> WhatsAppPairingResponse:
+    _require_owner(caller, village_id)
+    village = _village(session, village_id)
+    channel = _channel(session, village_id)
+    account_id = (
+        channel["external_account_id"] if channel else f"laporpak-{village_id.hex}"
+    )
+    gateway = _gateway()
+    agent_id = f"laporpak-{village_id.hex[:12]}"
+    try:
+        workspace_service = get_openclaw_workspace_service()
+        workspace_service.create_workspace_from_village_config(village_id, village)
+        gateway.ensure_village_agent(
+            agent_id, workspace_service.get_workspace_path(village_id)
+        )
+        gateway.ensure_whatsapp_account(account_id, village["name"], agent_id)
+        result = gateway.start_pairing(account_id)
+    except OpenClawGatewayError as exc:
+        raise _gateway_error() from exc
+
+    connected = bool(result.get("connected"))
+    now = datetime.now(UTC)
+    try:
+        if channel:
+            session.execute(
+                channel_integrations.update()
+                .where(channel_integrations.c.id == channel["id"])
+                .values(is_active=connected, updated_at=now)
+            )
+        else:
+            session.execute(
+                channel_integrations.insert().values(
+                    id=uuid4(),
+                    channel="whatsapp",
+                    external_account_id=account_id,
+                    administrative_unit_id=village_id,
+                    is_active=connected,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        session.commit()
+    except IntegrityError as exc:
+        session.rollback()
+        raise APIError(
+            status_code=409,
+            code="WHATSAPP_ACCOUNT_ALREADY_LINKED",
+            message="WhatsApp account is already linked to another village",
+        ) from exc
+
+    qr_data_url = result.get("qrDataUrl")
+    return WhatsAppPairingResponse(
+        status="connected" if connected else "pairing",
+        connected=connected,
+        qr_data_url=qr_data_url,
+        expires_at=now + timedelta(minutes=2) if qr_data_url else None,
+        message=(
+            "WhatsApp terhubung."
+            if connected
+            else "Pindai QR melalui WhatsApp sebelum kedaluwarsa."
+        ),
     )
 
 
@@ -63,373 +145,58 @@ def check_whatsapp_webhook_configured() -> bool:
     "/{village_id}/whatsapp/status",
     response_model=WhatsAppChannelInfo,
 )
-def get_whatsapp_status(
-    village_id: UUID,
-    caller: AdminCaller,
-    session: SessionDep,
+def whatsapp_status(
+    village_id: UUID, caller: AdminCaller, session: SessionDep
 ) -> WhatsAppChannelInfo:
-    """Get WhatsApp connection status for a village."""
-
-    require_admin_access(caller, village_id)
-    get_village_or_404(session, village_id)
-
-    # Get existing WhatsApp channel
-    channel = session.execute(
-        select(channel_integrations).where(
-            channel_integrations.c.administrative_unit_id == village_id,
-            channel_integrations.c.channel == "whatsapp",
-        )
-    ).mappings().one_or_none()
-
+    _require_owner(caller, village_id)
+    _village(session, village_id)
+    channel = _channel(session, village_id)
     if channel is None:
-        return WhatsAppChannelInfo(
-            phone_number=None,
-            is_connected=False,
-            connected_at=None,
-            last_message_at=None,
-        )
-
-    return WhatsAppChannelInfo(
-        phone_number=channel["external_account_id"],
-        is_connected=channel["is_active"],
-        connected_at=channel["created_at"],
-        last_message_at=channel["updated_at"],
-    )
-
-
-@router.post(
-    "/{village_id}/whatsapp/init",
-    response_model=dict,
-)
-def init_whatsapp_connection(
-    village_id: UUID,
-    caller: AdminCaller,
-    session: SessionDep,
-) -> dict:
-    """Initialize WhatsApp connection for a village.
-
-    This endpoint provides the configuration needed to connect a WhatsApp
-    Business account to a village via QR code or phone number linking.
-
-    Note: Actual WhatsApp Business API integration requires:
-    1. Meta Business App setup
-    2. WhatsApp Business API credentials
-    3. Webhook endpoint configuration
-
-    For development/demo, this returns mock configuration.
-    """
-
-    require_admin_access(caller, village_id)
-    village = get_village_or_404(session, village_id)
-
-    # Check if already connected
-    existing = session.execute(
-        select(channel_integrations).where(
-            channel_integrations.c.administrative_unit_id == village_id,
-            channel_integrations.c.channel == "whatsapp",
-        )
-    ).mappings().one_or_none()
-
-    if existing and existing["is_active"]:
-        return {
-            "status": "already_connected",
-            "phone_number": existing["external_account_id"],
-            "village_id": str(village_id),
-            "village_name": village["name"],
-            "message": "WhatsApp is already connected to this village",
-        }
-
-    # Generate connection info
-    # In production, this would integrate with WhatsApp Business API
-    connection_token = f"WA_CONN_{village_id.hex[:8]}"
-
-    # If there's an existing inactive connection, reactivate it
-    if existing:
-        session.execute(
-            channel_integrations.update()
-            .where(channel_integrations.c.id == existing["id"])
-            .values(
-                is_active=True,
-                updated_at=datetime.now(UTC),
-            )
-        )
-        session.commit()
-        return {
-            "status": "reconnected",
-            "connection_token": connection_token,
-            "village_id": str(village_id),
-            "village_name": village["name"],
-            "message": "WhatsApp connection reactivated",
-        }
-
-    # Create new channel integration
-    from uuid import uuid4
-    session.execute(
-        channel_integrations.insert().values(
-            id=uuid4(),
-            channel="whatsapp",
-            external_account_id=connection_token,  # Placeholder until actual phone is linked
-            administrative_unit_id=village_id,
-            is_active=True,
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-    )
-    session.commit()
-
-    return {
-        "status": "initialized",
-        "connection_token": connection_token,
-        "village_id": str(village_id),
-        "village_name": village["name"],
-        "instructions": {
-            "step_1": "Go to WhatsApp Business API setup",
-            "step_2": "Link your business phone number",
-            "step_3": "Configure webhook URL for this village",
-            "webhook_url": f"/api/v1/webhooks/whatsapp/{village_id}",
-        },
-        "message": "WhatsApp connection initialized. Complete setup in WhatsApp Business portal.",
-    }
-
-
-@router.post(
-    "/{village_id}/whatsapp/link-phone",
-    response_model=dict,
-)
-def link_whatsapp_phone(
-    village_id: UUID,
-    phone_number: str,
-    caller: AdminCaller,
-    session: SessionDep,
-) -> dict:
-    """Link a WhatsApp Business phone number to a village.
-
-    This is called after the WhatsApp Business API verification is complete.
-    """
-
-    require_admin_access(caller, village_id)
-    village = get_village_or_404(session, village_id)
-
-    # Check if phone is already linked to another village
-    existing_phone = session.execute(
-        select(channel_integrations).where(
-            channel_integrations.c.channel == "whatsapp",
-            channel_integrations.c.external_account_id == phone_number,
-            channel_integrations.c.is_active == True,
-        )
-    ).mappings().one_or_none()
-
-    if existing_phone and existing_phone["administrative_unit_id"] != village_id:
-        raise APIError(
-            status_code=409,
-            code="PHONE_ALREADY_LINKED",
-            message="This phone number is already linked to another village",
-        )
-
-    # Check if village has existing channel
-    existing = session.execute(
-        select(channel_integrations).where(
-            channel_integrations.c.administrative_unit_id == village_id,
-            channel_integrations.c.channel == "whatsapp",
-        )
-    ).mappings().one_or_none()
-
-    if existing:
-        # Update existing channel
-        session.execute(
-            channel_integrations.update()
-            .where(channel_integrations.c.id == existing["id"])
-            .values(
-                external_account_id=phone_number,
-                is_active=True,
-                updated_at=datetime.now(UTC),
-            )
-        )
-    else:
-        # Create new channel
-        from uuid import uuid4
-        session.execute(
-            channel_integrations.insert().values(
-                id=uuid4(),
-                channel="whatsapp",
-                external_account_id=phone_number,
-                administrative_unit_id=village_id,
-                is_active=True,
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
-        )
-
-    session.commit()
-
-    return {
-        "status": "linked",
-        "phone_number": phone_number,
-        "village_id": str(village_id),
-        "village_name": village["name"],
-        "message": f"WhatsApp number {phone_number} successfully linked to {village['name']}",
-    }
-
-
-@router.delete(
-    "/{village_id}/whatsapp/disconnect",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-def disconnect_whatsapp(
-    village_id: UUID,
-    caller: AdminCaller,
-    session: SessionDep,
-) -> None:
-    """Disconnect WhatsApp from a village."""
-
-    require_admin_access(caller, village_id)
-    get_village_or_404(session, village_id)
-
+        return WhatsAppChannelInfo(message="WhatsApp belum disiapkan.")
+    try:
+        snapshot = _gateway().status(channel["external_account_id"])
+    except OpenClawGatewayError as exc:
+        raise _gateway_error() from exc
+    connected = bool(snapshot.get("connected") and snapshot.get("linked"))
     session.execute(
         channel_integrations.update()
-        .where(
-            channel_integrations.c.administrative_unit_id == village_id,
-            channel_integrations.c.channel == "whatsapp",
-        )
-        .values(
-            is_active=False,
-            updated_at=datetime.now(UTC),
-        )
+        .where(channel_integrations.c.id == channel["id"])
+        .values(is_active=connected, updated_at=datetime.now(UTC))
     )
     session.commit()
-
-
-# ============================================================================
-# WhatsApp Webhook Handler
-# ============================================================================
-
-@router.post(
-    "/webhooks/whatsapp/{village_id}",
-)
-def whatsapp_webhook(
-    village_id: UUID,
-    payload: dict,
-    session: SessionDep,
-) -> dict:
-    """Handle incoming WhatsApp webhook events.
-
-    This endpoint receives webhook events from WhatsApp Business API.
-    It validates the webhook and forwards the event to the OpenClaw integration.
-    """
-
-    # Verify webhook token
-    # Note: In production, verify X-Hub-Signature-256 from Meta
-
-    get_village_or_404(session, village_id)
-
-    # Get channel
-    channel = session.execute(
-        select(channel_integrations).where(
-            channel_integrations.c.administrative_unit_id == village_id,
-            channel_integrations.c.channel == "whatsapp",
-            channel_integrations.c.is_active == True,
-        )
-    ).mappings().one_or_none()
-
-    if channel is None:
-        raise APIError(
-            status_code=404,
-            code="CHANNEL_NOT_FOUND",
-            message="WhatsApp channel not configured for this village",
-        )
-
-    # Forward to OpenClaw
-    # In production, this would call the OpenClaw webhook endpoint
-    return {
-        "status": "received",
-        "village_id": str(village_id),
-        "message": "Webhook event received",
-    }
-
-
-# ============================================================================
-# OpenClaw Integration
-# ============================================================================
-
-@router.get(
-    "/{village_id}/openclaw/config",
-    response_model=dict,
-)
-def get_openclaw_config(
-    village_id: UUID,
-    caller: AdminCaller,
-    session: SessionDep,
-) -> dict:
-    """Get OpenClaw configuration for a village.
-
-    This returns the configuration needed to connect a village's
-    WhatsApp to OpenClaw.
-    """
-
-    require_admin_access(caller, village_id)
-    village = get_village_or_404(session, village_id)
-
-    from app.core.config import settings
-    from app.services.openclaw_workspace import get_openclaw_workspace_service
-
-    workspace_service = get_openclaw_workspace_service()
-
-    # Ensure workspace exists
-    workspace_path = workspace_service.ensure_workspace_exists(village_id)
-
-    # Get or create workspace config
-    if not workspace_service.workspace_exists(village_id):
-        workspace_service.create_workspace_from_village_config(
-            village_id=village_id,
-            village_config={"metadata": village.get("metadata", {})},
-        )
-
-    return {
-        "village_id": str(village_id),
-        "village_name": village["name"],
-        "workspace_path": str(workspace_path),
-        "openclaw_api_url": settings.openclaw_api_url,
-        "openclaw_api_key": settings.openclaw_api_key.get_secret_value() if settings.openclaw_api_key else None,
-        "instructions": [
-            "1. Install OpenClaw on your server",
-            "2. Configure OpenClaw to use this workspace",
-            "3. Link WhatsApp Business API to OpenClaw",
-            "4. Start OpenClaw agent for this village",
-        ],
-    }
-
-
-@router.post(
-    "/{village_id}/openclaw/generate-workspace",
-    response_model=dict,
-)
-def generate_openclaw_workspace(
-    village_id: UUID,
-    caller: AdminCaller,
-    session: SessionDep,
-) -> dict:
-    """Generate or regenerate OpenClaw workspace for a village.
-
-    This creates the workspace files (IDENTITY.md, SOUL.md, openclaw.json)
-    based on the village's current configuration.
-    """
-
-    require_admin_access(caller, village_id)
-    village = get_village_or_404(session, village_id)
-
-    from app.services.openclaw_workspace import get_openclaw_workspace_service
-
-    workspace_service = get_openclaw_workspace_service()
-
-    created_files = workspace_service.create_workspace_from_village_config(
-        village_id=village_id,
-        village_config=village,
+    identity = snapshot.get("self") or {}
+    return WhatsAppChannelInfo(
+        phone_number=identity.get("e164"),
+        is_connected=connected,
+        connected_at=channel["created_at"] if connected else None,
+        last_message_at=None,
+        status=(
+            "connected"
+            if connected
+            else "error"
+            if snapshot.get("lastError")
+            else "disconnected"
+        ),
+        message=snapshot.get("lastError"),
     )
 
-    return {
-        "status": "generated",
-        "village_id": str(village_id),
-        "village_name": village["name"],
-        "files": created_files,
-        "message": "OpenClaw workspace generated successfully",
-    }
+
+@router.delete("/{village_id}/whatsapp", status_code=status.HTTP_204_NO_CONTENT)
+def disconnect_whatsapp(
+    village_id: UUID, caller: AdminCaller, session: SessionDep
+) -> None:
+    _require_owner(caller, village_id)
+    _village(session, village_id)
+    channel = _channel(session, village_id)
+    if channel is None:
+        return
+    try:
+        _gateway().logout(channel["external_account_id"])
+    except OpenClawGatewayError as exc:
+        raise _gateway_error() from exc
+    session.execute(
+        channel_integrations.update()
+        .where(channel_integrations.c.id == channel["id"])
+        .values(is_active=False, updated_at=datetime.now(UTC))
+    )
+    session.commit()

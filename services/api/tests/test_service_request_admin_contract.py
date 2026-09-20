@@ -117,7 +117,7 @@ def test_list_is_minimal_and_detail_history_hides_internal_identifier(clean_over
     assert "supabase:" not in response.text
 
 
-def test_system_admin_can_read_but_cannot_decide(clean_overrides):
+def test_system_admin_cannot_read_or_decide(clean_overrides):
     client = client_for(AdminRole.SYSTEM_ADMIN)
 
     detail_response = client.get(f"/api/v1/service-requests/{REQUEST_ID}")
@@ -126,8 +126,8 @@ def test_system_admin_can_read_but_cannot_decide(clean_overrides):
         json={"status": "approved", "reason": "Lengkap"},
     )
 
-    assert detail_response.status_code == 200
-    assert detail_response.json()["allowed_transitions"] == []
+    assert detail_response.status_code == 403
+    assert detail_response.json()["error"]["code"] == "FORBIDDEN"
     assert patch_response.status_code == 403
     assert patch_response.json()["error"]["code"] == "FORBIDDEN"
     assert clean_overrides.update_calls == []
