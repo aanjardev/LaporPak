@@ -1,22 +1,55 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-async function getToken(): Promise<string> {
-  const response = await fetch("/api/auth/token", { method: "POST", credentials: "include" });
-  if (!response.ok) throw new Error("Sesi admin tidak tersedia");
-  return (await response.json()).token;
+let tokenRequest: Promise<string> | null = null;
+let cachedToken: string | null = null;
+const activeGetRequests = new Map<string, Promise<unknown>>();
+
+async function getToken(forceRefresh = false): Promise<string> {
+  if (forceRefresh) cachedToken = null;
+  if (cachedToken) return cachedToken;
+  if (tokenRequest) return tokenRequest;
+
+  tokenRequest = fetch("/api/auth/token", {
+    method: "POST",
+    credentials: "include",
+    cache: "no-store",
+  }).then(async (response) => {
+    if (!response.ok) throw new Error("Sesi admin tidak tersedia. Silakan masuk kembali.");
+    const token = (await response.json()).token as string;
+    cachedToken = token;
+    return token;
+  }).finally(() => { tokenRequest = null; });
+
+  return tokenRequest;
 }
 
-export async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = await getToken();
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...options.headers },
-  });
+async function requestApi<T>(endpoint: string, options: RequestInit): Promise<T> {
+  async function request(forceRefresh = false) {
+    const token = await getToken(forceRefresh);
+    return fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...options.headers },
+    });
+  }
+
+  let response = await request();
+  if (response.status === 401) response = await request(true);
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error?.message || body?.message || "Permintaan gagal");
   }
   return response.status === 204 ? (undefined as T) : response.json();
+}
+
+export function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const method = (options.method || "GET").toUpperCase();
+  if (method !== "GET" || options.signal) return requestApi<T>(endpoint, options);
+
+  const active = activeGetRequests.get(endpoint) as Promise<T> | undefined;
+  if (active) return active;
+  const request = requestApi<T>(endpoint, options).finally(() => activeGetRequests.delete(endpoint));
+  activeGetRequests.set(endpoint, request);
+  return request;
 }
 
 export type AdminRole = "system_admin" | "village_admin";

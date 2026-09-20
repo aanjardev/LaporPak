@@ -87,12 +87,16 @@ def start_pairing(
     gateway = _gateway()
     agent_id = f"laporpak-{village_id.hex[:12]}"
     try:
-        workspace_service = get_openclaw_workspace_service()
-        workspace_service.create_workspace_from_village_config(village_id, village)
-        gateway.ensure_village_agent(
-            agent_id, workspace_service.get_workspace_path(village_id)
-        )
-        gateway.ensure_whatsapp_account(account_id, village["name"], agent_id)
+        # A stored channel means agent/account provisioning completed on an
+        # earlier pairing attempt. Repeating five CLI calls added ~45 seconds
+        # before OpenClaw could return a fresh QR.
+        if channel is None:
+            workspace_service = get_openclaw_workspace_service()
+            workspace_service.create_workspace_from_village_config(village_id, village)
+            gateway.ensure_village_agent(
+                agent_id, workspace_service.get_workspace_path(village_id)
+            )
+            gateway.ensure_whatsapp_account(account_id, village["name"], agent_id)
         result = gateway.start_pairing(account_id)
     except OpenClawGatewayError as exc:
         raise _gateway_error() from exc
