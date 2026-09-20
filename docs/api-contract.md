@@ -961,3 +961,32 @@ Perubahan berikut menaikkan contract minor/breaking baseline dan wajib dikomunik
 - state transition berubah.
 
 Update dokumen ini sebelum atau bersamaan dengan code change.
+## REPORT document endpoints
+
+All admin routes below require a Supabase bearer token for an authorized
+`village_admin`. A `system_admin` cannot access report documents.
+
+```text
+POST /api/v1/villages/{village_id}/logo
+GET  /api/v1/villages/{village_id}/logo
+GET  /api/v1/reports/{report_id}/documents
+GET  /api/v1/reports/{report_id}/documents/{document_id}/download
+POST /api/v1/reports/{report_id}/documents/{document_id}/retry
+POST /api/v1/reports/{report_id}/documents/revisions
+POST /api/v1/reports/{report_id}/documents/{document_id}/revoke
+POST /api/v1/report-documents/delivery-requests
+GET  /api/v1/verify/{verification_token}
+```
+
+Logo upload is `multipart/form-data`, accepts a validated PNG or JPEG up to
+2 MB, and stores it in private Storage. Revision payload is
+`{"document_type":"receipt|verified","reason":"..."}`; revoke uses
+`{"reason":"..."}`. The public verification response contains only
+`valid`, ticket number, document type, version, village name, issue time,
+record status, and SHA-256. It never contains report content, citizen data,
+attachments, Storage paths, or a PDF download URL.
+
+Document types are `receipt` and `verified`. Record states are `pending`,
+`ready`, `failed`, `replaced`, and `revoked`; delivery states are `pending`,
+`sent`, `failed`, and `unknown`. A gateway timeout uses `unknown` and requires
+operator review before resend.

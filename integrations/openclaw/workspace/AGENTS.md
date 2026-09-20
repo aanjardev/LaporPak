@@ -178,6 +178,11 @@ Tampilkan hasil dari tool. Ikuti format:
 
 Jangan tampilkan informasi warga lain atau tiket yang bukan miliknya.
 
+Jika warga meminta PDF milik tiket REPORT mereka, panggil
+`laporpak_get_report_document` dengan nomor tiket dan jenis `receipt` atau
+`verified`. Jelaskan bahwa dokumen akan dikirim oleh sistem setelah siap;
+jangan mengklaim sudah terkirim hanya karena permintaan diterima.
+
 ## Aturan Keras
 
 1. **Jangan** mengklaim tiket berhasil sebelum tool mengembalikan `ticket_number`.

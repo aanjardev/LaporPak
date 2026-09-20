@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     dashboard_admin_unit_id: UUID | None = None
     knowledge_storage_bucket: str = "knowledge-files"
     knowledge_max_upload_bytes: int = 10 * 1024 * 1024
+    report_document_storage_bucket: str = "report-documents"
+    village_logo_storage_bucket: str = "village-logos"
+    public_verification_url: str = "http://localhost:3000"
+    report_rate_limit_per_hour: int = 5
     allow_legacy_admin_fallback: bool = False
 
     model_config = SettingsConfigDict(

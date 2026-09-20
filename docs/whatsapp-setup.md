@@ -93,15 +93,10 @@ The dashboard polls this state after the QR is shown. If OpenClaw reports a
 linked account whose runtime has not started yet, FastAPI schedules one guarded
 Gateway restart and the next poll confirms the running channel.
 
-The channel uses `dmPolicy: pairing`. When a citizen sends the first message,
-approve the access request:
-
-```powershell
-openclaw pairing list whatsapp
-openclaw pairing approve whatsapp <CODE>
-```
-
-The pairing code expires after one hour.
+The village account is provisioned with `dmPolicy: open`, `allowFrom: ["*"]`,
+and `groupPolicy: disabled`. Citizens can therefore start a direct conversation
+without number approval. QR pairing is only used to link the village's WhatsApp
+device to OpenClaw.
 
 Test the chatbot from a different WhatsApp number than the account scanned by
 the QR. The scanned account is the bot identity and cannot start a conversation
@@ -109,7 +104,7 @@ with itself.
 
 ## 5. Run the REPORT test
 
-Send this message from an approved WhatsApp number:
+Send this message from a WhatsApp number other than the linked village account:
 
 ```text
 Pak, jalan di RT 03 dekat masjid rusak parah.

@@ -3,10 +3,11 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.errors import APIError
 from app.core.security import AdminCaller, AdminRole
 from app.db.session import get_db_session
@@ -30,6 +31,11 @@ from app.schemas.village import (
 )
 from app.services.openclaw_gateway import OpenClawGateway, OpenClawGatewayError
 from app.services.openclaw_workspace import get_openclaw_workspace_service
+from app.services.report_documents import (
+    download_storage_object,
+    upload_storage_object,
+    validate_logo,
+)
 
 router = APIRouter(prefix="/api/v1/villages", tags=["Villages"])
 SessionDep = Annotated[Session, Depends(get_db_session)]
@@ -54,9 +60,13 @@ def _require_owner(caller: AdminCaller, village_id: UUID) -> None:
 
 
 def get_village_or_404(session: Session, village_id: UUID) -> dict:
-    row = session.execute(
-        select(administrative_units).where(administrative_units.c.id == village_id)
-    ).mappings().one_or_none()
+    row = (
+        session.execute(
+            select(administrative_units).where(administrative_units.c.id == village_id)
+        )
+        .mappings()
+        .one_or_none()
+    )
     if row is None:
         raise APIError(
             status_code=404,
@@ -85,9 +95,7 @@ def row_to_village_response(row: dict) -> VillageResponse:
                 custom_greetings=personality.get(
                     "custom_greetings", ["Halo", "Hai", "Assalamualaikum"]
                 ),
-                tone=personality.get(
-                    "tone", "santai dan familiar seperti tetangga"
-                ),
+                tone=personality.get("tone", "santai dan familiar seperti tetangga"),
             ),
             is_ai_enabled=metadata.get("is_ai_enabled", True),
             whatsapp_business_name=metadata.get("whatsapp_business_name"),
@@ -101,6 +109,12 @@ def row_to_village_response(row: dict) -> VillageResponse:
             regency=metadata.get("regency"),
             district=metadata.get("district"),
             office_hours=metadata.get("office_hours"),
+            regency_type=metadata.get("regency_type"),
+            postal_code=metadata.get("postal_code"),
+            document_official_name=metadata.get("document_official_name"),
+            document_official_title=metadata.get("document_official_title"),
+            has_logo=bool(metadata.get("logo_storage_path")),
+            logo_file_name=metadata.get("logo_file_name"),
         ),
         is_active=row["is_active"],
         activation_status=row.get("activation_status", "approved"),
@@ -120,7 +134,9 @@ def list_villages(
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     search: str | None = None,
 ) -> VillageListResponse:
-    query = select(administrative_units).where(administrative_units.c.level == "village")
+    query = select(administrative_units).where(
+        administrative_units.c.level == "village"
+    )
     if caller.role is AdminRole.VILLAGE_ADMIN:
         query = query.where(administrative_units.c.id.in_(caller.unit_ids))
     if search:
@@ -128,11 +144,15 @@ def list_villages(
     total = session.execute(
         select(func.count()).select_from(query.subquery())
     ).scalar_one()
-    rows = session.execute(
-        query.order_by(administrative_units.c.name)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    ).mappings().all()
+    rows = (
+        session.execute(
+            query.order_by(administrative_units.c.name)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        .mappings()
+        .all()
+    )
     return VillageListResponse(
         items=[row_to_village_response(dict(row)) for row in rows], total=total
     )
@@ -142,11 +162,15 @@ def list_villages(
 def get_my_villages(caller: AdminCaller, session: SessionDep) -> VillageListResponse:
     if caller.role is not AdminRole.VILLAGE_ADMIN:
         return VillageListResponse(items=[], total=0)
-    rows = session.execute(
-        select(administrative_units)
-        .where(administrative_units.c.id.in_(caller.unit_ids))
-        .order_by(administrative_units.c.name)
-    ).mappings().all()
+    rows = (
+        session.execute(
+            select(administrative_units)
+            .where(administrative_units.c.id.in_(caller.unit_ids))
+            .order_by(administrative_units.c.name)
+        )
+        .mappings()
+        .all()
+    )
     return VillageListResponse(
         items=[row_to_village_response(dict(row)) for row in rows], total=len(rows)
     )
@@ -170,7 +194,9 @@ def get_village(
     report_counts = _status_counts(session, reports, village_id)
     request_counts = _status_counts(session, service_requests, village_id)
     knowledge_count = session.execute(
-        select(func.count()).select_from(knowledge_documents).where(
+        select(func.count())
+        .select_from(knowledge_documents)
+        .where(
             knowledge_documents.c.administrative_unit_id == village_id,
             knowledge_documents.c.is_active.is_(True),
         )
@@ -249,12 +275,16 @@ def get_village_channels(
 ) -> VillageChannelResponse:
     _require_access(caller, village_id)
     get_village_or_404(session, village_id)
-    row = session.execute(
-        select(channel_integrations).where(
-            channel_integrations.c.administrative_unit_id == village_id,
-            channel_integrations.c.channel == "whatsapp",
+    row = (
+        session.execute(
+            select(channel_integrations).where(
+                channel_integrations.c.administrative_unit_id == village_id,
+                channel_integrations.c.channel == "whatsapp",
+            )
         )
-    ).mappings().one_or_none()
+        .mappings()
+        .one_or_none()
+    )
     connected = False
     if row:
         try:
@@ -270,3 +300,76 @@ def get_village_channels(
             last_message_at=row["updated_at"] if row else None,
         ),
     )
+
+
+@router.post("/{village_id}/logo", response_model=VillageResponse)
+async def upload_village_logo(
+    village_id: UUID,
+    caller: AdminCaller,
+    session: SessionDep,
+    file: Annotated[UploadFile, File()],
+) -> VillageResponse:
+    _require_owner(caller, village_id)
+    row = get_village_or_404(session, village_id)
+    data = await file.read(2 * 1024 * 1024 + 1)
+    try:
+        extension = validate_logo(data, file.content_type or "")
+        path = f"{village_id}/logo.{extension}"
+        upload_storage_object(
+            settings.village_logo_storage_bucket,
+            path,
+            data,
+            file.content_type or "application/octet-stream",
+        )
+    except ValueError as exc:
+        raise APIError(
+            status_code=422,
+            code="INVALID_VILLAGE_LOGO",
+            message=str(exc),
+        ) from exc
+    except Exception as exc:
+        raise APIError(
+            status_code=503,
+            code="STORAGE_UNAVAILABLE",
+            message="Logo desa tidak dapat disimpan",
+        ) from exc
+    metadata = dict(row.get("metadata") or {})
+    metadata.update(
+        {
+            "logo_storage_path": path,
+            "logo_file_name": file.filename or f"logo.{extension}",
+        }
+    )
+    session.execute(
+        administrative_units.update()
+        .where(administrative_units.c.id == village_id)
+        .values(metadata=metadata, updated_at=func.now())
+    )
+    session.commit()
+    return row_to_village_response(get_village_or_404(session, village_id))
+
+
+@router.get("/{village_id}/logo")
+def get_village_logo(
+    village_id: UUID, caller: AdminCaller, session: SessionDep
+) -> Response:
+    _require_access(caller, village_id)
+    row = get_village_or_404(session, village_id)
+    metadata = row.get("metadata") or {}
+    path = metadata.get("logo_storage_path")
+    if not path:
+        raise APIError(
+            status_code=404,
+            code="VILLAGE_LOGO_NOT_FOUND",
+            message="Logo desa belum tersedia",
+        )
+    try:
+        content = download_storage_object(settings.village_logo_storage_bucket, path)
+    except Exception as exc:
+        raise APIError(
+            status_code=503,
+            code="STORAGE_UNAVAILABLE",
+            message="Logo desa tidak dapat dimuat",
+        ) from exc
+    media_type = "image/png" if str(path).endswith(".png") else "image/jpeg"
+    return Response(content=content, media_type=media_type)

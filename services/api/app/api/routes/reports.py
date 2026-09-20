@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Header, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Header, Query, Response, status
 
 from app.core.config import settings
 from app.core.errors import APIError
@@ -36,7 +36,9 @@ from app.services.exceptions import (
     InvalidStatusTransitionError,
     ReportNotFoundError,
     ReportPersistenceError,
+    ReportRateLimitError,
 )
+from app.services.report_documents import process_pending_document_jobs
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
 
@@ -49,6 +51,7 @@ router = APIRouter(prefix="/api/v1/reports", tags=["Reports"])
 def create_report(
     payload: ReportCreate,
     response: Response,
+    background_tasks: BackgroundTasks,
     _caller: OpenClawCaller,
     report_service: ReportServiceDependency,
     idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
@@ -109,6 +112,12 @@ def create_report(
             code="DUPLICATE_OPERATION",
             message="Idempotency key was already used for another payload",
         ) from exc
+    except ReportRateLimitError as exc:
+        raise APIError(
+            status_code=429,
+            code="RATE_LIMIT_EXCEEDED",
+            message="Batas laporan per jam telah tercapai. Coba lagi nanti.",
+        ) from exc
     except ReportPersistenceError as exc:
         raise APIError(
             status_code=503,
@@ -118,6 +127,8 @@ def create_report(
 
     if result.replayed:
         response.status_code = status.HTTP_200_OK
+    else:
+        background_tasks.add_task(process_pending_document_jobs)
 
     return ReportCreateResponse(
         id=result.report["id"],
@@ -221,19 +232,23 @@ def get_report_attachment(
 def update_report_status(
     report_id: UUID,
     payload: ReportStatusUpdate,
+    background_tasks: BackgroundTasks,
     caller: AdminCaller,
     report_service: ReportServiceDependency,
 ) -> ReportStatusUpdateResponse:
     require_village_operator(caller)
     try:
         unit_ids = operator_scope(caller)
-        return report_service.update_report_status(
+        result = report_service.update_report_status(
             report_id=report_id,
             new_status=payload.status,
             reason=payload.reason,
             actor_identifier=caller.identifier,
             unit_ids=unit_ids,
         )
+        if payload.status is ReportStatus.VERIFIED:
+            background_tasks.add_task(process_pending_document_jobs)
+        return result
     except ReportNotFoundError as exc:
         raise APIError(
             status_code=404,

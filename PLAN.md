@@ -39,3 +39,23 @@ lengkap. Keputusan dan alasannya dicatat pada riwayat aktivasi.
 
 Isolasi dua desa, pembatasan Super Admin, siklus aktivasi, reload pengaturan,
 status gateway, lint/build frontend, dan pytest/Ruff backend harus lulus.
+
+## WhatsApp terbuka dan dokumen REPORT
+
+- Setiap akun kanal LaporPak memakai `dmPolicy: "open"`, `allowFrom: ["*"]`,
+  dan `groupPolicy: "disabled"`. QR hanya menautkan perangkat desa; warga
+  tidak perlu dipasangkan. Scope desa dan identitas warga tetap berasal dari
+  metadata kanal tepercaya.
+- REPORT baru mengantrekan **Bukti Penerimaan Laporan** pada transaksi yang
+  sama dengan tiket. Transisi pertama ke `verified` mengantrekan **Laporan
+  Terverifikasi**.
+- Worker PostgreSQL merender PDF A4 dari snapshot data yang tersimpan,
+  menyimpannya di bucket privat, dan mengirim sebagai dokumen WhatsApp.
+  Kegagalan dokumen tidak membatalkan tiket.
+- Kop memakai profil desa dan logo unggahan privat. PDF yang sudah terbit
+  tidak ditimpa; koreksi membuat versi baru dan menyimpan audit.
+- QR berisi token acak menuju `/verify/{token}`. Halaman publik hanya membuka
+  metadata penerbitan dan hash SHA-256, tanpa isi laporan, warga, lampiran,
+  atau file PDF.
+- Tahap ini hanya berlaku untuk REPORT. QR diberi label "Verifikasi dokumen
+  digital LaporPak" dan bukan tanda tangan elektronik tersertifikasi.

@@ -386,6 +386,45 @@ export function buildTrackTool(context, fetchImpl = globalThis.fetch, env = proc
   };
 }
 
+export function buildReportDocumentTool(
+  context,
+  fetchImpl = globalThis.fetch,
+  env = process.env,
+) {
+  return {
+    name: "laporpak_get_report_document",
+    label: "Send citizen report document",
+    description:
+      "Request delivery of the authenticated WhatsApp sender's own receipt or verified REPORT PDF. The backend checks citizen ownership and village scope before sending the private document.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["ticket_number", "document_type"],
+      properties: {
+        ticket_number: { type: "string", pattern: "^LP-[0-9]{4}-[0-9]{4,}$" },
+        document_type: { type: "string", enum: ["receipt", "verified"] },
+      },
+    },
+    async execute(_toolCallId, input) {
+      requireWhatsappContext(context, "laporpak_get_report_document");
+      const { result } = await callBackend(
+        fetchImpl,
+        env,
+        "/api/v1/report-documents/delivery-requests",
+        {
+          sender_phone_number: context.requesterSenderId,
+          ticket_number: input.ticket_number,
+          document_type: input.document_type,
+        },
+      );
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        details: result,
+      };
+    },
+  };
+}
+
 export function buildServiceRequestTool(
   context,
   fetchImpl = globalThis.fetch,
@@ -611,6 +650,10 @@ export default {
     });
     api.registerTool((context) => buildTrackTool(context), {
       name: "laporpak_track_report",
+      optional: true,
+    });
+    api.registerTool((context) => buildReportDocumentTool(context), {
+      name: "laporpak_get_report_document",
       optional: true,
     });
     api.registerTool((context) => buildServiceRequestTool(context), {

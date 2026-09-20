@@ -26,9 +26,14 @@ async function getToken(forceRefresh = false): Promise<string> {
 async function requestApi<T>(endpoint: string, options: RequestInit): Promise<T> {
   async function request(forceRefresh = false) {
     const token = await getToken(forceRefresh);
+    const headers = Object.fromEntries(new Headers(options.headers).entries());
+    headers.Authorization = `Bearer ${token}`;
+    if (options.body && !(options.body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
     return fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...options.headers },
+      headers,
     });
   }
 

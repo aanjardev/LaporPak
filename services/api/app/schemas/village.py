@@ -60,6 +60,10 @@ class VillageMetadata(StrictSchema):
     regency: str | None = None
     district: str | None = None
     office_hours: str | None = None
+    regency_type: str | None = None
+    postal_code: str | None = None
+    document_official_name: str | None = None
+    document_official_title: str | None = None
 
 
 # ============================================================================
@@ -137,6 +141,12 @@ class VillageMetadataResponse(StrictSchema):
     regency: str | None
     district: str | None
     office_hours: str | None
+    regency_type: str | None
+    postal_code: str | None
+    document_official_name: str | None
+    document_official_title: str | None
+    has_logo: bool
+    logo_file_name: str | None
 
 
 class VillageResponse(StrictSchema):

@@ -831,3 +831,15 @@ Contoh:
 - invalid output → jangan execute.
 - unauthorized tool → block.
 - webhook retry → jangan create duplicate.
+## REPORT document boundary
+
+FastAPI owns document snapshots, rendering, versioning, authorization, and
+verification. ReportLab renders A4 PDFs in the API process. A small worker
+claims PostgreSQL jobs with `FOR UPDATE SKIP LOCKED`; no Redis, Celery, new
+microservice, or AI generation is involved.
+
+`report_documents` stores immutable issuance metadata and snapshots,
+`report_document_jobs` stores retry state, and `report_document_audit` records
+issuance/retry/replacement/revocation/delivery. PDFs and village logos live in
+private Supabase Storage buckets. OpenClaw only transports the finished media
+to the trusted report owner; it is not the document system of record.

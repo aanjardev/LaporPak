@@ -9,6 +9,7 @@ import {
   buildAskTool,
   buildConfirmResolutionTool,
   buildCreateReportTool,
+  buildReportDocumentTool,
   buildServiceRequestTool,
   buildTrackTool,
 } from "./index.js";
@@ -194,6 +195,34 @@ test("TRACK injects trusted sender identity", async () => {
   await tool.execute("call-5", { ticket_number: "LP-2026-0001" });
   assert.equal(body.sender_phone_number, "6281234567890");
   assert.equal(body.ticket_number, "LP-2026-0001");
+});
+
+test("document delivery request injects trusted sender and channel", async () => {
+  let request;
+  const tool = buildReportDocumentTool(
+    { messageChannel: "whatsapp", requesterSenderId: "6281234567890" },
+    async (url, options) => {
+      request = { url: String(url), options };
+      return Response.json({
+        id: "72af1a52-7016-48c7-aacc-6c35417be819",
+        document_type: "receipt",
+        version: 1,
+        status: "ready",
+        delivery_status: "pending",
+        created_at: "2026-09-20T05:00:00Z",
+      });
+    },
+    testEnv,
+  );
+
+  await tool.execute("call-document", {
+    ticket_number: "LP-2026-0001",
+    document_type: "receipt",
+  });
+  const body = JSON.parse(request.options.body);
+  assert.equal(request.url, "http://localhost:8000/api/v1/report-documents/delivery-requests");
+  assert.equal(body.sender_phone_number, "6281234567890");
+  assert.equal(request.options.headers["X-Channel-Account-ID"], "whatsapp-demo");
 });
 
 test("resolution confirmation injects trusted sender identity", async () => {

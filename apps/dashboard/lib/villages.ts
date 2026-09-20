@@ -1,4 +1,4 @@
-import { apiFetch } from "./admin";
+import { apiFetch } from "./admin.ts";
 
 export interface VillageAIPersonality {
   name: string; emoji: string; vibe: string; welcome_message: string;
@@ -19,6 +19,12 @@ export interface VillageMetadata {
   regency?: string;
   district?: string;
   office_hours?: string;
+  regency_type?: "Kabupaten" | "Kota";
+  postal_code?: string;
+  document_official_name?: string;
+  document_official_title?: string;
+  has_logo?: boolean;
+  logo_file_name?: string;
 }
 
 export interface Village {
@@ -54,6 +60,11 @@ export const getVillages = (params?: { is_active?: boolean }) => {
 export const getVillage = (villageId: string) => apiFetch<VillageDetail>(`/api/v1/villages/${villageId}`);
 export const updateVillage = (villageId: string, data: { name?: string; metadata?: VillageMetadata }) =>
   apiFetch<Village>(`/api/v1/villages/${villageId}`, { method: "PATCH", body: JSON.stringify(data) });
+export const uploadVillageLogo = (villageId: string, file: File) => {
+  const body = new FormData();
+  body.set("file", file);
+  return apiFetch<Village>(`/api/v1/villages/${villageId}/logo`, { method: "POST", body });
+};
 export const getWhatsAppStatus = (villageId: string, signal?: AbortSignal) =>
   apiFetch<WhatsAppChannelInfo>(`/api/v1/villages/${villageId}/whatsapp/status`, { signal });
 export const startWhatsAppPairing = (villageId: string, signal?: AbortSignal) =>

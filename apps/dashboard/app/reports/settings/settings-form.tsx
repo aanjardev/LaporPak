@@ -4,13 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
-  Bot, CheckCircle2, LoaderCircle, MessageCircle, RefreshCw, Save, Send,
+  Bot, CheckCircle2, FileText, LoaderCircle, MessageCircle, RefreshCw, Save, Send,
   Smartphone, Unplug, UserRound,
 } from "lucide-react";
 import type { AdminMe, AdminVillage } from "@/lib/admin";
 import { submitActivation, updateMe } from "@/lib/admin";
 import {
   disconnectWhatsApp, getWhatsAppStatus, startWhatsAppPairing, updateVillage,
+  uploadVillageLogo,
   type VillageAIPersonality, type VillageMetadata, type WhatsAppChannelInfo,
 } from "@/lib/villages";
 
@@ -29,6 +30,7 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
   const [waError, setWaError] = useState("");
   const [qr, setQr] = useState<string | null>(null);
   const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
+  const [logo, setLogo] = useState<File | null>(null);
 
   const refreshWhatsApp = useCallback(async () => {
     setWaLoading(true);
@@ -88,10 +90,15 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
       address: String(data.address), village_code: String(data.village_code),
       province: String(data.province), regency: String(data.regency), district: String(data.district),
       office_hours: String(data.office_hours),
+      regency_type: String(data.regency_type) as "Kabupaten" | "Kota",
+      postal_code: String(data.postal_code),
+      document_official_name: String(data.document_official_name),
+      document_official_title: String(data.document_official_title),
     };
     try {
       await updateMe({ display_name: String(data.display_name), contact_phone: String(data.contact_phone) });
       await updateVillage(village.id, { name: String(data.village_name), metadata: nextMetadata });
+      if (logo) await uploadVillageLogo(village.id, logo);
       setNotice("Pengaturan berhasil disimpan.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan"); }
     finally { setSaving(false); }
@@ -143,13 +150,19 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
         <div><span className="text-sm font-semibold">Kata sandi</span><Link href="/set-password" className="ui-control mt-1.5 flex items-center px-3 text-sm font-semibold text-brand">Ubah kata sandi</Link></div>
       </div></section>
 
-      <section className="ui-panel p-5 sm:p-6"><Header icon={CheckCircle2} title="Profil Desa" description="Data wajib untuk pengajuan aktivasi." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <section className="ui-panel p-5 sm:p-6"><Header icon={CheckCircle2} title="Profil Desa" description="Data wajib untuk aktivasi dan kop dokumen laporan." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Field label="Nama desa" name="village_name" value={village.name} required /><Field label="Kode desa" name="village_code" value={metadata.village_code} required />
-        <Field label="Provinsi" name="province" value={metadata.province} required /><Field label="Kabupaten/Kota" name="regency" value={metadata.regency} required />
+        <Field label="Provinsi" name="province" value={metadata.province} required />
+        <label className="block text-sm font-semibold">Jenis wilayah<span className="ml-1 text-rose-600">*</span><select name="regency_type" defaultValue={metadata.regency_type || "Kabupaten"} required className={`${input}`}><option>Kabupaten</option><option>Kota</option></select></label>
+        <Field label="Nama kabupaten/kota" name="regency" value={metadata.regency} required />
         <Field label="Kecamatan" name="district" value={metadata.district} required /><Field label="Kontak layanan" name="service_phone" value={metadata.contact_phone} required />
         <Field label="Email layanan" name="service_email" value={metadata.contact_email} /><Field label="Jam pelayanan" name="office_hours" value={metadata.office_hours} required />
-        <Field label="Alamat kantor" name="address" value={metadata.address} required wide />
+        <Field label="Alamat kantor" name="address" value={metadata.address} required /><Field label="Kode pos" name="postal_code" value={metadata.postal_code} required />
+        <Field label="Nama penanggung jawab dokumen" name="document_official_name" value={metadata.document_official_name} required /><Field label="Jabatan" name="document_official_title" value={metadata.document_official_title || "Kepala Desa"} required />
+        <label className="block text-sm font-semibold sm:col-span-2">Logo resmi desa<span className="ml-1 text-rose-600">*</span><input type="file" accept="image/png,image/jpeg" required={!metadata.has_logo} onChange={(event) => { const file = event.target.files?.[0] || null; if (file && file.size > 2 * 1024 * 1024) { setError("Logo maksimal 2 MB."); event.target.value = ""; setLogo(null); return; } setError(""); setLogo(file); }} className="mt-1.5 block w-full rounded-md border border-input bg-card px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:font-semibold" /><span className="mt-1 block text-xs font-normal text-muted-foreground">PNG/JPEG maksimal 2 MB. {logo?.name || metadata.logo_file_name || "Belum ada logo"}</span></label>
       </div></section>
+
+      <section className="ui-panel overflow-hidden"><div className="border-b border-border p-5 sm:p-6"><Header icon={FileText} title="Pratinjau Kop Dokumen" description="Format akhir mengikuti data profil yang tersimpan." /></div><div className="bg-white p-6 text-center font-serif text-slate-950 sm:p-8"><p className="text-lg font-bold">PEMERINTAH {(metadata.regency_type || "KABUPATEN").toUpperCase()} {(metadata.regency || "...").toUpperCase()}</p><p className="text-lg font-bold">KECAMATAN {(metadata.district || "...").toUpperCase()}</p><p className="text-xl font-bold">KANTOR DESA {village.name.toUpperCase()}</p><p className="mt-1 text-sm">Alamat: {metadata.address || "..."} {metadata.postal_code ? `Kode Pos ${metadata.postal_code}` : ""}</p><div className="mt-3 border-b-2 border-slate-900" /></div></section>
 
       <section className="ui-panel p-5 sm:p-6"><Header icon={Bot} title="Personalisasi AI" description="Personalisasi hanya berlaku untuk desa ini; guardrail tetap sama." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Field label="Nama asisten" name="ai_name" value={personality.name || "LaporPak"} required /><Field label="Emoji" name="ai_emoji" value={personality.emoji || "📋"} />

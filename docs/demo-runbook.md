@@ -58,8 +58,9 @@ openclaw gateway health
 openclaw channels status --probe
 ```
 
-Gunakan pairing atau `allowFrom` untuk nomor uji. Nilai
-`LAPORPAK_CHANNEL_ACCOUNT_ID` harus sama dengan
+Setiap akun kanal LaporPak memakai `dmPolicy: open`, `allowFrom: ["*"]`, dan
+`groupPolicy: disabled`, sehingga nomor uji tidak memerlukan persetujuan.
+Nilai `LAPORPAK_CHANNEL_ACCOUNT_ID` harus sama dengan
 `channel_integrations.external_account_id` yang aktif pada desa uji.
 
 ## 3. Urutan demo

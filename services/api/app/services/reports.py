@@ -6,6 +6,7 @@ import logging
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -38,6 +39,7 @@ from app.services.exceptions import (
     InvalidStatusTransitionError,
     ReportNotFoundError,
     ReportPersistenceError,
+    ReportRateLimitError,
 )
 
 PHONE_NUMBER_PATTERN = re.compile(r"^\+[1-9][0-9]{7,14}$")
@@ -193,6 +195,15 @@ class ReportPersistenceService:
                     return IdempotentReportResult(existing, replayed=True)
 
                 citizen = self.repository.get_or_create_citizen(phone_number)
+                if (
+                    self.repository.count_recent_reports(
+                        citizen["id"],
+                        administrative_unit_id,
+                        datetime.now(UTC) - timedelta(hours=1),
+                    )
+                    >= settings.report_rate_limit_per_hour
+                ):
+                    raise ReportRateLimitError
                 category = self.repository.resolve_active_category(
                     payload.category.value
                 )
@@ -244,9 +255,7 @@ class ReportPersistenceService:
                 )
                 for attachment in payload.attachments:
                     try:
-                        data = base64.b64decode(
-                            attachment.data_base64, validate=True
-                        )
+                        data = base64.b64decode(attachment.data_base64, validate=True)
                     except (binascii.Error, ValueError) as exc:
                         raise InvalidAttachmentError(
                             "attachment data is not valid base64"
@@ -276,9 +285,15 @@ class ReportPersistenceService:
                             "metadata": {"file_size": len(data)},
                         }
                     )
+                self.repository.queue_document(report["id"], "receipt")
                 transaction_work_complete = True
                 return IdempotentReportResult(report, replayed=False)
-        except CategoryNotFoundError, DuplicateOperationError, InvalidAttachmentError:
+        except (
+            CategoryNotFoundError,
+            DuplicateOperationError,
+            InvalidAttachmentError,
+            ReportRateLimitError,
+        ):
             for storage_path in uploaded_paths:
                 delete_storage_object("report-attachments", storage_path)
             raise
@@ -287,9 +302,7 @@ class ReportPersistenceService:
             if transaction_work_complete:
                 try:
                     should_cleanup = (
-                        self.repository.find_report_by_idempotency_key(
-                            idempotency_key
-                        )
+                        self.repository.find_report_by_idempotency_key(idempotency_key)
                         is None
                     )
                 except SQLAlchemyError:
@@ -505,6 +518,10 @@ class ReportPersistenceService:
                         "notes": reason,
                     }
                 )
+                if new_status is ReportStatus.VERIFIED:
+                    self.repository.queue_document(
+                        report_id, "verified", actor_identifier
+                    )
                 return ReportStatusUpdateResponse(
                     id=updated["id"],
                     ticket_number=updated["ticket_number"],

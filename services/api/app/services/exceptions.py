@@ -46,3 +46,13 @@ class InvalidStatusTransitionError(ReportServiceError):
         super().__init__(f"Invalid status transition: {old_status} -> {new_status}")
         self.old_status = old_status
         self.new_status = new_status
+
+
+class ReportRateLimitError(ReportServiceError):
+    def __init__(self) -> None:
+        super().__init__("Report rate limit exceeded")
+
+
+class DocumentDeliveryUnknownError(ReportServiceError):
+    def __init__(self) -> None:
+        super().__init__("Document delivery outcome requires operator review")

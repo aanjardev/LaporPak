@@ -1,0 +1,17 @@
+"use client";
+
+import { use, useEffect, useState } from "react";
+import { CheckCircle2, FileSearch, ShieldAlert } from "lucide-react";
+
+type Verification = { valid: boolean; ticket_number: string; document_type: "receipt" | "verified"; version: number; village_name: string; issued_at: string | null; status: string; file_sha256: string | null };
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+export default function VerifyDocumentPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params);
+  const [data, setData] = useState<Verification | null>(null);
+  const [error, setError] = useState("");
+  const [hashResult, setHashResult] = useState<"" | "match" | "mismatch">("");
+  useEffect(() => { fetch(`${API_BASE_URL}/api/v1/verify/${token}`).then(async (response) => { if (!response.ok) throw new Error("Dokumen tidak ditemukan"); setData(await response.json()); }).catch((reason) => setError(reason instanceof Error ? reason.message : "Verifikasi gagal")); }, [token]);
+  async function inspect(file: File) { const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer()))).map((value) => value.toString(16).padStart(2, "0")).join(""); setHashResult(digest === data?.file_sha256 ? "match" : "mismatch"); }
+  return <main className="mx-auto min-h-screen max-w-2xl px-5 py-12"><div className="ui-panel overflow-hidden"><div className="bg-brand p-6 text-white"><p className="text-sm font-semibold text-brand-accent">LaporPak</p><h1 className="mt-2 text-2xl font-bold">Verifikasi dokumen digital</h1></div><div className="p-6">{error ? <div className="flex gap-3 text-rose-800"><ShieldAlert /><p>{error}</p></div> : !data ? <p>Memeriksa token {token.slice(0, 8)}…</p> : <><div className={`flex gap-3 ${data.valid ? "text-emerald-700" : "text-amber-800"}`}>{data.valid ? <CheckCircle2 /> : <ShieldAlert />}<div><p className="font-bold">{data.valid ? "Rekaman dokumen berlaku" : `Dokumen ${data.status}`}</p><p className="mt-1 text-sm">QR membuktikan adanya rekaman penerbitan di LaporPak.</p></div></div><dl className="mt-6 grid gap-4 rounded-lg bg-muted p-4 sm:grid-cols-2"><div><dt className="text-xs text-muted-foreground">Desa penerbit</dt><dd className="font-semibold">{data.village_name}</dd></div><div><dt className="text-xs text-muted-foreground">Nomor laporan</dt><dd className="font-semibold">{data.ticket_number}</dd></div><div><dt className="text-xs text-muted-foreground">Jenis</dt><dd className="font-semibold">{data.document_type === "receipt" ? "Bukti Penerimaan" : "Laporan Terverifikasi"}</dd></div><div><dt className="text-xs text-muted-foreground">Versi</dt><dd className="font-semibold">{data.version}</dd></div></dl><div className="mt-6 border-t border-border pt-6"><h2 className="flex items-center gap-2 font-bold"><FileSearch size={19} />Periksa keutuhan PDF</h2><p className="mt-2 text-sm text-muted-foreground">Pilih salinan PDF. Pemeriksaan SHA-256 dilakukan di browser; file tidak diunggah.</p><input type="file" accept="application/pdf" onChange={(event) => { const file = event.target.files?.[0]; if (file) void inspect(file); }} className="mt-4 block w-full text-sm" />{hashResult && <p className={`mt-3 text-sm font-semibold ${hashResult === "match" ? "text-emerald-700" : "text-rose-700"}`}>{hashResult === "match" ? "Hash cocok. File sama dengan rekaman penerbitan." : "Hash tidak cocok. File berbeda atau telah diubah."}</p>}</div></>}</div></div></main>;
+}

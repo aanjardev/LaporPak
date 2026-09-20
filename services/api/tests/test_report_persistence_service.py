@@ -19,6 +19,7 @@ from app.services.exceptions import (
     InvalidStatusTransitionError,
     ReportNotFoundError,
     ReportPersistenceError,
+    ReportRateLimitError,
 )
 from app.services.reports import (
     ReportPersistenceService,
@@ -98,6 +99,8 @@ class FakeRepository:
         self.updated_report = None
         self.existing_report = None
         self.lock_key = None
+        self.queued_documents = []
+        self.recent_report_count = 0
 
     def acquire_idempotency_lock(self, lock_key):
         self.lock_key = lock_key
@@ -114,6 +117,9 @@ class FakeRepository:
         self.category_code = category_code
         return self.category
 
+    def count_recent_reports(self, citizen_id, administrative_unit_id, since):
+        return self.recent_report_count
+
     def insert_report(self, values):
         self.inserted_report = values
         return self.report
@@ -125,6 +131,10 @@ class FakeRepository:
     def insert_attachment(self, values):
         self.inserted_attachment = values
         return values
+
+    def queue_document(self, report_id, document_type, actor_identifier=None):
+        self.queued_documents.append((report_id, document_type, actor_identifier))
+        return {"id": UUID("77777777-7777-4777-8777-777777777777")}
 
     def lock_report(self, report_id):
         self.report_id = report_id
@@ -245,6 +255,23 @@ def test_missing_category_aborts_create_transaction():
 
     assert repository.inserted_report is None
     assert session.last_exception_type is CategoryNotFoundError
+    assert session.rolled_back == 1
+
+
+def test_rate_limit_aborts_before_report_insert(monkeypatch):
+    session = TransactionSession()
+    repository = FakeRepository()
+    repository.recent_report_count = 5
+    service = ReportPersistenceService(session, repository)
+    monkeypatch.setattr(settings, "report_rate_limit_per_hour", 5)
+
+    with pytest.raises(ReportRateLimitError):
+        service.create_idempotent_report(
+            payload=valid_payload(),
+            idempotency_key=UUID("ef51f99f-a47d-4a31-a3db-e520838997f5"),
+        )
+
+    assert repository.inserted_report is None
     assert session.rolled_back == 1
 
 
@@ -530,6 +557,9 @@ class ConcurrentRepository:
     def resolve_active_category(self, category_code):
         return {"id": UUID("600dc7e0-1cd8-4249-aa22-80a1ad65ee42")}
 
+    def count_recent_reports(self, citizen_id, administrative_unit_id, since):
+        return 0
+
     def insert_report(self, values):
         self.store.report_inserts += 1
         self.store.report = {
@@ -547,6 +577,9 @@ class ConcurrentRepository:
 
     def insert_attachment(self, values):
         return values
+
+    def queue_document(self, report_id, document_type, actor_identifier=None):
+        return {"id": UUID("77777777-7777-4777-8777-777777777777")}
 
 
 def test_concurrent_same_key_requests_create_only_one_report():

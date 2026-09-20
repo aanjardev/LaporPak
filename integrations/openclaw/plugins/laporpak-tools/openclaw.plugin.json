@@ -16,6 +16,7 @@
       "laporpak_create_report",
       "laporpak_ask",
       "laporpak_track_report",
+      "laporpak_get_report_document",
       "laporpak_create_service_request",
       "laporpak_detect_emergency",
       "laporpak_check_similar",
@@ -32,6 +33,10 @@
       "replaySafe": true
     },
     "laporpak_track_report": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_get_report_document": {
       "optional": true,
       "replaySafe": true
     },

@@ -89,6 +89,9 @@ def validate_baseline(connection) -> None:
         "knowledge_documents",
         "knowledge_templates",
         "report_attachments",
+        "report_document_audit",
+        "report_document_jobs",
+        "report_documents",
         "report_categories",
         "report_status_history",
         "reports",
@@ -126,11 +129,17 @@ def validate_baseline(connection) -> None:
         for row in connection.execute(
             text(
                 "select id,public from storage.buckets "
-                "where id in ('knowledge-files','report-attachments')"
+                "where id in ('knowledge-files','report-attachments',"
+                "'report-documents','village-logos')"
             )
         )
     }
-    if buckets != {"knowledge-files": False, "report-attachments": False}:
+    if buckets != {
+        "knowledge-files": False,
+        "report-attachments": False,
+        "report-documents": False,
+        "village-logos": False,
+    }:
         raise RuntimeError("Required private Storage buckets are missing or public")
 
     required_columns = {
@@ -141,6 +150,7 @@ def validate_baseline(connection) -> None:
         ("knowledge_documents", "source_type"),
         ("knowledge_documents", "content"),
         ("report_attachments", "storage_path"),
+        ("report_documents", "verification_token"),
         ("service_requests", "idempotency_key"),
     }
     columns = set(
@@ -165,9 +175,7 @@ def validate_baseline(connection) -> None:
     }
     indexes = set(
         connection.execute(
-            text(
-                "select indexname from pg_indexes where schemaname='public'"
-            )
+            text("select indexname from pg_indexes where schemaname='public'")
         ).scalars()
     )
     missing_indexes = sorted(required_indexes - indexes)
@@ -201,7 +209,8 @@ def validate_baseline(connection) -> None:
                 "select relname from pg_class c join pg_namespace n on n.oid=c.relnamespace "
                 "where n.nspname='public' and relname in "
                 "('admin_accounts','admin_unit_memberships','citizens','reports',"
-                "'report_attachments','knowledge_documents','service_requests') "
+                "'report_attachments','report_documents','report_document_jobs',"
+                "'report_document_audit','knowledge_documents','service_requests') "
                 "and not relrowsecurity"
             )
         )
@@ -217,7 +226,8 @@ def validate_baseline(connection) -> None:
             "from information_schema.role_table_grants "
             "where table_schema='public' and grantee in ('anon','authenticated') "
             "and table_name in ('admin_accounts','admin_unit_memberships','citizens',"
-            "'reports','report_attachments','knowledge_documents','service_requests')"
+            "'reports','report_attachments','report_documents','report_document_jobs',"
+            "'report_document_audit','knowledge_documents','service_requests')"
         )
     ).all()
     if unsafe_grants:
@@ -285,11 +295,7 @@ def command_apply() -> None:
             continue
         with engine.begin() as connection:
             connection.execute(
-                text(
-                    strip_transaction_wrapper(
-                        item.path.read_text(encoding="utf-8")
-                    )
-                )
+                text(strip_transaction_wrapper(item.path.read_text(encoding="utf-8")))
             )
             connection.execute(
                 text(

@@ -699,3 +699,27 @@ uv run python -m app.db.provision_super_admin
 ```
 
 Password tidak ditulis ke Git, migration, seed, atau dokumentasi.
+## REPORT PDF issuance and WhatsApp delivery
+
+1. The REPORT transaction persists the ticket, initial history, receipt
+   document record, and unique PostgreSQL job.
+2. The API confirms the ticket immediately. It does not claim that the PDF was
+   sent.
+3. The worker freezes a snapshot of the report and village letterhead, renders
+   the PDF, stores it privately, records SHA-256, then sends it through the
+   report village's OpenClaw account.
+4. The first transition to `verified` queues the verified document with the
+   actual admin actor.
+5. Temporary failures retry at most three times. Unknown WhatsApp delivery is
+   not retried automatically. Admin Desa can retry a failed job.
+6. Revisions create a new immutable version; replacement and revocation retain
+   the previous audit record.
+
+An incomplete letterhead never blocks ticket creation. The document job fails
+with a visible profile-completion task and can be retried after the profile is
+fixed. Public QR verification exposes issuance metadata only.
+
+LaporPak WhatsApp accounts accept direct messages from every sender with
+`dmPolicy: "open"` and `allowFrom: ["*"]`; groups remain disabled. Session,
+ownership, village scope, active-village checks, and backend authorization are
+unchanged.

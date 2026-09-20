@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
@@ -13,6 +14,9 @@ from app.db.tables import (
     citizens,
     report_attachments,
     report_categories,
+    report_document_audit,
+    report_document_jobs,
+    report_documents,
     report_status_history,
     reports,
 )
@@ -72,6 +76,23 @@ class ReportRepository:
         statement = insert(reports).values(**values).returning(*reports.c)
         return self.session.execute(statement).mappings().one()
 
+    def count_recent_reports(
+        self,
+        citizen_id: UUID,
+        administrative_unit_id: UUID | None,
+        since: datetime,
+    ) -> int:
+        conditions = [reports.c.citizen_id == citizen_id, reports.c.created_at >= since]
+        if administrative_unit_id is not None:
+            conditions.append(
+                reports.c.administrative_unit_id == administrative_unit_id
+            )
+        return int(
+            self.session.execute(
+                select(func.count()).select_from(reports).where(*conditions)
+            ).scalar_one()
+        )
+
     def insert_status_history(self, values: Mapping[str, Any]) -> RowMapping:
         statement = (
             insert(report_status_history)
@@ -85,6 +106,38 @@ class ReportRepository:
             insert(report_attachments).values(**values).returning(*report_attachments.c)
         )
         return self.session.execute(statement).mappings().one()
+
+    def queue_document(
+        self,
+        report_id: UUID,
+        document_type: str,
+        actor_identifier: str | None = None,
+    ) -> RowMapping:
+        document = (
+            self.session.execute(
+                insert(report_documents)
+                .values(
+                    report_id=report_id,
+                    document_type=document_type,
+                    version=1,
+                    issued_by=actor_identifier,
+                )
+                .returning(*report_documents.c)
+            )
+            .mappings()
+            .one()
+        )
+        self.session.execute(
+            insert(report_document_jobs).values(document_id=document["id"])
+        )
+        self.session.execute(
+            insert(report_document_audit).values(
+                document_id=document["id"],
+                action="queued",
+                actor_identifier=actor_identifier,
+            )
+        )
+        return document
 
     def list_reports(
         self,

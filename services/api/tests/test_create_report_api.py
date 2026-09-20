@@ -13,6 +13,7 @@ from app.services.exceptions import (
     DuplicateOperationError,
     InvalidSenderIdentityError,
     ReportPersistenceError,
+    ReportRateLimitError,
 )
 from app.services.reports import IdempotentReportResult
 
@@ -140,6 +141,7 @@ def test_create_report_returns_200_for_idempotent_replay(auth_tokens):
         (InvalidSenderIdentityError(), 422, "VALIDATION_ERROR"),
         (CategoryNotFoundError("infrastructure"), 422, "VALIDATION_ERROR"),
         (DuplicateOperationError(), 409, "DUPLICATE_OPERATION"),
+        (ReportRateLimitError(), 429, "RATE_LIMIT_EXCEEDED"),
         (ReportPersistenceError("report creation"), 503, "DATABASE_UNAVAILABLE"),
     ],
 )

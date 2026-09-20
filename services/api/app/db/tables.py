@@ -3,6 +3,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Integer,
     MetaData,
     Numeric,
     Table,
@@ -479,7 +480,9 @@ admin_invitations = Table(
     ),
     Column("email", Text, nullable=False),
     Column("role", Text, nullable=False),
-    Column("village_id", UUID(as_uuid=True), ForeignKey("public.administrative_units.id")),
+    Column(
+        "village_id", UUID(as_uuid=True), ForeignKey("public.administrative_units.id")
+    ),
     Column("token", Text, nullable=False, unique=True),
     Column("status", Text, nullable=False, server_default=text("'pending'")),
     Column("invited_by", Text),
@@ -512,6 +515,123 @@ village_activation_history = Table(
         ForeignKey("public.admin_accounts.id"),
         nullable=False,
     ),
+    Column("reason", Text),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+)
+
+report_documents = Table(
+    "report_documents",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "report_id", UUID(as_uuid=True), ForeignKey("public.reports.id"), nullable=False
+    ),
+    Column("document_type", Text, nullable=False),
+    Column("version", Integer, nullable=False, server_default=text("1")),
+    Column("status", Text, nullable=False, server_default=text("'pending'")),
+    Column("delivery_status", Text, nullable=False, server_default=text("'pending'")),
+    Column(
+        "verification_token",
+        UUID(as_uuid=True),
+        nullable=False,
+        unique=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column("storage_bucket", Text),
+    Column("storage_path", Text),
+    Column("file_sha256", Text),
+    Column("snapshot", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column(
+        "supersedes_document_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.report_documents.id"),
+    ),
+    Column("issued_by", Text),
+    Column("issued_at", DateTime(timezone=True)),
+    Column("revoked_at", DateTime(timezone=True)),
+    Column("revoked_by", Text),
+    Column("revocation_reason", Text),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+)
+
+report_document_jobs = Table(
+    "report_document_jobs",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "document_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.report_documents.id"),
+        nullable=False,
+        unique=True,
+    ),
+    Column("status", Text, nullable=False, server_default=text("'pending'")),
+    Column("attempt_count", Integer, nullable=False, server_default=text("0")),
+    Column(
+        "next_attempt_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column("locked_at", DateTime(timezone=True)),
+    Column("last_error", Text),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+)
+
+report_document_audit = Table(
+    "report_document_audit",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "document_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.report_documents.id"),
+        nullable=False,
+    ),
+    Column("action", Text, nullable=False),
+    Column("actor_identifier", Text),
     Column("reason", Text),
     Column(
         "created_at",

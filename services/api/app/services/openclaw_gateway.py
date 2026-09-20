@@ -17,6 +17,10 @@ class OpenClawGatewayError(RuntimeError):
     pass
 
 
+class OpenClawGatewayTimeoutError(OpenClawGatewayError):
+    pass
+
+
 _STATUS_CACHE_SECONDS = 5
 _status_cache_lock = Lock()
 _status_cache: tuple[float, dict[str, dict[str, Any]], str | None] | None = None
@@ -81,7 +85,9 @@ class OpenClawGateway:
                 encoding="utf-8",
                 errors="replace",
             )
-        except (OSError, subprocess.TimeoutExpired) as exc:
+        except subprocess.TimeoutExpired as exc:
+            raise OpenClawGatewayTimeoutError("OpenClaw operation timed out") from exc
+        except OSError as exc:
             raise OpenClawGatewayError("OpenClaw gateway is unavailable") from exc
         if completed.returncode != 0:
             raise OpenClawGatewayError("OpenClaw operation failed")
@@ -102,6 +108,27 @@ class OpenClawGateway:
             agent_id,
             "--name",
             safe_name,
+        )
+        self._run(
+            "config",
+            "set",
+            f'channels.whatsapp.accounts["{account_id}"].dmPolicy',
+            '"open"',
+            "--strict-json",
+        )
+        self._run(
+            "config",
+            "set",
+            f'channels.whatsapp.accounts["{account_id}"].allowFrom',
+            '["*"]',
+            "--strict-json",
+        )
+        self._run(
+            "config",
+            "set",
+            f'channels.whatsapp.accounts["{account_id}"].groupPolicy',
+            '"disabled"',
+            "--strict-json",
         )
         bindings = _json_output(self._run("agents", "bindings", "--json"))
         if not isinstance(bindings, list):
@@ -156,6 +183,7 @@ class OpenClawGateway:
             "laporpak_create_report",
             "laporpak_ask",
             "laporpak_track_report",
+            "laporpak_get_report_document",
             "laporpak_create_service_request",
             "laporpak_detect_emergency",
             "laporpak_check_similar",
@@ -205,7 +233,13 @@ class OpenClawGateway:
             now = time.monotonic()
             if now - _gateway_restarted_at < _GATEWAY_RESTART_COOLDOWN_SECONDS:
                 return
-            self._run("gateway", "restart", timeout=60)
+            try:
+                self._run("gateway", "restart", timeout=60)
+            except OpenClawGatewayTimeoutError:
+                # The Windows scheduled-task command can keep its parent shim
+                # open after the replacement gateway is already healthy.
+                _clear_status_cache()
+                self.whatsapp_statuses()
             _gateway_restarted_at = time.monotonic()
             _clear_status_cache()
         finally:
@@ -219,7 +253,12 @@ class OpenClawGateway:
                 return _status_cache[1], _status_cache[2]
             snapshot = _last_json(
                 self._run(
-                    "channels", "status", "--channel", "whatsapp", "--probe", "--json",
+                    "channels",
+                    "status",
+                    "--channel",
+                    "whatsapp",
+                    "--probe",
+                    "--json",
                     timeout=12,
                 )
             )
@@ -233,11 +272,13 @@ class OpenClawGateway:
                 if item.get("accountId")
             }
             if default_id and default_id not in result:
-                result[default_id] = dict(snapshot.get("channels", {}).get("whatsapp") or {})
+                result[default_id] = dict(
+                    snapshot.get("channels", {}).get("whatsapp") or {}
+                )
             if default_id in result:
-                result[default_id]["self"] = snapshot.get("channels", {}).get(
-                    "whatsapp", {}
-                ).get("self")
+                result[default_id]["self"] = (
+                    snapshot.get("channels", {}).get("whatsapp", {}).get("self")
+                )
             _status_cache = (now, result, default_id)
             return result, default_id
 
@@ -245,8 +286,7 @@ class OpenClawGateway:
         statuses, _ = self.whatsapp_statuses()
         account = statuses.get(account_id)
         result = dict(
-            account
-            or {"accountId": account_id, "connected": False, "linked": False}
+            account or {"accountId": account_id, "connected": False, "linked": False}
         )
         return result
 
@@ -264,3 +304,31 @@ class OpenClawGateway:
             payload,
         )
         _clear_status_cache()
+
+    def send_document(
+        self,
+        *,
+        account_id: str,
+        target: str,
+        path: Path,
+        message: str,
+    ) -> dict[str, Any]:
+        return _last_json(
+            self._run(
+                "message",
+                "send",
+                "--channel",
+                "whatsapp",
+                "--account",
+                account_id,
+                "--target",
+                target,
+                "--media",
+                str(path),
+                "--message",
+                message,
+                "--force-document",
+                "--json",
+                timeout=45,
+            )
+        )
