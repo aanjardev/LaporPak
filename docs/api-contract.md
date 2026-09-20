@@ -993,3 +993,17 @@ Document types are `receipt` and `verified`. Record states are `pending`,
 `ready`, `failed`, `replaced`, and `revoked`; delivery states are `pending`,
 `sent`, `failed`, and `unknown`. A gateway timeout uses `unknown` and requires
 operator review before resend.
+## Dashboard analitik Admin Desa
+
+Spesifikasi lengkap response, definisi metrik, periode WIB dan acceptance ada di
+[village-analytics-dashboard.md](village-analytics-dashboard.md).
+
+`GET /api/v1/villages/{village_id}/dashboard?days=30` memakai bearer token,
+role `village_admin`, membership dan desa aktif/approved. Query days: 7/30/90.
+Respons mencakup village, period, generated_at, kpis, attention_counts,
+report_status_counts, request_status_counts, knowledge, daily dan attention.
+Agregasi dilakukan FastAPI. Status dan ASK adalah snapshot seluruh data;
+KPI masuk dan daily mengikuti periode. Tidak ada PII atau detail dokumen.
+401/403/404/422/503 mengikuti envelope standar. Desa di luar membership memakai
+scoped `404 VILLAGE_NOT_FOUND`; desa dalam membership yang belum aktif/approved
+memakai `403 VILLAGE_INACTIVE`.

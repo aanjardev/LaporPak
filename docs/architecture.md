@@ -843,3 +843,10 @@ microservice, or AI generation is involved.
 issuance/retry/replacement/revocation/delivery. PDFs and village logos live in
 private Supabase Storage buckets. OpenClaw only transports the finished media
 to the trusted report owner; it is not the document system of record.
+## Agregasi dashboard desa (usulan)
+
+FastAPI menghitung metrik dashboard melalui SQL dengan scope desa dan izin
+Admin Desa. Next.js hanya menampilkan response dan meneruskan sesi server.
+Endpoint monitoring Super Admin tidak digunakan untuk dashboard Admin Desa.
+Tidak ada akses database dari frontend, migration analitik baru, atau hitungan
+berdasarkan satu halaman pagination. Rincian: [dashboard desa](village-analytics-dashboard.md).

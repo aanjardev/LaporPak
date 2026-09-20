@@ -293,3 +293,10 @@ alur serta izin inti stabil, dan tampilkan statusnya secara jujur saat demo.
 **Deployment publik siap** setelah izin, privasi, kontrol lampiran yang dipakai,
 manual fallback, dan isolasi data diuji pada API nyata. Keberhasilan dashboard
 mock atau satu demo WhatsApp saja tidak memenuhi gerbang publik tersebut.
+
+## Basic analytics — pekerjaan aktif
+
+Rencana [dashboard Admin Desa](village-analytics-dashboard.md) mencakup kontrak
+agregat untuk direview Anjar, frontend Ferdi dengan mock, serta konfirmasi
+kesiapan sumber ASK oleh Farel. Endpoint dan integrasi API nyata belum selesai.
+Basic analytics tidak menutup gerbang pengujian MVP lain yang masih terbuka.
