@@ -3,12 +3,14 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.errors import APIError
 from app.core.security import AdminCaller, AdminRole
+from app.db.dashboard_repository import DashboardRepository
 from app.db.session import get_db_session
 from app.db.tables import (
     administrative_units,
@@ -17,6 +19,7 @@ from app.db.tables import (
     reports,
     service_requests,
 )
+from app.schemas.dashboard import VillageDashboardResponse
 from app.schemas.village import (
     VillageAIPersonalityResponse,
     VillageChannelResponse,
@@ -28,6 +31,7 @@ from app.schemas.village import (
     VillageUpdate,
     WhatsAppChannelInfo,
 )
+from app.services.dashboard import build_dashboard
 from app.services.openclaw_gateway import OpenClawGateway, OpenClawGatewayError
 from app.services.openclaw_workspace import get_openclaw_workspace_service
 
@@ -159,6 +163,68 @@ def _status_counts(session: Session, table, village_id: UUID) -> dict[str, int]:
         .group_by(table.c.status)
     ).all()
     return {str(row[0]): int(row[1]) for row in rows}
+
+
+@router.get("/{village_id}/dashboard", response_model=VillageDashboardResponse)
+def get_village_dashboard(
+    village_id: UUID,
+    caller: AdminCaller,
+    session: SessionDep,
+    response: Response,
+    days: Annotated[int, Query()] = 30,
+) -> VillageDashboardResponse:
+    if days not in {7, 30, 90}:
+        raise APIError(
+            status_code=422,
+            code="VALIDATION_ERROR",
+            message="days must be one of: 7, 30, 90",
+        )
+    if caller.role is not AdminRole.VILLAGE_ADMIN:
+        raise APIError(
+            status_code=403,
+            code="FORBIDDEN",
+            message="Village administrator role required",
+        )
+    if village_id not in caller.unit_ids:
+        raise APIError(
+            status_code=404,
+            code="VILLAGE_NOT_FOUND",
+            message="Village not found",
+        )
+    try:
+        village = (
+            session.execute(
+                select(administrative_units).where(
+                    administrative_units.c.id == village_id
+                )
+            )
+            .mappings()
+            .one_or_none()
+        )
+        if village is None:
+            raise APIError(
+                status_code=404,
+                code="VILLAGE_NOT_FOUND",
+                message="Village not found",
+            )
+        if not village["is_active"] or village["activation_status"] != "approved":
+            raise APIError(
+                status_code=403,
+                code="VILLAGE_INACTIVE",
+                message="Village is not active",
+            )
+        result = build_dashboard(DashboardRepository(session), dict(village), days)
+    except APIError:
+        raise
+    except SQLAlchemyError as exc:
+        session.rollback()
+        raise APIError(
+            status_code=503,
+            code="DATABASE_UNAVAILABLE",
+            message="Village dashboard is temporarily unavailable",
+        ) from exc
+    response.headers["Cache-Control"] = "private, no-store"
+    return result
 
 
 @router.get("/{village_id}", response_model=VillageDetailResponse)
