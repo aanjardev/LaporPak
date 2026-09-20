@@ -18,6 +18,7 @@ Sebelum mengubah kode, baca dokumen berikut dalam urutan ini:
 5. `docs/workflows.md`
 6. `docs/development-rules.md`
 7. Untuk pekerjaan frontend/UI: `docs/design-system.md` (panduan visual; kontrak API dan aturan arsitektur tetap berlaku).
+8. Untuk dashboard analitik: `docs/village-analytics-dashboard.md` (metrik, kontrak usulan, pembagian role dan acceptance).
 
 Jika terdapat konflik:
 
