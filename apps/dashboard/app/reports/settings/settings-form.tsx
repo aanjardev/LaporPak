@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bot, CheckCircle2, FileText, LoaderCircle, MessageCircle, RefreshCw, Save, Send,
   Smartphone, Unplug, UserRound,
@@ -31,6 +31,13 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
   const [qr, setQr] = useState<string | null>(null);
   const [qrExpiresAt, setQrExpiresAt] = useState<string | null>(null);
   const [logo, setLogo] = useState<File | null>(null);
+  const [logoRevision, setLogoRevision] = useState(0);
+  const hasStoredLogo = Boolean(metadata.has_logo || metadata.logo_file_name);
+  const selectedLogoUrl = useMemo(() => logo ? URL.createObjectURL(logo) : null, [logo]);
+
+  useEffect(() => () => {
+    if (selectedLogoUrl) URL.revokeObjectURL(selectedLogoUrl);
+  }, [selectedLogoUrl]);
 
   const refreshWhatsApp = useCallback(async () => {
     setWaLoading(true);
@@ -75,7 +82,8 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setNotice(""); setError("");
-    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form).entries());
     const nextMetadata: VillageMetadata = {
       ai_personality: {
         name: String(data.ai_name), emoji: String(data.ai_emoji || "📋"),
@@ -98,7 +106,13 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
     try {
       await updateMe({ display_name: String(data.display_name), contact_phone: String(data.contact_phone) });
       await updateVillage(village.id, { name: String(data.village_name), metadata: nextMetadata });
-      if (logo) await uploadVillageLogo(village.id, logo);
+      if (logo) {
+        await uploadVillageLogo(village.id, logo);
+        setLogo(null);
+        setLogoRevision(Date.now());
+        const input = form.elements.namedItem("logo");
+        if (input instanceof HTMLInputElement) input.value = "";
+      }
       setNotice("Pengaturan berhasil disimpan.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengaturan gagal disimpan"); }
     finally { setSaving(false); }
@@ -159,10 +173,10 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
         <Field label="Email layanan" name="service_email" value={metadata.contact_email} /><Field label="Jam pelayanan" name="office_hours" value={metadata.office_hours} required />
         <Field label="Alamat kantor" name="address" value={metadata.address} required /><Field label="Kode pos" name="postal_code" value={metadata.postal_code} required />
         <Field label="Nama penanggung jawab dokumen" name="document_official_name" value={metadata.document_official_name} required /><Field label="Jabatan" name="document_official_title" value={metadata.document_official_title || "Kepala Desa"} required />
-        <label className="block text-sm font-semibold sm:col-span-2">Logo resmi desa<span className="ml-1 text-rose-600">*</span><input type="file" accept="image/png,image/jpeg" required={!metadata.has_logo} onChange={(event) => { const file = event.target.files?.[0] || null; if (file && file.size > 2 * 1024 * 1024) { setError("Logo maksimal 2 MB."); event.target.value = ""; setLogo(null); return; } setError(""); setLogo(file); }} className="mt-1.5 block w-full rounded-md border border-input bg-card px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:font-semibold" /><span className="mt-1 block text-xs font-normal text-muted-foreground">PNG/JPEG maksimal 2 MB. {logo?.name || metadata.logo_file_name || "Belum ada logo"}</span></label>
+        <label className="block text-sm font-semibold sm:col-span-2">Logo resmi desa<span className="ml-1 text-rose-600">*</span><input name="logo" type="file" accept="image/png,image/jpeg" required={!hasStoredLogo} onChange={(event) => { const file = event.target.files?.[0] || null; if (file && file.size > 2 * 1024 * 1024) { setError("Logo maksimal 2 MB."); event.target.value = ""; setLogo(null); return; } setError(""); setLogo(file); }} className="mt-1.5 block w-full rounded-md border border-input bg-card px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-muted file:px-3 file:py-1.5 file:font-semibold" /><span className="mt-1 block text-xs font-normal text-muted-foreground">PNG/JPEG maksimal 2 MB. {logo?.name || metadata.logo_file_name || "Belum ada logo"}</span></label>
       </div></section>
 
-      <section className="ui-panel overflow-hidden"><div className="border-b border-border p-5 sm:p-6"><Header icon={FileText} title="Pratinjau Kop Dokumen" description="Format akhir mengikuti data profil yang tersimpan." /></div><div className="bg-white p-6 text-center font-serif text-slate-950 sm:p-8"><p className="text-lg font-bold">PEMERINTAH {(metadata.regency_type || "KABUPATEN").toUpperCase()} {(metadata.regency || "...").toUpperCase()}</p><p className="text-lg font-bold">KECAMATAN {(metadata.district || "...").toUpperCase()}</p><p className="text-xl font-bold">KANTOR DESA {village.name.toUpperCase()}</p><p className="mt-1 text-sm">Alamat: {metadata.address || "..."} {metadata.postal_code ? `Kode Pos ${metadata.postal_code}` : ""}</p><div className="mt-3 border-b-2 border-slate-900" /></div></section>
+      <section className="ui-panel overflow-hidden"><div className="border-b border-border p-5 sm:p-6"><Header icon={FileText} title="Pratinjau Kop Dokumen" description="Format akhir mengikuti data profil yang tersimpan." /></div><div className="bg-white p-6 font-serif text-slate-950 sm:p-8"><div className="grid grid-cols-[72px_minmax(0,1fr)_72px] items-center gap-4"><div className="flex size-[72px] items-center justify-center">{selectedLogoUrl || hasStoredLogo ? <Image unoptimized src={selectedLogoUrl || `/api/villages/${village.id}/logo?v=${logoRevision}`} alt={`Logo ${village.name}`} width={72} height={72} className="size-[72px] object-contain" /> : <span className="text-xs text-slate-400">Logo desa</span>}</div><div className="text-center"><p className="text-lg font-bold">PEMERINTAH {(metadata.regency_type || "KABUPATEN").toUpperCase()} {(metadata.regency || "...").toUpperCase()}</p><p className="text-lg font-bold">KECAMATAN {(metadata.district || "...").toUpperCase()}</p><p className="text-xl font-bold">KANTOR DESA {village.name.toUpperCase()}</p><p className="mt-1 text-sm">Alamat: {metadata.address || "..."} {metadata.postal_code ? `Kode Pos ${metadata.postal_code}` : ""}</p></div><div aria-hidden="true" /></div><div className="mt-3 border-b-2 border-slate-900" /></div></section>
 
       <section className="ui-panel p-5 sm:p-6"><Header icon={Bot} title="Personalisasi AI" description="Personalisasi hanya berlaku untuk desa ini; guardrail tetap sama." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
         <Field label="Nama asisten" name="ai_name" value={personality.name || "LaporPak"} required /><Field label="Emoji" name="ai_emoji" value={personality.emoji || "📋"} />

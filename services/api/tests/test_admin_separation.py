@@ -2,7 +2,7 @@ from uuid import UUID
 
 import pytest
 
-from app.api.routes.admin import profile_complete
+from app.api.routes.admin import profile_complete, village_summary
 from app.core.errors import APIError
 from app.core.security import (
     AdminRole,
@@ -59,6 +59,26 @@ def test_activation_completeness_uses_account_and_required_village_fields():
     assert profile_complete(account, village) is True
     village["metadata"]["office_hours"] = ""
     assert profile_complete(account, village) is False
+
+
+def test_admin_village_summary_exposes_logo_without_storage_path():
+    summary = village_summary(
+        {
+            "id": UNIT_ID,
+            "name": "Desa Uji",
+            "level": "village",
+            "metadata": {
+                "logo_storage_path": f"{UNIT_ID}/logo.png",
+                "logo_file_name": "logo.png",
+            },
+            "is_active": True,
+            "activation_status": "approved",
+        }
+    )
+
+    assert summary.metadata["has_logo"] is True
+    assert summary.metadata["logo_file_name"] == "logo.png"
+    assert "logo_storage_path" not in summary.metadata
 
 
 def test_openclaw_json_parser_ignores_runtime_warnings():

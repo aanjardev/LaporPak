@@ -66,12 +66,18 @@ def profile_complete(account: dict, village: dict) -> bool:
     )
 
 
+def public_village_metadata(metadata: dict | None) -> dict:
+    result = dict(metadata or {})
+    result["has_logo"] = bool(result.pop("logo_storage_path", None))
+    return result
+
+
 def village_summary(row: dict) -> AdminVillageSummary:
     return AdminVillageSummary(
         id=row["id"],
         name=row["name"],
         level=row["level"],
-        metadata=row.get("metadata") or {},
+        metadata=public_village_metadata(row.get("metadata")),
         is_active=row["is_active"],
         activation_status=row["activation_status"],
         activation_requested_at=row.get("activation_requested_at"),
