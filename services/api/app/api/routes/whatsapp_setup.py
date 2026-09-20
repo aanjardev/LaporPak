@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -150,17 +150,23 @@ def start_pairing(
     response_model=WhatsAppChannelInfo,
 )
 def whatsapp_status(
-    village_id: UUID, caller: AdminCaller, session: SessionDep
+    village_id: UUID,
+    background_tasks: BackgroundTasks,
+    caller: AdminCaller,
+    session: SessionDep,
 ) -> WhatsAppChannelInfo:
     _require_owner(caller, village_id)
     _village(session, village_id)
     channel = _channel(session, village_id)
     if channel is None:
         return WhatsAppChannelInfo(message="WhatsApp belum disiapkan.")
+    gateway = _gateway()
     try:
-        snapshot = _gateway().status(channel["external_account_id"])
+        snapshot = gateway.status(channel["external_account_id"])
     except OpenClawGatewayError as exc:
         raise _gateway_error() from exc
+    if snapshot.get("linked") and not snapshot.get("running"):
+        background_tasks.add_task(gateway.restart)
     connected = bool(snapshot.get("connected") and snapshot.get("linked"))
     session.execute(
         channel_integrations.update()
@@ -181,7 +187,11 @@ def whatsapp_status(
             if snapshot.get("lastError")
             else "disconnected"
         ),
-        message=snapshot.get("lastError"),
+        message=(
+            "WhatsApp tertaut; gateway sedang mengaktifkan kanal."
+            if snapshot.get("linked") and not snapshot.get("running")
+            else snapshot.get("lastError")
+        ),
     )
 
 

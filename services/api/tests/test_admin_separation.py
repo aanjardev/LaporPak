@@ -12,6 +12,7 @@ from app.core.security import (
     require_village_operator,
 )
 from app.services.openclaw_gateway import (
+    _GATEWAY_RESTART_COOLDOWN_SECONDS,
     OpenClawGateway,
     _clear_status_cache,
     _json_output,
@@ -127,3 +128,21 @@ def test_openclaw_status_snapshot_is_reused_for_concurrent_dashboard_reads(
     assert first == second
     assert len(calls) == 1
     _clear_status_cache()
+
+
+def test_gateway_restart_is_cooled_down(monkeypatch, tmp_path):
+    cli = tmp_path / "openclaw.exe"
+    cli.write_text("")
+    gateway = OpenClawGateway(str(cli))
+    calls = []
+
+    monkeypatch.setattr(gateway, "_run", lambda *args, **kwargs: calls.append(args) or "")
+    monkeypatch.setattr(
+        "app.services.openclaw_gateway._gateway_restarted_at",
+        -_GATEWAY_RESTART_COOLDOWN_SECONDS,
+    )
+
+    gateway.restart()
+    gateway.restart()
+
+    assert calls == [("gateway", "restart")]

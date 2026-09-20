@@ -89,6 +89,10 @@ openclaw channels status --probe
 The expected WhatsApp state after QR pairing is `enabled`, `configured`,
 `linked`, and `running`.
 
+The dashboard polls this state after the QR is shown. If OpenClaw reports a
+linked account whose runtime has not started yet, FastAPI schedules one guarded
+Gateway restart and the next poll confirms the running channel.
+
 The channel uses `dmPolicy: pairing`. When a citizen sends the first message,
 approve the access request:
 
@@ -98,6 +102,10 @@ openclaw pairing approve whatsapp <CODE>
 ```
 
 The pairing code expires after one hour.
+
+Test the chatbot from a different WhatsApp number than the account scanned by
+the QR. The scanned account is the bot identity and cannot start a conversation
+with itself.
 
 ## 5. Run the REPORT test
 

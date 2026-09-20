@@ -20,6 +20,9 @@ class OpenClawGatewayError(RuntimeError):
 _STATUS_CACHE_SECONDS = 5
 _status_cache_lock = Lock()
 _status_cache: tuple[float, dict[str, dict[str, Any]], str | None] | None = None
+_gateway_restart_lock = Lock()
+_gateway_restarted_at = 0.0
+_GATEWAY_RESTART_COOLDOWN_SECONDS = 30
 
 
 def _clear_status_cache() -> None:
@@ -190,6 +193,23 @@ class OpenClawGateway:
         )
         _clear_status_cache()
         return result
+
+    def restart(self) -> None:
+        """Restart a linked channel runtime once after QR pairing."""
+        global _gateway_restarted_at
+        # ponytail: one local gateway needs only process-local coordination.
+        # Use shared coordination if the API is deployed with multiple workers.
+        if not _gateway_restart_lock.acquire(blocking=False):
+            return
+        try:
+            now = time.monotonic()
+            if now - _gateway_restarted_at < _GATEWAY_RESTART_COOLDOWN_SECONDS:
+                return
+            self._run("gateway", "restart", timeout=60)
+            _gateway_restarted_at = time.monotonic()
+            _clear_status_cache()
+        finally:
+            _gateway_restart_lock.release()
 
     def whatsapp_statuses(self) -> tuple[dict[str, dict[str, Any]], str | None]:
         global _status_cache

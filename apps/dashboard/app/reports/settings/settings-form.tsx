@@ -56,6 +56,21 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
     return () => { active = false; };
   }, [village.id]);
 
+  useEffect(() => {
+    if (!qr) return;
+    const timer = window.setInterval(() => {
+      getWhatsAppStatus(village.id).then((status) => {
+        setWa(status);
+        if (status.is_connected) {
+          setQr(null);
+          setQrExpiresAt(null);
+          setNotice("WhatsApp terhubung dan chatbot siap menerima pesan.");
+        }
+      }).catch(() => undefined);
+    }, 3_000);
+    return () => window.clearInterval(timer);
+  }, [qr, village.id]);
+
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setNotice(""); setError("");
     const data = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -168,7 +183,7 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
           {pairing && <p className="mt-3 text-xs leading-5 text-muted-foreground">OpenClaw sedang menyiapkan akun kanal dan QR. Setup pertama dapat lebih lama; jangan menutup halaman.</p>}
         </div>
         <div className="flex min-h-64 items-center justify-center rounded-lg border border-dashed border-input bg-muted/40 p-4">
-          {qr ? <div className="text-center"><Image unoptimized src={qr} alt="QR pairing WhatsApp" width={240} height={240} className="mx-auto bg-white" /><p className="mt-3 text-xs text-muted-foreground">Pindai dari WhatsApp → Perangkat tertaut.</p>{qrExpiresAt && <p className="mt-1 text-[11px] text-muted-foreground">QR berlaku sampai {new Date(qrExpiresAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}.</p>}</div> : <div className="max-w-56 text-center text-muted-foreground"><MessageCircle className="mx-auto" size={32} /><p className="mt-3 text-sm">QR akan tampil di area ini setelah gateway siap.</p></div>}
+          {qr ? <div className="text-center"><Image unoptimized src={qr} alt="QR pairing WhatsApp" width={240} height={240} className="mx-auto bg-white" /><p className="mt-3 text-xs text-muted-foreground">Pindai dari WhatsApp → Perangkat tertaut. Status diperiksa otomatis.</p>{qrExpiresAt && <p className="mt-1 text-[11px] text-muted-foreground">QR berlaku sampai {new Date(qrExpiresAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}.</p>}</div> : <div className="max-w-56 text-center text-muted-foreground"><MessageCircle className="mx-auto" size={32} /><p className="mt-3 text-sm">QR akan tampil di area ini setelah gateway siap.</p></div>}
         </div>
       </div>
     </section>
