@@ -5,7 +5,9 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from app.core.config import settings
@@ -13,6 +15,17 @@ from app.core.config import settings
 
 class OpenClawGatewayError(RuntimeError):
     pass
+
+
+_STATUS_CACHE_SECONDS = 5
+_status_cache_lock = Lock()
+_status_cache: tuple[float, dict[str, dict[str, Any]], str | None] | None = None
+
+
+def _clear_status_cache() -> None:
+    global _status_cache
+    with _status_cache_lock:
+        _status_cache = None
 
 
 def _json_output(value: str) -> Any:
@@ -116,6 +129,7 @@ class OpenClawGateway:
             f"whatsapp:{account_id}",
             "--json",
         )
+        _clear_status_cache()
 
     def ensure_village_agent(self, agent_id: str, workspace: Path) -> None:
         agents = _json_output(self._run("agents", "list", "--json"))
@@ -162,7 +176,7 @@ class OpenClawGateway:
             },
             separators=(",", ":"),
         )
-        return _last_json(
+        result = _last_json(
             self._run(
                 "gateway",
                 "call",
@@ -174,29 +188,38 @@ class OpenClawGateway:
                 payload,
             )
         )
+        _clear_status_cache()
+        return result
 
     def whatsapp_statuses(self) -> tuple[dict[str, dict[str, Any]], str | None]:
-        snapshot = _last_json(
-            self._run(
-                "channels", "status", "--channel", "whatsapp", "--probe", "--json"
+        global _status_cache
+        with _status_cache_lock:
+            now = time.monotonic()
+            if _status_cache and now - _status_cache[0] < _STATUS_CACHE_SECONDS:
+                return _status_cache[1], _status_cache[2]
+            snapshot = _last_json(
+                self._run(
+                    "channels", "status", "--channel", "whatsapp", "--probe", "--json",
+                    timeout=12,
+                )
             )
-        )
-        if not snapshot.get("gatewayReachable", True):
-            raise OpenClawGatewayError("OpenClaw gateway is unavailable")
-        accounts = snapshot.get("channelAccounts", {}).get("whatsapp", [])
-        default_id = snapshot.get("channelDefaultAccountId", {}).get("whatsapp")
-        result = {
-            str(item.get("accountId")): dict(item)
-            for item in accounts
-            if item.get("accountId")
-        }
-        if default_id and default_id not in result:
-            result[default_id] = dict(snapshot.get("channels", {}).get("whatsapp") or {})
-        if default_id in result:
-            result[default_id]["self"] = snapshot.get("channels", {}).get(
-                "whatsapp", {}
-            ).get("self")
-        return result, default_id
+            if not snapshot.get("gatewayReachable", True):
+                raise OpenClawGatewayError("OpenClaw gateway is unavailable")
+            accounts = snapshot.get("channelAccounts", {}).get("whatsapp", [])
+            default_id = snapshot.get("channelDefaultAccountId", {}).get("whatsapp")
+            result = {
+                str(item.get("accountId")): dict(item)
+                for item in accounts
+                if item.get("accountId")
+            }
+            if default_id and default_id not in result:
+                result[default_id] = dict(snapshot.get("channels", {}).get("whatsapp") or {})
+            if default_id in result:
+                result[default_id]["self"] = snapshot.get("channels", {}).get(
+                    "whatsapp", {}
+                ).get("self")
+            _status_cache = (now, result, default_id)
+            return result, default_id
 
     def status(self, account_id: str) -> dict[str, Any]:
         statuses, _ = self.whatsapp_statuses()
@@ -220,3 +243,4 @@ class OpenClawGateway:
             "--params",
             payload,
         )
+        _clear_status_cache()

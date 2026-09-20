@@ -54,9 +54,9 @@ export const getVillages = (params?: { is_active?: boolean }) => {
 export const getVillage = (villageId: string) => apiFetch<VillageDetail>(`/api/v1/villages/${villageId}`);
 export const updateVillage = (villageId: string, data: { name?: string; metadata?: VillageMetadata }) =>
   apiFetch<Village>(`/api/v1/villages/${villageId}`, { method: "PATCH", body: JSON.stringify(data) });
-export const getWhatsAppStatus = (villageId: string) =>
-  apiFetch<WhatsAppChannelInfo>(`/api/v1/villages/${villageId}/whatsapp/status`);
-export const startWhatsAppPairing = (villageId: string) =>
-  apiFetch<WhatsAppPairingResponse>(`/api/v1/villages/${villageId}/whatsapp/pairing`, { method: "POST" });
+export const getWhatsAppStatus = (villageId: string, signal?: AbortSignal) =>
+  apiFetch<WhatsAppChannelInfo>(`/api/v1/villages/${villageId}/whatsapp/status`, { signal });
+export const startWhatsAppPairing = (villageId: string, signal?: AbortSignal) =>
+  apiFetch<WhatsAppPairingResponse>(`/api/v1/villages/${villageId}/whatsapp/pairing`, { method: "POST", signal });
 export const disconnectWhatsApp = (villageId: string) =>
   apiFetch<void>(`/api/v1/villages/${villageId}/whatsapp`, { method: "DELETE" });

@@ -25,11 +25,15 @@ lengkap. Keputusan dan alasannya dicatat pada riwayat aktivasi.
 ## Antarmuka
 
 - Admin Desa memakai `/reports` dan pengaturan terpadu `/reports/settings`.
-- Super Admin memakai `/admin` dan detail agregat `/admin/villages/{id}`.
+- Super Admin memakai dashboard `/admin`, antrean `/admin/activations`, daftar
+  monitoring `/admin/villages`, dan detail agregat `/admin/villages/{id}`.
 - Pengaturan WhatsApp membaca status gateway OpenClaw dan memakai QR pairing;
   penyimpanan konfigurasi saja tidak berarti terhubung.
 - Respons browser tidak memuat secret, token, path workspace, atau kredensial
   gateway.
+- Permintaan QR memakai ulang provisioning kanal yang sudah ada, menampilkan
+  state loading/error yang terbatas waktu, dan memulihkan sekali sesi yang
+  kedaluwarsa sebelum meminta pengguna login kembali.
 
 ## Gerbang selesai
 

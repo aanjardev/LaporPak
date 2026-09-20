@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
+import { MonitoringDashboard } from "./monitoring-dashboard";
 
-export default async function VillagesPage() {
-  redirect("/admin");
-}
+export default function VillagesPage() { return <MonitoringDashboard />; }

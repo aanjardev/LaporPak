@@ -331,13 +331,20 @@ def decide_activation(
     return village_summary(dict(updated))
 
 
-def _status_counts(session: Session, table, village_id: UUID) -> dict[str, int]:
+def _status_counts_by_village(
+    session: Session, table, village_ids: list[UUID]
+) -> dict[UUID, dict[str, int]]:
+    if not village_ids:
+        return {}
     rows = session.execute(
-        select(table.c.status, func.count())
-        .where(table.c.administrative_unit_id == village_id)
-        .group_by(table.c.status)
+        select(table.c.administrative_unit_id, table.c.status, func.count())
+        .where(table.c.administrative_unit_id.in_(village_ids))
+        .group_by(table.c.administrative_unit_id, table.c.status)
     ).all()
-    return {str(row[0]): int(row[1]) for row in rows}
+    result: dict[UUID, dict[str, int]] = {}
+    for unit_id, item_status, count in rows:
+        result.setdefault(unit_id, {})[str(item_status)] = int(count)
+    return result
 
 
 def _monitoring(
@@ -345,6 +352,8 @@ def _monitoring(
     page: int,
     page_size: int,
     activation_status: str | None,
+    *,
+    check_gateway: bool = True,
 ) -> VillageMonitoringResponse:
     query = select(administrative_units).where(administrative_units.c.level == "village")
     if activation_status:
@@ -357,42 +366,69 @@ def _monitoring(
         .offset((page - 1) * page_size)
         .limit(page_size)
     ).mappings().all()
-    try:
-        whatsapp_statuses, _ = OpenClawGateway().whatsapp_statuses()
-    except OpenClawGatewayError:
-        whatsapp_statuses = {}
+    village_ids = [row["id"] for row in villages]
+    if not village_ids:
+        return VillageMonitoringResponse(items=[], total=total)
+
+    account_rows = session.execute(
+        select(
+            admin_unit_memberships.c.administrative_unit_id.label("unit_id"),
+            admin_accounts,
+        )
+        .join(
+            admin_accounts,
+            admin_accounts.c.id == admin_unit_memberships.c.admin_account_id,
+        )
+        .where(admin_unit_memberships.c.administrative_unit_id.in_(village_ids))
+        .order_by(admin_accounts.c.created_at)
+    ).mappings().all()
+    accounts: dict[UUID, dict] = {}
+    for account in account_rows:
+        accounts.setdefault(account["unit_id"], dict(account))
+
+    report_counts_by_village = _status_counts_by_village(session, reports, village_ids)
+    request_counts_by_village = _status_counts_by_village(
+        session, service_requests, village_ids
+    )
+    channel_rows = session.execute(
+        select(
+            channel_integrations.c.administrative_unit_id,
+            channel_integrations.c.external_account_id,
+        ).where(
+            channel_integrations.c.administrative_unit_id.in_(village_ids),
+            channel_integrations.c.channel == "whatsapp",
+        )
+    ).all()
+    channels = {row[0]: row[1] for row in channel_rows}
+    knowledge_rows = session.execute(
+        select(knowledge_documents.c.administrative_unit_id, func.count())
+        .where(
+            knowledge_documents.c.administrative_unit_id.in_(village_ids),
+            knowledge_documents.c.is_active.is_(True),
+        )
+        .group_by(knowledge_documents.c.administrative_unit_id)
+    ).all()
+    knowledge_counts = {row[0]: int(row[1]) for row in knowledge_rows}
+
+    whatsapp_statuses: dict[str, dict] = {}
+    if check_gateway and channels:
+        try:
+            whatsapp_statuses, _ = OpenClawGateway().whatsapp_statuses()
+        except OpenClawGatewayError:
+            pass
     items = []
     for row in villages:
         village = dict(row)
-        account = session.execute(
-            select(admin_accounts)
-            .join(
-                admin_unit_memberships,
-                admin_unit_memberships.c.admin_account_id == admin_accounts.c.id,
-            )
-            .where(admin_unit_memberships.c.administrative_unit_id == row["id"])
-            .limit(1)
-        ).mappings().one_or_none()
-        report_counts = _status_counts(session, reports, row["id"])
-        request_counts = _status_counts(session, service_requests, row["id"])
-        account_id = session.execute(
-            select(channel_integrations.c.external_account_id).where(
-                channel_integrations.c.administrative_unit_id == row["id"],
-                channel_integrations.c.channel == "whatsapp",
-            )
-        ).scalar_one_or_none()
+        account = accounts.get(row["id"])
+        report_counts = report_counts_by_village.get(row["id"], {})
+        request_counts = request_counts_by_village.get(row["id"], {})
+        account_id = channels.get(row["id"])
         whatsapp_connected = False
         if account_id:
             gateway_status = whatsapp_statuses.get(account_id, {})
             whatsapp_connected = bool(
                 gateway_status.get("connected") and gateway_status.get("linked")
             )
-        knowledge_count = session.execute(
-            select(func.count()).select_from(knowledge_documents).where(
-                knowledge_documents.c.administrative_unit_id == row["id"],
-                knowledge_documents.c.is_active.is_(True),
-            )
-        ).scalar_one()
         items.append(
             VillageMonitoringItem(
                 **village_summary(village).model_dump(),
@@ -403,7 +439,7 @@ def _monitoring(
                 report_status_counts=report_counts,
                 total_requests=sum(request_counts.values()),
                 request_status_counts=request_counts,
-                knowledge_documents=knowledge_count,
+                knowledge_documents=knowledge_counts.get(row["id"], 0),
             )
         )
     return VillageMonitoringResponse(items=items, total=total)
@@ -417,7 +453,9 @@ def activation_queue(
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> VillageMonitoringResponse:
     _require_system_admin(caller)
-    return _monitoring(session, page, page_size, "pending_review")
+    return _monitoring(
+        session, page, page_size, "pending_review", check_gateway=False
+    )
 
 
 @router.get("/monitoring", response_model=VillageMonitoringResponse)
