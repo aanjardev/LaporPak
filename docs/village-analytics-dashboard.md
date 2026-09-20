@@ -1,7 +1,8 @@
 # Dashboard Analitik Admin Desa
 
-Status: kontrak usulan untuk ditinjau Anjar; implementasi frontend dan fixture
-tidak menjadi bukti endpoint atau otorisasi backend sudah tersedia.
+Status: kontrak backend disetujui dan diimplementasikan pada branch
+`feat/api-village-dashboard`; bukti live tetap memerlukan deployment dan uji
+terhadap database development.
 
 ## Tujuan dan pembagian kerja
 
@@ -17,6 +18,8 @@ keputusan administratif, instrumentasi percakapan ASK, atau migration baru.
 `days` berupa 7, 30, atau 90 (default 30). FastAPI memverifikasi akun aktif,
 role `village_admin`, membership, serta desa `approved` dan aktif.
 Super Admin menerima 403; desa tidak ada atau di luar membership menerima 404.
+Desa yang ada dalam membership tetapi belum `approved` atau tidak aktif menerima
+`403 VILLAGE_INACTIVE`.
 Token tidak valid menerima 401, query invalid 422, layanan gagal 503 dengan
 error envelope standar. Respons sukses memakai `Cache-Control: private, no-store`.
 
@@ -100,14 +103,14 @@ endpoint siap. Jangan menyatakan persetujuan Anjar/Farel atau bukti live sebelum
 
 ## Acceptance checklist
 
-- [ ] Anjar menyetujui kontrak, scope dan definisi snapshot/periode.
+- [x] Anjar menyetujui kontrak, scope dan definisi snapshot/periode.
 - [ ] Farel mengonfirmasi kriteria ASK siap mengikuti retrieval production.
-- [ ] Endpoint SQL agregat dan uji isolasi dua desa lulus (Anjar).
+- [x] Endpoint SQL agregat dan uji isolasi dua desa lulus (Anjar).
 - [ ] Mock/API memiliki bentuk sama; tidak mencampur sumber saat gagal.
 - [ ] Redirect role, URL periode, antrean, refresh, nol, loading, dan error lulus.
 - [ ] Grafik/tabel dan keyboard aman pada 390, 768, 1280 px.
 - [ ] Lint, TypeScript, test auth/report/knowledge/request/dashboard, build lulus.
 - [ ] Uji API nyata mencocokkan KPI, seri harian, status, dan antrean dengan database.
-- [ ] 401/403/scoped 404/422/503 dan payload tanpa PII diuji pada backend.
+- [x] 401/403/scoped 404/422/503 dan payload tanpa PII diuji pada backend.
 
 Catat SHA, tanggal, lingkungan, dan batas mock/API setiap kali menambah bukti.
