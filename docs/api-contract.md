@@ -771,6 +771,43 @@ All citizen/OpenClaw operations require `X-OpenClaw-API-Key` and
 `X-Channel-Account-ID`. The backend resolves the village from the active
 channel integration; model-generated payloads cannot select a village.
 
+### Admin identity and village activation
+
+Role labels are `village_admin` (Admin Desa) and `system_admin` (Super Admin).
+Super Admin is not an operational data role and receives `403 FORBIDDEN` from
+REPORT, REQUEST, attachment, and knowledge endpoints.
+
+```http
+GET   /api/v1/admin/me
+PATCH /api/v1/admin/me
+POST  /api/v1/admin/onboarding
+POST  /api/v1/admin/villages/{village_id}/activation-submission
+GET   /api/v1/admin/activation-queue
+PATCH /api/v1/admin/villages/{village_id}/activation
+GET   /api/v1/admin/monitoring
+```
+
+Self-registration requires a verified Supabase identity and always creates a
+`village_admin`. Onboarding atomically creates the account, inactive village,
+and membership. Repeating onboarding returns the existing account instead of
+creating a second village.
+
+Activation status is `draft`, `pending_review`, `changes_requested`, or
+`approved`. Submission requires account identity/contact plus village code,
+province, regency/city, district, address, service contact, and office hours.
+Only `system_admin` can return `approved` or `changes_requested`; a reason is
+required for requested changes. Approved villages have `is_active=true`.
+
+```http
+POST /api/v1/villages/{village_id}/whatsapp/pairing
+GET  /api/v1/villages/{village_id}/whatsapp/status
+DELETE /api/v1/villages/{village_id}/whatsapp
+```
+
+Pairing returns a short-lived QR data URL from OpenClaw or a connected status.
+Status is derived from a gateway probe. Responses never include gateway
+secrets, API keys, auth directories, or workspace paths.
+
 - `POST /api/v1/track` reads only the authenticated sender's `LP-*` or `REQ-*`
   ticket. Omitting the ticket returns at most five recent owned items.
 - `POST /api/v1/service-requests` creates an idempotent `residency_letter`.
@@ -823,7 +860,8 @@ Content-Type: application/json
 ```
 
 The request accepts only `approved` or `rejected`; reason is trimmed and must
-contain 1–1000 characters. A system admin is read-only (`403 FORBIDDEN`), while
+contain 1–1000 characters. A system admin has no knowledge access
+(`403 FORBIDDEN`), while
 an absent, legacy, or out-of-scope document returns
 `404 KNOWLEDGE_DOCUMENT_NOT_FOUND`. Repeating the current state returns
 `409 INVALID_STATUS_TRANSITION`. Editing content resets the document to
@@ -844,16 +882,17 @@ Gemini credentials remain on the OpenClaw host. Failed jobs call `/fail` and do
 not make a document `ready`.
 
 Admin tokens are accepted only when the Supabase Auth UUID maps to an active
-`admin_accounts` row. `system_admin` is global; `village_admin` is limited by
-`admin_unit_memberships`. Out-of-scope detail/mutation returns `404`.
+`admin_accounts` row. `system_admin` is limited to activation and aggregate
+monitoring; `village_admin` is limited by `admin_unit_memberships` and active
+village status. Out-of-scope operational access is denied.
 
 ### Admin REQUEST contract
 
 Admin endpoints require a Supabase bearer token mapped to an active
-`admin_accounts` row. `system_admin` may read every REQUEST for audit but cannot
-make an administrative decision. Only `village_admin` with membership in the
-REQUEST village may change its status. An absent or out-of-scope REQUEST uses
-`404 SERVICE_REQUEST_NOT_FOUND`.
+`admin_accounts` row. `system_admin` receives `403 FORBIDDEN` and cannot read
+or decide REQUEST. Only `village_admin` with membership in an approved, active
+REQUEST village may read or change its status. An absent or out-of-scope
+REQUEST uses `404 SERVICE_REQUEST_NOT_FOUND` after role authorization.
 
 #### List REQUEST
 

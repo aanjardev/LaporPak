@@ -7,8 +7,9 @@ from app.core.config import settings
 from app.core.errors import APIError
 from app.core.security import (
     AdminCaller,
-    AdminRole,
     OpenClawCaller,
+    operator_scope,
+    require_village_operator,
     resolve_channel_unit,
 )
 from app.schemas.enums import (
@@ -140,12 +141,9 @@ def list_reports(
     category: Annotated[ReportCategory | None, Query()] = None,
     search: Annotated[str | None, Query(max_length=200)] = None,
 ) -> ReportListResponse:
+    require_village_operator(caller)
     try:
-        unit_ids = (
-            None
-            if caller.admin_account_id is None or caller.role is AdminRole.SYSTEM_ADMIN
-            else caller.unit_ids
-        )
+        unit_ids = operator_scope(caller)
         return report_service.list_reports(
             page=page,
             page_size=page_size,
@@ -169,14 +167,9 @@ def get_report_detail(
     caller: AdminCaller,
     report_service: ReportServiceDependency,
 ) -> ReportDetail:
+    require_village_operator(caller)
     try:
-        unit_ids = (
-            None
-            if caller.admin_account_id is None or caller.role is AdminRole.SYSTEM_ADMIN
-            else caller.unit_ids
-        )
-        if unit_ids is None:
-            return report_service.get_report_detail(report_id)
+        unit_ids = operator_scope(caller)
         return report_service.get_report_detail(report_id, unit_ids)
     except ReportNotFoundError as exc:
         raise APIError(
@@ -199,11 +192,8 @@ def get_report_attachment(
     caller: AdminCaller,
     report_service: ReportServiceDependency,
 ) -> Response:
-    unit_ids = (
-        None
-        if caller.admin_account_id is None or caller.role is AdminRole.SYSTEM_ADMIN
-        else caller.unit_ids
-    )
+    require_village_operator(caller)
+    unit_ids = operator_scope(caller)
     try:
         content, mime_type = report_service.get_report_attachment(
             report_id, attachment_id, unit_ids
@@ -234,12 +224,9 @@ def update_report_status(
     caller: AdminCaller,
     report_service: ReportServiceDependency,
 ) -> ReportStatusUpdateResponse:
+    require_village_operator(caller)
     try:
-        unit_ids = (
-            None
-            if caller.admin_account_id is None or caller.role is AdminRole.SYSTEM_ADMIN
-            else caller.unit_ids
-        )
+        unit_ids = operator_scope(caller)
         return report_service.update_report_status(
             report_id=report_id,
             new_status=payload.status,

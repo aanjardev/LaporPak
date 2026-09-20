@@ -57,6 +57,20 @@ administrative_units = Table(
     Column("metadata", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
     Column("is_active", Boolean, nullable=False, server_default=text("true")),
     Column(
+        "activation_status",
+        Text,
+        nullable=False,
+        server_default=text("'approved'"),
+    ),
+    Column("activation_requested_at", DateTime(timezone=True)),
+    Column("activation_reviewed_at", DateTime(timezone=True)),
+    Column(
+        "activation_reviewed_by",
+        UUID(as_uuid=True),
+        ForeignKey("public.admin_accounts.id"),
+    ),
+    Column("activation_review_reason", Text),
+    Column(
         "created_at",
         DateTime(timezone=True),
         nullable=False,
@@ -182,6 +196,7 @@ admin_accounts = Table(
     Column("auth_user_id", UUID(as_uuid=True), nullable=False, unique=True),
     Column("role", Text, nullable=False),
     Column("display_name", Text),
+    Column("contact_phone", Text),
     Column("is_active", Boolean, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
     Column("updated_at", DateTime(timezone=True), nullable=False),
@@ -472,4 +487,36 @@ admin_invitations = Table(
     Column("expires_at", DateTime(timezone=True)),
     Column("accepted_at", DateTime(timezone=True)),
     Column("revoked_at", DateTime(timezone=True)),
+)
+
+village_activation_history = Table(
+    "village_activation_history",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "administrative_unit_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.administrative_units.id"),
+        nullable=False,
+    ),
+    Column("old_status", Text),
+    Column("new_status", Text, nullable=False),
+    Column(
+        "actor_admin_account_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.admin_accounts.id"),
+        nullable=False,
+    ),
+    Column("reason", Text),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
 )

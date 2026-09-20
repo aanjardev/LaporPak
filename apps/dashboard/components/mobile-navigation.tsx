@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import { Dialog } from "@base-ui/react/dialog";
-import Link from "next/link";
-import { Building2, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { ReportsNav } from "@/components/reports-nav";
-import { VillageSelector } from "@/components/village-selector";
 
-export function MobileNavigation({ showKnowledge }: { showKnowledge: boolean }) {
+export function MobileNavigation({ showKnowledge, accountName, villageName }: { showKnowledge: boolean; accountName: string; villageName: string }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -21,13 +19,8 @@ export function MobileNavigation({ showKnowledge }: { showKnowledge: boolean }) 
             <Dialog.Close aria-label="Tutup navigasi" className="inline-flex size-11 shrink-0 items-center justify-center rounded-md hover:bg-white/10 focus-visible:outline-primary"><X size={21} /></Dialog.Close>
           </div>
           <div className="mt-4 rounded-md bg-card p-3"><BrandLogo /></div>
-          <VillageSelector className="mt-4 text-foreground" />
+          <div className="mt-4 rounded-lg border border-white/15 px-3 py-3"><p className="text-sm font-semibold">{accountName}</p><p className="mt-1 text-xs text-white/65">{villageName}</p></div>
           <ReportsNav showKnowledge={showKnowledge} onNavigate={() => setOpen(false)} />
-          <div className="mt-4 border-t border-white/15 pt-4">
-            <Link href="/admin/villages" onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm text-white/85 hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
-              <Building2 aria-hidden="true" size={18} /> Manajemen Desa
-            </Link>
-          </div>
           <p className="mt-auto pt-8 text-xs leading-5 text-white/70">Portal pelayanan dan pengaduan desa</p>
         </Dialog.Popup>
       </Dialog.Portal>

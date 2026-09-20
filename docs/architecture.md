@@ -481,6 +481,17 @@ admin_unit_memberships: admin_account_id, administrative_unit_id, created_at
 Role canonical adalah `system_admin` dan `village_admin`. FastAPI memakai
 membership untuk membatasi baca dan mutation per desa.
 
+`village_admin` adalah operator independen untuk unit pada membership-nya.
+`system_admin` hanya menjadi authority aktivasi desa dan pembaca metrik
+agregat; role ini tidak memiliki akses detail warga, attachment, knowledge,
+atau keputusan REPORT/REQUEST. Akun system admin dibuat lewat provisioning
+server, bukan pendaftaran publik.
+
+`administrative_units.activation_status` terpisah dari status koneksi channel
+dan status tiket. Riwayat keputusan berada pada
+`village_activation_history`. Desa baru belum menjadi scope operasional sampai
+status `approved` dan `is_active=true`.
+
 ### `channel_integrations`
 
 ```text

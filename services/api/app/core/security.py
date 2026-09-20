@@ -14,7 +14,12 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.errors import APIError
 from app.db.session import get_db_session
-from app.db.tables import admin_accounts, admin_unit_memberships, channel_integrations
+from app.db.tables import (
+    admin_accounts,
+    admin_unit_memberships,
+    administrative_units,
+    channel_integrations,
+)
 
 
 class CallerType(StrEnum):
@@ -36,6 +41,15 @@ class AuthenticatedCaller(BaseModel):
     admin_account_id: UUID | None = None
     role: AdminRole | None = None
     unit_ids: tuple[UUID, ...] = ()
+    operational_unit_ids: tuple[UUID, ...] | None = None
+
+
+class SupabaseIdentity(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    email: str
+    email_verified: bool
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -85,6 +99,9 @@ def authenticate_caller(
                 unit_ids=(settings.dashboard_admin_unit_id,)
                 if settings.dashboard_admin_unit_id
                 else (),
+                operational_unit_ids=(settings.dashboard_admin_unit_id,)
+                if settings.dashboard_admin_unit_id
+                else (),
             )
         if account is None or not account["is_active"]:
             raise APIError(
@@ -96,6 +113,23 @@ def authenticate_caller(
             session.execute(
                 select(admin_unit_memberships.c.administrative_unit_id).where(
                     admin_unit_memberships.c.admin_account_id == account["id"]
+                )
+            )
+            .scalars()
+            .all()
+        )
+        operational_units = tuple(
+            session.execute(
+                select(admin_unit_memberships.c.administrative_unit_id)
+                .join(
+                    administrative_units,
+                    administrative_units.c.id
+                    == admin_unit_memberships.c.administrative_unit_id,
+                )
+                .where(
+                    admin_unit_memberships.c.admin_account_id == account["id"],
+                    administrative_units.c.is_active.is_(True),
+                    administrative_units.c.activation_status == "approved",
                 )
             )
             .scalars()
@@ -114,6 +148,7 @@ def authenticate_caller(
             admin_account_id=account["id"],
             role=role,
             unit_ids=units,
+            operational_unit_ids=operational_units,
         )
     except SQLAlchemyError as exc:
         if not settings.allow_legacy_admin_fallback:
@@ -130,6 +165,9 @@ def authenticate_caller(
             unit_ids=(settings.dashboard_admin_unit_id,)
             if settings.dashboard_admin_unit_id
             else (),
+            operational_unit_ids=(settings.dashboard_admin_unit_id,)
+            if settings.dashboard_admin_unit_id
+            else (),
         )
     finally:
         # Authentication reads use the request-scoped session and therefore
@@ -138,7 +176,7 @@ def authenticate_caller(
         session.rollback()
 
 
-def verify_supabase_access_token(access_token: str) -> UUID:
+def verify_supabase_identity(access_token: str) -> SupabaseIdentity:
     if not settings.supabase_url or not settings.supabase_anon_key:
         raise APIError(
             status_code=503,
@@ -176,7 +214,12 @@ def verify_supabase_access_token(access_token: str) -> UUID:
         )
 
     try:
-        return UUID(response.json()["id"])
+        payload = response.json()
+        return SupabaseIdentity(
+            id=UUID(payload["id"]),
+            email=str(payload["email"]),
+            email_verified=bool(payload.get("email_confirmed_at")),
+        )
     except (KeyError, TypeError, ValueError) as exc:
         raise APIError(
             status_code=401,
@@ -185,9 +228,32 @@ def verify_supabase_access_token(access_token: str) -> UUID:
         ) from exc
 
 
+def verify_supabase_access_token(access_token: str) -> UUID:
+    return verify_supabase_identity(access_token).id
+
+
+def authenticate_identity(
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None,
+        Depends(bearer_scheme),
+    ],
+) -> SupabaseIdentity:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise APIError(
+            status_code=401,
+            code="UNAUTHORIZED",
+            message="Valid bearer token required",
+        )
+    return verify_supabase_identity(credentials.credentials)
+
+
 AuthenticatedCallerDependency = Annotated[
     AuthenticatedCaller,
     Depends(authenticate_caller),
+]
+SupabaseIdentityDependency = Annotated[
+    SupabaseIdentity,
+    Depends(authenticate_identity),
 ]
 
 
@@ -218,17 +284,49 @@ def require_admin(
     return caller
 
 
+def require_village_operator(caller: AuthenticatedCallerDependency) -> AuthenticatedCaller:
+    operational = (
+        caller.unit_ids
+        if caller.operational_unit_ids is None
+        else caller.operational_unit_ids
+    )
+    if caller.role is not AdminRole.VILLAGE_ADMIN or not operational:
+        raise APIError(
+            status_code=403,
+            code="FORBIDDEN",
+            message="Active village administrator role required",
+        )
+    return caller
+
+
 OpenClawCaller = Annotated[AuthenticatedCaller, Depends(require_openclaw)]
 AdminCaller = Annotated[AuthenticatedCaller, Depends(require_admin)]
+VillageOperator = Annotated[AuthenticatedCaller, Depends(require_village_operator)]
+
+
+def operator_scope(caller: AuthenticatedCaller) -> tuple[UUID, ...]:
+    return (
+        caller.unit_ids
+        if caller.operational_unit_ids is None
+        else caller.operational_unit_ids
+    )
 
 
 def resolve_channel_unit(session: Session, external_account_id: str) -> UUID:
     try:
         row = session.execute(
-            select(channel_integrations.c.administrative_unit_id).where(
+            select(channel_integrations.c.administrative_unit_id)
+            .join(
+                administrative_units,
+                administrative_units.c.id
+                == channel_integrations.c.administrative_unit_id,
+            )
+            .where(
                 channel_integrations.c.channel == "whatsapp",
                 channel_integrations.c.external_account_id == external_account_id,
                 channel_integrations.c.is_active.is_(True),
+                administrative_units.c.is_active.is_(True),
+                administrative_units.c.activation_status == "approved",
             )
         ).scalar_one_or_none()
     except SQLAlchemyError as exc:

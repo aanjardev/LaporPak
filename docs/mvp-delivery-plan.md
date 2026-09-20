@@ -5,6 +5,9 @@
 > Semua contoh dan pengujian memakai data serta akun uji; jangan mencatat
 > kredensial, token, nomor WhatsApp pribadi, atau isi laporan warga nyata.
 
+Pemisahan kewenangan Admin Desa, Super Admin, onboarding, dan pengaturan
+mandiri mengikuti [rencana admin](../PLAN.md).
+
 ## 1. Acuan dan arti selesai
 
 - [PRD V3](prd/PRD_V3_AI_Village_Service_Agent.md) menetapkan cakupan dan

@@ -5,6 +5,7 @@ enabling AI personality customization and memory isolation.
 """
 
 import json
+import shutil
 from pathlib import Path
 from uuid import UUID
 
@@ -20,7 +21,11 @@ class OpenClawWorkspaceService:
         Args:
             base_path: Base path for OpenClaw workspaces. Defaults to config value.
         """
-        self.base_path = Path(base_path or getattr(settings, 'openclaw_workspaces_path', 'openclaw/workspaces'))
+        repository = Path(__file__).resolve().parents[4]
+        self.base_path = Path(
+            base_path or repository / "integrations" / "openclaw" / "workspaces"
+        )
+        self.template_path = repository / "integrations" / "openclaw" / "workspace"
 
     def get_workspace_path(self, village_id: UUID) -> Path:
         """Get the workspace path for a village.
@@ -44,6 +49,11 @@ class OpenClawWorkspaceService:
         """
         workspace_path = self.get_workspace_path(village_id)
         workspace_path.mkdir(parents=True, exist_ok=True)
+        for filename in ("AGENTS.md", "BOOTSTRAP.md", "USER.md"):
+            source = self.template_path / filename
+            destination = workspace_path / filename
+            if source.exists() and not destination.exists():
+                shutil.copyfile(source, destination)
         return workspace_path
 
     def create_identity_file(

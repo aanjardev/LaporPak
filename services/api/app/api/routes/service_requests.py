@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 from app.core.errors import APIError
 from app.core.security import (
     AdminCaller,
-    AdminRole,
     OpenClawCaller,
+    operator_scope,
+    require_village_operator,
     resolve_channel_unit,
 )
 from app.db.session import get_db_session
@@ -74,10 +75,6 @@ def create(
         ) from exc
 
 
-def scope(caller):
-    return None if caller.role is AdminRole.SYSTEM_ADMIN else caller.unit_ids
-
-
 @router.get("", response_model=ServiceRequestList)
 def list_requests(
     caller: AdminCaller,
@@ -85,8 +82,9 @@ def list_requests(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> ServiceRequestList:
+    require_village_operator(caller)
     try:
-        return ServiceRequestService(session).list(page, page_size, scope(caller))
+        return ServiceRequestService(session).list(page, page_size, operator_scope(caller))
     except ReportPersistenceError as exc:
         raise APIError(
             status_code=503,
@@ -101,11 +99,12 @@ def detail(
     caller: AdminCaller,
     session: Annotated[Session, Depends(get_db_session)],
 ) -> ServiceRequestDetail:
+    require_village_operator(caller)
     try:
         return ServiceRequestService(session).detail(
             request_id,
-            scope(caller),
-            can_transition=caller.role is AdminRole.VILLAGE_ADMIN,
+            operator_scope(caller),
+            can_transition=True,
         )
     except ReportNotFoundError as exc:
         raise APIError(
@@ -130,15 +129,14 @@ def update_status(
     caller: AdminCaller,
     session: Annotated[Session, Depends(get_db_session)],
 ) -> ServiceRequestStatusUpdateResponse:
-    if caller.role is not AdminRole.VILLAGE_ADMIN:
-        raise APIError(
-            status_code=403,
-            code="FORBIDDEN",
-            message="Village administrator role required",
-        )
+    require_village_operator(caller)
     try:
         return ServiceRequestService(session).update(
-            request_id, payload.status, payload.reason, caller.identifier, scope(caller)
+            request_id,
+            payload.status,
+            payload.reason,
+            caller.identifier,
+            operator_scope(caller),
         )
     except ReportNotFoundError as exc:
         raise APIError(
