@@ -7,7 +7,7 @@ export default function KnowledgeNotFound() {
       <FileQuestion aria-hidden="true" className="text-muted-foreground" size={40} />
       <h1 className="mt-5 text-2xl font-bold">Sumber tidak ditemukan</h1>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">Tautan ini tidak tersedia atau akses Anda telah berubah.</p>
-      <Link href="/reports/knowledge" className="mt-6 inline-flex min-h-11 items-center rounded-lg bg-brand px-5 text-sm font-semibold text-white hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Kembali ke sumber ASK</Link>
+      <Link href="/reports/settings/knowledge" className="mt-6 inline-flex min-h-11 items-center rounded-lg bg-brand px-5 text-sm font-semibold text-white hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Kembali ke sumber ASK</Link>
     </div>
   );
 }

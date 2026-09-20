@@ -50,7 +50,7 @@ export function VillageDashboardView({ data, isMock }: { data: VillageDashboard;
       <div className="grid gap-4 lg:grid-cols-3">
         <StatusPanel title="Laporan warga" href="/reports" rows={reportStatuses.map((status) => [statusLabels[status], data.report_status_counts[status]])} />
         <StatusPanel title="Pengajuan layanan" href="/reports/requests" rows={requestStatuses.map((status) => [requestStatusLabels[status], data.request_status_counts[status]])} />
-        <StatusPanel title="Sumber ASK" href="/reports/knowledge" rows={[["Sumber aktif", data.knowledge.active], ["Siap digunakan", data.knowledge.ready], ["Draf aktif", data.knowledge.draft], ["Pemrosesan gagal", data.knowledge.failed], ["Menunggu / diproses", data.knowledge.processing]]} note="Sumber draf dapat sekaligus gagal diproses. Jumlah kategori tidak dijumlahkan sebagai total." />
+        <StatusPanel title="Sumber ASK" href="/reports/settings/knowledge" rows={[["Sumber aktif", data.knowledge.active], ["Siap digunakan", data.knowledge.ready], ["Draf aktif", data.knowledge.draft], ["Pemrosesan gagal", data.knowledge.failed], ["Menunggu / diproses", data.knowledge.processing]]} note="Sumber draf dapat sekaligus gagal diproses. Jumlah kategori tidak dijumlahkan sebagai total." />
       </div>
     </section>
   </>;

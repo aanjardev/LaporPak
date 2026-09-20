@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useMemo, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -9,6 +9,7 @@ import {
   reviewKnowledgeAction,
 } from "./actions";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard";
 
 type Values = {
   title: string;
@@ -35,6 +36,14 @@ const categoryOptions = [
 export function KnowledgeForm({ action, initialValues, mode }: Props) {
   const [state, formAction, pending] = useActionState(action, { message: null });
   const [values, setValues] = useState(initialValues);
+  const dirty = useMemo(() =>
+    values.title !== initialValues.title ||
+    values.category !== initialValues.category ||
+    values.serviceKey !== initialValues.serviceKey ||
+    values.content !== initialValues.content ||
+    values.isMandatory !== initialValues.isMandatory ||
+    (values.unitId ?? "") !== (initialValues.unitId ?? ""),
+  [initialValues, values]);
 
   return (
     <form action={formAction} onSubmit={(event) => { if (pending) event.preventDefault(); }} className={mode === "create" ? "mt-5 grid min-w-0 gap-4" : "grid min-w-0 gap-4 ui-panel p-5 "}>
@@ -68,6 +77,7 @@ export function KnowledgeForm({ action, initialValues, mode }: Props) {
       <button type="submit" disabled={pending} className="ui-primary justify-self-start">
         {pending ? "Menyimpan…" : mode === "create" ? "Simpan sumber" : "Simpan perubahan"}
       </button>
+      <UnsavedChangesGuard active={dirty && !pending} />
     </form>
   );
 }

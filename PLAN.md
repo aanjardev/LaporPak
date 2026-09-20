@@ -77,3 +77,12 @@ Tahap ini memakai komponen bersama tanpa notification center atau tabel baru:
 
 Keberhasilan hanya diumumkan setelah backend mengonfirmasi. Kegagalan refresh
 setelah mutasi mengarahkan pengguna memuat data terbaru tanpa submit ulang.
+
+## Pengaturan dan Sumber ASK
+
+- Pengaturan Admin Desa memakai dua tab berbasis URL: `/reports/settings` untuk
+  akun, profil, WhatsApp, dan AI; `/reports/settings/knowledge` untuk Sumber ASK.
+- Sumber ASK tidak lagi menjadi menu utama. URL lama `/reports/knowledge`
+  mengarahkan ke tab baru dan mempertahankan parameter feedback yang dikenal.
+- Form akun dan knowledge memperingatkan sebelum navigasi ketika ada perubahan
+  yang belum disimpan. Tidak ada data form yang disimpan di browser storage.

@@ -51,7 +51,7 @@ test("tautan antrean memakai route lokal per jenis", () => {
   const items = mockDashboard(village, 7, now).attention;
   assert.equal(attentionHref(items[0]), `/reports/${items[0].id}`);
   assert.equal(attentionHref(items[1]), `/reports/requests/${items[1].id}`);
-  assert.equal(attentionHref(items[2]), `/reports/knowledge/${items[2].id}`);
+  assert.equal(attentionHref(items[2]), `/reports/settings/knowledge/${items[2].id}`);
 });
 
 test("API meneruskan token dan periode, no-store, tanpa fallback mock", async (t) => {

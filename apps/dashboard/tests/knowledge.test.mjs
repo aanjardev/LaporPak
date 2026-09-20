@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 
 import {
   createKnowledgeDocument,
@@ -10,6 +11,8 @@ import {
   reviewKnowledgeDocument,
   updateKnowledgeDocument,
 } from "../lib/knowledge.ts";
+import { knowledgeDetailPath, knowledgeSettingsPath, legacyKnowledgeRedirect } from "../lib/knowledge-route.ts";
+import { internalNavigationTarget } from "../lib/unsaved-navigation.ts";
 
 const originalFetch = globalThis.fetch;
 const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -87,4 +90,29 @@ test("knowledge API meneruskan kegagalan jaringan sebagai kegagalan layanan", as
   process.env.NEXT_PUBLIC_API_URL = "http://localhost:8000";
   globalThis.fetch = async () => { throw new TypeError("network unavailable"); };
   await assert.rejects(listKnowledgeDocuments("test-token"), TypeError);
+});
+
+test("Sumber ASK memakai route pengaturan dan redirect lama menjaga feedback", () => {
+  assert.equal(knowledgeSettingsPath, "/reports/settings/knowledge");
+  assert.equal(knowledgeDetailPath("doc / satu"), "/reports/settings/knowledge/doc%20%2F%20satu");
+  assert.equal(
+    legacyKnowledgeRedirect(null, { saved: "1", ignored: "private" }),
+    "/reports/settings/knowledge?saved=1",
+  );
+  assert.equal(
+    legacyKnowledgeRedirect("doc-1", { reviewed: "1", error: "invalid" }),
+    "/reports/settings/knowledge/doc-1?reviewed=1&error=invalid",
+  );
+  const navigation = readFileSync(new URL("../components/reports-nav.tsx", import.meta.url), "utf8");
+  const tabs = readFileSync(new URL("../app/reports/settings/settings-tabs.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(navigation, /Sumber ASK/);
+  assert.match(tabs, /Sumber ASK/);
+  assert.match(tabs, /aria-current/);
+});
+
+test("penjaga perubahan hanya menahan navigasi internal yang berpindah halaman", () => {
+  const current = "http://localhost:3000/reports/settings?tab=account";
+  assert.equal(internalNavigationTarget(current, "/reports/settings/knowledge"), "/reports/settings/knowledge");
+  assert.equal(internalNavigationTarget(current, current), null);
+  assert.equal(internalNavigationTarget(current, "https://example.com/help"), null);
 });

@@ -15,7 +15,7 @@ export function KnowledgeUnavailable({ retry }: { retry?: () => void }) {
         ) : (
           <a href="" className="inline-flex min-h-11 items-center rounded-lg bg-brand px-5 text-sm font-semibold text-white hover:bg-brand-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Coba lagi</a>
         )}
-        <Link href="/reports" className="inline-flex min-h-11 items-center rounded-lg border border-input px-5 text-sm font-semibold text-foreground hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Daftar laporan</Link>
+        <Link href="/reports/settings" className="inline-flex min-h-11 items-center rounded-lg border border-input px-5 text-sm font-semibold text-foreground hover:bg-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Pengaturan akun</Link>
       </div>
     </div>
   );

@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, ClipboardList, FileText, Settings, LayoutDashboard } from "lucide-react";
+import { ClipboardList, FileText, Settings, LayoutDashboard } from "lucide-react";
 
-export function ReportsNav({ showKnowledge, onNavigate }: { showKnowledge: boolean; onNavigate?: () => void }) {
+export function ReportsNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const dashboardActive = pathname === "/reports/dashboard";
-  const knowledgeActive = showKnowledge && pathname.startsWith("/reports/knowledge");
   const requestsActive = pathname.startsWith("/reports/requests");
   const settingsActive = pathname.startsWith("/reports/settings");
   const activeClass = "bg-primary font-semibold text-primary-foreground";
@@ -18,17 +17,12 @@ export function ReportsNav({ showKnowledge, onNavigate }: { showKnowledge: boole
       <Link onClick={onNavigate} href="/reports/dashboard" aria-current={dashboardActive ? "page" : undefined} className={`mb-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${dashboardActive ? activeClass : idleClass}`}>
         <LayoutDashboard aria-hidden="true" size={18} /> Dashboard
       </Link>
-      <Link onClick={onNavigate} href="/reports" aria-current={!dashboardActive && !knowledgeActive && !requestsActive && !settingsActive ? "page" : undefined} className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${!dashboardActive && !knowledgeActive && !requestsActive && !settingsActive ? activeClass : idleClass}`}>
+      <Link onClick={onNavigate} href="/reports" aria-current={!dashboardActive && !requestsActive && !settingsActive ? "page" : undefined} className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${!dashboardActive && !requestsActive && !settingsActive ? activeClass : idleClass}`}>
         <ClipboardList aria-hidden="true" size={18} /> Laporan warga
       </Link>
       <Link onClick={onNavigate} href="/reports/requests" aria-current={requestsActive ? "page" : undefined} className={`mt-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${requestsActive ? activeClass : idleClass}`}>
         <FileText aria-hidden="true" size={18} /> Pengajuan layanan
       </Link>
-      {showKnowledge && (
-        <Link onClick={onNavigate} href="/reports/knowledge" aria-current={knowledgeActive ? "page" : undefined} className={`mt-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${knowledgeActive ? activeClass : idleClass}`}>
-          <BookOpen aria-hidden="true" size={18} /> Sumber ASK
-        </Link>
-      )}
       <Link onClick={onNavigate} href="/reports/settings" aria-current={settingsActive ? "page" : undefined} className={`mt-2 flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${settingsActive ? activeClass : idleClass}`}>
         <Settings aria-hidden="true" size={18} /> Pengaturan Akun
       </Link>

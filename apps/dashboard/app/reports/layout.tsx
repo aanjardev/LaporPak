@@ -23,13 +23,13 @@ export default async function ReportsLayout({ children }: { children: React.Reac
         <Link href="/reports/dashboard" className="block rounded-md bg-card p-3 focus-visible:outline-primary"><BrandLogo /></Link>
         <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.12em] text-white/65">Administrasi desa</p>
         <div className="mt-4 rounded-lg border border-white/15 px-3 py-3"><p className="truncate text-sm font-semibold">{village.name}</p><p className="mt-1 text-xs text-white/65">{village.activation_status === "approved" ? "Desa aktif" : "Menunggu aktivasi"}</p></div>
-        <ReportsNav showKnowledge={!isMock} />
+        <ReportsNav />
         <Link href="/reports/settings" className="mt-auto rounded-lg border border-white/15 p-3 hover:bg-white/10"><div className="flex items-center gap-2 text-sm font-semibold"><Settings size={16} />{admin.display_name || "Admin Desa"}</div><p className="mt-1 truncate text-xs text-white/65">{admin.email}</p></Link>
       </aside>
       <div className="min-w-0 lg:pl-64">
         <header className="flex min-h-20 items-center justify-between gap-3 border-b border-border bg-card px-4 sm:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <MobileNavigation showKnowledge={!isMock} accountName={admin.display_name || "Admin Desa"} villageName={village.name} />
+            <MobileNavigation accountName={admin.display_name || "Admin Desa"} villageName={village.name} />
             <div className="min-w-0"><p className="text-sm font-semibold text-brand">Portal petugas</p><p className="mt-1 hidden text-xs text-muted-foreground sm:block">Pelayanan dan pengaduan desa</p></div>
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-5">

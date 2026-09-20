@@ -46,7 +46,7 @@ secret backend dan tidak membaca tabel laporan langsung dari Supabase.
 
 ## Pengelolaan sumber ASK
 
-Route `/reports/knowledge` menyediakan daftar, tambah, edit, dan penonaktifan
+Route `/reports/settings/knowledge` menyediakan daftar, tambah, edit, dan penonaktifan
 sumber ASK melalui FastAPI. Request dijalankan dari server Next.js dengan token
 sesi petugas. Respons `401` mengarah ke login, `403` ke halaman akses ditolak,
 `404` detail ke halaman tidak ditemukan, dan kegagalan layanan menampilkan pesan

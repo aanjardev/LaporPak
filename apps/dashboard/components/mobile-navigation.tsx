@@ -7,7 +7,7 @@ import { Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { ReportsNav } from "@/components/reports-nav";
 
-export function MobileNavigation({ showKnowledge, accountName, villageName }: { showKnowledge: boolean; accountName: string; villageName: string }) {
+export function MobileNavigation({ accountName, villageName }: { accountName: string; villageName: string }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -21,7 +21,7 @@ export function MobileNavigation({ showKnowledge, accountName, villageName }: { 
           </div>
           <Link href="/reports/dashboard" onClick={() => setOpen(false)} className="mt-4 rounded-md bg-card p-3"><BrandLogo /></Link>
           <div className="mt-4 rounded-lg border border-white/15 px-3 py-3"><p className="text-sm font-semibold">{accountName}</p><p className="mt-1 text-xs text-white/65">{villageName}</p></div>
-          <ReportsNav showKnowledge={showKnowledge} onNavigate={() => setOpen(false)} />
+          <ReportsNav onNavigate={() => setOpen(false)} />
           <p className="mt-auto pt-8 text-xs leading-5 text-white/70">Portal pelayanan dan pengaduan desa</p>
         </Dialog.Popup>
       </Dialog.Portal>

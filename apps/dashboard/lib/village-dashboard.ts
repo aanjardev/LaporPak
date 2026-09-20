@@ -38,7 +38,7 @@ export function dashboardDays(value: unknown): DashboardDays {
 }
 
 export function attentionHref(item: AttentionItem) {
-  const prefix = { report: "/reports", request: "/reports/requests", knowledge: "/reports/knowledge" };
+  const prefix = { report: "/reports", request: "/reports/requests", knowledge: "/reports/settings/knowledge" };
   return `${prefix[item.kind]}/${encodeURIComponent(item.id)}`;
 }
 

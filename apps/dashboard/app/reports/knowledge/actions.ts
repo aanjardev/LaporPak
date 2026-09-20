@@ -11,6 +11,7 @@ import {
   reviewKnowledgeDocument,
   updateKnowledgeDocument,
 } from "@/lib/knowledge";
+import { knowledgeDetailPath, knowledgeSettingsPath } from "@/lib/knowledge-route";
 
 export type KnowledgeFormState = { message: string | null };
 
@@ -54,13 +55,13 @@ export async function createKnowledgeAction(
   try {
     await createKnowledgeDocument(payload, await getAdminAccessToken());
   } catch (error) {
-    handleAuthError(error, "/reports/knowledge");
+    handleAuthError(error, knowledgeSettingsPath);
     return { message: error instanceof KnowledgeApiError && error.status === 422
       ? invalidMessage
       : "Sumber belum dapat disimpan. Isi formulir tetap tersedia untuk dicoba lagi." };
   }
-  revalidatePath("/reports/knowledge");
-  redirect("/reports/knowledge?saved=1");
+  revalidatePath(knowledgeSettingsPath);
+  redirect(`${knowledgeSettingsPath}?saved=1`);
 }
 
 export async function updateKnowledgeAction(
@@ -76,7 +77,7 @@ export async function updateKnowledgeAction(
     return { message: invalidMessage };
   }
 
-  const returnPath = `/reports/knowledge/${encodeURIComponent(id)}`;
+  const returnPath = knowledgeDetailPath(id);
   try {
     await updateKnowledgeDocument(
       id,
@@ -98,22 +99,22 @@ export async function updateKnowledgeAction(
       ? invalidMessage
       : "Perubahan belum dapat disimpan. Isi formulir tetap tersedia untuk dicoba lagi." };
   }
-  revalidatePath("/reports/knowledge");
+  revalidatePath(knowledgeSettingsPath);
   revalidatePath(returnPath);
   redirect(`${returnPath}?saved=1`);
 }
 
 export async function deactivateKnowledgeAction(formData: FormData) {
   const id = textValue(formData, "id");
-  if (!id) redirect("/reports/knowledge?error=invalid");
+  if (!id) redirect(`${knowledgeSettingsPath}?error=invalid`);
   try {
     await deactivateKnowledgeDocument(id, await getAdminAccessToken());
   } catch (error) {
-    handleAuthError(error, "/reports/knowledge");
-    redirect(`/reports/knowledge?error=${error instanceof KnowledgeApiError && error.status === 404 ? "not-found" : "delete"}`);
+    handleAuthError(error, knowledgeSettingsPath);
+    redirect(`${knowledgeSettingsPath}?error=${error instanceof KnowledgeApiError && error.status === 404 ? "not-found" : "delete"}`);
   }
-  revalidatePath("/reports/knowledge");
-  redirect("/reports/knowledge?deleted=1");
+  revalidatePath(knowledgeSettingsPath);
+  redirect(`${knowledgeSettingsPath}?deleted=1`);
 }
 
 export async function reviewKnowledgeAction(
@@ -123,7 +124,7 @@ export async function reviewKnowledgeAction(
 ): Promise<KnowledgeFormState> {
   const status = textValue(formData, "status");
   const reason = textValue(formData, "reason");
-  const returnPath = `/reports/knowledge/${encodeURIComponent(id)}`;
+  const returnPath = knowledgeDetailPath(id);
   if (!(["approved", "rejected"] as string[]).includes(status) || !reason || reason.length > 1000) {
     return { message: "Pilih keputusan dan isi alasan 1–1000 karakter." };
   }
@@ -143,7 +144,7 @@ export async function reviewKnowledgeAction(
     }
     return { message: "Keputusan review belum dapat disimpan. Silakan coba lagi." };
   }
-  revalidatePath("/reports/knowledge");
+  revalidatePath(knowledgeSettingsPath);
   revalidatePath(returnPath);
   redirect(`${returnPath}?reviewed=1`);
 }

@@ -16,6 +16,7 @@ import {
 } from "@/lib/villages";
 import { InlineFeedback, PendingButton, SlowStatus, useToast } from "@/components/action-feedback";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard";
 
 const input = "ui-control mt-1.5 px-3";
 
@@ -46,15 +47,6 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
   useEffect(() => () => {
     if (selectedLogoUrl) URL.revokeObjectURL(selectedLogoUrl);
   }, [selectedLogoUrl]);
-
-  useEffect(() => {
-    const guard = (event: BeforeUnloadEvent) => {
-      if (!dirty) return;
-      event.preventDefault();
-    };
-    window.addEventListener("beforeunload", guard);
-    return () => window.removeEventListener("beforeunload", guard);
-  }, [dirty]);
 
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
 
@@ -219,7 +211,7 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
         <Field label="Nama penanggung jawab" name="display_name" value={admin.display_name} required />
         <Field label="Email terverifikasi" name="email" value={admin.email} disabled />
         <Field label="Kontak penanggung jawab" name="contact_phone" value={admin.contact_phone} required />
-        <div><span className="text-sm font-semibold">Kata sandi</span><Link href="/set-password" onClick={(event) => { if (dirty && !window.confirm("Perubahan belum disimpan. Tinggalkan halaman?")) event.preventDefault(); }} className="ui-control mt-1.5 flex items-center px-3 text-sm font-semibold text-brand">Ubah kata sandi</Link></div>
+        <div><span className="text-sm font-semibold">Kata sandi</span><Link href="/set-password" className="ui-control mt-1.5 flex items-center px-3 text-sm font-semibold text-brand">Ubah kata sandi</Link></div>
       </div></section>
 
       <section className="ui-panel p-5 sm:p-6"><Header icon={CheckCircle2} title="Profil Desa" description="Data wajib untuk aktivasi dan kop dokumen laporan." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -275,6 +267,7 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
 
     {activationStatus !== "approved" && <section className="ui-alert-warning border p-5"><h2 className="font-bold text-amber-950">Aktivasi desa</h2><p className="mt-2 text-sm text-amber-900">Status: {activationStatus.replaceAll("_", " ")}{village.activation_review_reason ? ` — ${village.activation_review_reason}` : ""}</p><PendingButton type="button" pending={activating} pendingLabel="Mengirim pengajuan…" disabled={activationStatus === "pending_review"} onClick={async () => { setActivating(true); setError(""); try { const result = await submitActivation(village.id); setActivationStatus(result.activation_status); setNotice("Pengajuan aktivasi dikirim."); toast({ kind: "success", title: "Pengajuan aktivasi dikirim" }); } catch (reason) { setError(reason instanceof Error ? reason.message : "Pengajuan gagal"); } finally { setActivating(false); } }} className="ui-primary mt-4 gap-2"><Send size={16} />Ajukan aktivasi</PendingButton></section>}
     <ConfirmationDialog open={disconnectOpen} onOpenChange={setDisconnectOpen} title="Putuskan WhatsApp desa?" description="Chatbot berhenti menerima pesan warga sampai perangkat ditautkan kembali." confirmLabel="Putuskan WhatsApp" tone="danger" pending={pairing} onConfirm={disconnect} />
+    <UnsavedChangesGuard active={dirty} />
   </div>;
 }
 
