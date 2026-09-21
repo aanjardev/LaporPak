@@ -4,6 +4,7 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db_session
+from app.services.referrals import ReferralService
 from app.services.reports import ReportPersistenceService
 
 
@@ -16,4 +17,16 @@ def get_report_service(
 ReportServiceDependency = Annotated[
     ReportPersistenceService,
     Depends(get_report_service),
+]
+
+
+def get_referral_service(
+    session: Annotated[Session, Depends(get_db_session)],
+) -> ReferralService:
+    return ReferralService(session)
+
+
+ReferralServiceDependency = Annotated[
+    ReferralService,
+    Depends(get_referral_service),
 ]

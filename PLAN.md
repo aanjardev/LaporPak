@@ -86,3 +86,10 @@ setelah mutasi mengarahkan pengguna memuat data terbaru tanpa submit ulang.
   mengarahkan ke tab baru dan mempertahankan parameter feedback yang dikenal.
 - Form akun dan knowledge memperingatkan sebelum navigasi ketika ada perubahan
   yang belum disimpan. Tidak ada data form yang disimpan di browser storage.
+## Referral REPORT M0-M1
+
+Spesifikasi tambahan berada di
+[`docs/LAPORPAK_CODEX_IMPLEMENTATION_PLAN.md`](docs/LAPORPAK_CODEX_IMPLEMENTATION_PLAN.md).
+M0-M1 menambah penerusan backend melalui kanal mock sintetis, paket berversi,
+approval terikat hash, outbox persisten, rekonsiliasi, dan guard status
+`forwarded`. M2-M5 tetap roadmap dan belum diaktifkan.

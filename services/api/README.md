@@ -47,6 +47,22 @@ uv run uvicorn app.main:app --reload
 
 Buka `http://localhost:8000/health` untuk memeriksa API atau `http://localhost:8000/docs` untuk dokumentasi endpoint. Server dasar tidak memerlukan koneksi database. Isi `DATABASE_URL` di `.env` sebelum memeriksa koneksi database atau mengembangkan endpoint yang memakainya. Jangan commit `.env`.
 
+## Worker referral mock
+
+Setelah migration `0017_report_referrals.sql` dan seed sintetis
+`0005_referral_simulation.sql` diterapkan pada PostgreSQL uji terisolasi,
+worker referral ikut berjalan bersama API. Untuk menjalankannya terpisah:
+
+```powershell
+uv run python -m app.db.referral_worker --once
+uv run python -m app.db.referral_worker
+```
+
+M1 hanya memproses kanal `mock` sintetis dan tidak melakukan network request.
+Gunakan Desa Uji A untuk skenario accepted dan Desa Uji B untuk skenario
+timeout-after-accept/reconciliation. Jangan menjalankan seed ini sebagai data
+operasional pemerintah.
+
 ## Pemeriksaan
 
 ```powershell

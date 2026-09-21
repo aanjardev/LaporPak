@@ -182,6 +182,7 @@ class ReportDetail(ReportListItem):
     verified_at: datetime | None
     resolved_at: datetime | None
     updated_at: datetime
+    forwarding_verification: str | None = None
 
 
 class ReportStatusUpdate(StrictSchema):

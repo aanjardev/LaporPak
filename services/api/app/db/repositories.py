@@ -17,6 +17,7 @@ from app.db.tables import (
     report_document_audit,
     report_document_jobs,
     report_documents,
+    report_referrals,
     report_status_history,
     reports,
 )
@@ -291,3 +292,17 @@ class ReportRepository:
             .returning(*reports.c)
         )
         return self.session.execute(statement).mappings().one_or_none()
+
+    def has_accepted_referral(self, report_id: UUID) -> bool:
+        statement = select(
+            select(report_referrals.c.id)
+            .where(
+                report_referrals.c.report_id == report_id,
+                report_referrals.c.handling_status.in_(
+                    ("accepted", "in_progress", "completed")
+                ),
+                report_referrals.c.evidence_reference.is_not(None),
+            )
+            .exists()
+        )
+        return bool(self.session.execute(statement).scalar_one())

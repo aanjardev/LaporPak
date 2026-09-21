@@ -1,7 +1,7 @@
 # LaporPak — Workflows
 
 > **Document status:** Canonical process flow untuk P0 REPORT dan fallback.  
-> **Contract version:** `0.2.0`
+> **Contract version:** `0.3.0`
 
 ---
 
@@ -726,3 +726,29 @@ LaporPak WhatsApp accounts accept direct messages from every sender with
 `dmPolicy: "open"` and `allowFrom: ["*"]`; groups remain disabled. Session,
 ownership, village scope, active-village checks, and backend authorization are
 unchanged.
+## Workflow referral REPORT M1
+
+```text
+Admin Desa membuka report in_progress
+  -> backend memberi kandidat mock yang sesuai desa + kategori
+  -> admin menyiapkan snapshot paket
+  -> backend memberi versi + hash dan menunggu approval
+  -> admin menyetujui versi/hash tertentu
+  -> dispatch menyimpan outbox secara idempotent (HTTP 202)
+  -> worker memeriksa ulang approval, versi, scope, dan mode kanal
+  -> connector mock menulis ledger persisten
+  -> backend mencatat receipt/event/tugas
+  -> report menjadi forwarded hanya bila handling accepted + bukti tersedia
+```
+
+Timeout setelah ledger penerima tersimpan menghasilkan `delivery_unknown` dan
+tugas rekonsiliasi. Worker berikutnya melakukan lookup dengan operation key
+yang sama. Bila bukti belum ditemukan, status tetap belum pasti dan pengiriman
+tidak diulang. Credential error berhenti sebagai gagal; throttling dan timeout
+sebelum penerima mencatat operasi mendapat retry terbatas. Ketika batas retry
+tercapai, tugas petugas dibuat dengan dedup key.
+
+Pembatalan hanya dapat mengklaim `cancelled` sebelum side effect dimulai.
+Perubahan paket membuat versi baru dan approval lama tidak berlaku. Penolakan
+target membuat tugas rerouting dan tidak mengubah laporan warga menjadi
+`rejected`.

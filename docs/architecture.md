@@ -1,7 +1,7 @@
 # LaporPak — Architecture
 
 > **Document status:** Canonical architecture baseline.  
-> **Contract version:** `0.2.0`
+> **Contract version:** `0.3.0`
 
 ---
 
@@ -850,3 +850,21 @@ Admin Desa. Next.js hanya menampilkan response dan meneruskan sesi server.
 Endpoint monitoring Super Admin tidak digunakan untuk dashboard Admin Desa.
 Tidak ada akses database dari frontend, migration analitik baru, atau hitungan
 berdasarkan satu halaman pagination. Rincian: [dashboard desa](village-analytics-dashboard.md).
+## Referral worker M1
+
+Referral REPORT tetap berada di modular monolith FastAPI. PostgreSQL menyimpan
+direktori kanal, snapshot paket immutable, approval, outbox, event, ledger
+penerima mock, dan tugas tindak lanjut. Pembuatan job dan perubahan referral
+berada dalam satu transaksi; worker mengklaim job dengan row lock serta lease,
+lalu melakukan transport di luar transaksi panjang.
+
+Worker M1 hanya menerima kanal mock sintetis. Ledger mock memakai
+`operation_key` unik sehingga proses baru dapat melakukan lookup atas hasil
+lama. Lease yang kedaluwarsa dipindahkan ke rekonsiliasi dan tidak menyebabkan
+blind resend. Hasil transport, registrasi, dan handling disimpan terpisah.
+Hanya handling `accepted` dengan bukti yang memproyeksikan report
+`in_progress -> forwarded`; `completed` tidak memproyeksikan `resolved`.
+
+OpenClaw/Gemini belum memperoleh tool referral pada M1. Backend memperoleh
+aktor dan scope dari autentikasi Admin Desa, bukan payload atau keluaran model.
+Tidak ada koneksi ke kanal pemerintah dalam implementasi ini.

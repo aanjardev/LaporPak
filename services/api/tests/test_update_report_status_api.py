@@ -16,6 +16,7 @@ from app.schemas.reports import ReportStatusUpdateResponse
 from app.services.dependencies import get_report_service
 from app.services.exceptions import (
     InvalidStatusTransitionError,
+    ReferralAcceptanceRequiredError,
     ReportNotFoundError,
     ReportPersistenceError,
 )
@@ -227,6 +228,11 @@ def test_update_status_requires_admin_and_valid_request(auth_tokens):
             InvalidStatusTransitionError("verified", "rejected"),
             409,
             "INVALID_STATUS_TRANSITION",
+        ),
+        (
+            ReferralAcceptanceRequiredError(),
+            409,
+            "REFERRAL_ACCEPTANCE_REQUIRED",
         ),
         (ReportPersistenceError("status update"), 503, "DATABASE_UNAVAILABLE"),
     ],

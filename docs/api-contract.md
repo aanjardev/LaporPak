@@ -1,6 +1,6 @@
 # LaporPak — API & Data Contract
 
-> **Contract version:** `0.3.0`
+> **Contract version:** `0.4.0`
 > **Status:** Day 1 baseline  
 > **Base API:** `/api/v1`
 
@@ -1007,3 +1007,58 @@ KPI masuk dan daily mengikuti periode. Tidak ada PII atau detail dokumen.
 401/403/404/422/503 mengikuti envelope standar. Desa di luar membership memakai
 scoped `404 VILLAGE_NOT_FOUND`; desa dalam membership yang belum aktif/approved
 memakai `403 VILLAGE_INACTIVE`.
+## Referral REPORT (M1, synthetic mock only)
+
+Referral memisahkan transport, registrasi, dan penanganan dari `reports.status`.
+Seluruh endpoint pada bagian ini hanya menerima Admin Desa aktif dan selalu
+dibatasi oleh membership desa dari token. Super Admin dan OpenClaw tidak dapat
+menyetujui atau mengirim referral pada M1.
+
+```text
+GET  /api/v1/reports/{report_id}/routing-options
+POST /api/v1/reports/{report_id}/referrals
+GET  /api/v1/reports/{report_id}/referrals
+POST /api/v1/referrals/{referral_id}/approve
+POST /api/v1/referrals/{referral_id}/dispatch
+POST /api/v1/referrals/{referral_id}/reconcile
+POST /api/v1/referrals/{referral_id}/cancel
+```
+
+`POST .../referrals` menerima `channel_id`, `request_key`, dan paket berisi
+`summary`, `chronology`, `requested_action`, `attachment_ids`, serta
+`share_citizen_identity`. Field aktor, desa, URL tujuan, dan status persetujuan
+ditolak. Laporan harus berstatus `in_progress`. Respons adalah referral dengan
+versi dan SHA-256 paket, label `is_simulated`, serta tiga status berikut:
+
+```text
+dispatch_status: draft | awaiting_approval | approved | queued | sending |
+                 sent | delivery_unknown | failed | cancelled
+registration_status: unverified | pending | registered | rejected
+handling_status: unassigned | awaiting_acceptance | accepted | in_progress |
+                 declined | completed
+```
+
+Approval menerima `package_version`, `package_hash`, dan `reason`. Perubahan
+paket membuat versi baru dan mencabut approval versi sebelumnya. Dispatch
+menerima satu `operation_key`; respons `202` hanya membuktikan job tersimpan,
+bukan laporan telah diterima. Replay key untuk paket yang sama mengembalikan
+job yang sama. Key sama untuk operasi lain atau operasi kedua untuk paket yang
+sama menghasilkan `409 REFERRAL_CONFLICT`.
+
+M1 hanya menjalankan `agency_channels.mode=mock` yang `synthetic=true` dan
+`approved_for_production=false`. Referensi mock memakai prefix `MOCK-` dan
+tidak boleh disebut nomor pengaduan resmi.
+
+Error tambahan:
+
+| HTTP | Kode | Arti |
+|---|---|---|
+| 404 | `REFERRAL_NOT_FOUND` | Kasus berada di luar scope atau tidak ada. |
+| 409 | `REFERRAL_CONFLICT` | State, versi, hash, atau idempotency bertentangan. |
+| 409 | `REFERRAL_ACCEPTANCE_REQUIRED` | PATCH langsung ke `forwarded` tanpa bukti penerimaan. |
+| 503 | `REFERRAL_UNAVAILABLE` | Penyimpanan referral tidak tersedia. |
+
+`ReportDetail.forwarding_verification` bernilai `verified` bila status
+`forwarded` didukung referral accepted dan bukti, `unverified_legacy` untuk
+data lama tanpa bukti, atau `null` pada status lain. Transisi `forwarded`
+tidak ditawarkan dan ditolak backend sampai bukti penerimaan tersimpan.

@@ -640,3 +640,293 @@ report_document_audit = Table(
         server_default=text("now()"),
     ),
 )
+
+agency_channels = Table(
+    "agency_channels",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "target_unit_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.administrative_units.id"),
+        nullable=False,
+    ),
+    Column(
+        "source_unit_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.administrative_units.id"),
+    ),
+    Column("channel_code", Text, nullable=False),
+    Column("display_name", Text, nullable=False),
+    Column("mode", Text, nullable=False),
+    Column(
+        "supported_categories",
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+    ),
+    Column("capabilities", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column(
+        "authority_source", JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    ),
+    Column("config", JSONB, nullable=False, server_default=text("'{}'::jsonb")),
+    Column("is_active", Boolean, nullable=False, server_default=text("true")),
+    Column("synthetic", Boolean, nullable=False, server_default=text("false")),
+    Column(
+        "approved_for_production", Boolean, nullable=False, server_default=text("false")
+    ),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+)
+
+report_referrals = Table(
+    "report_referrals",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "report_id", UUID(as_uuid=True), ForeignKey("public.reports.id"), nullable=False
+    ),
+    Column(
+        "source_unit_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.administrative_units.id"),
+        nullable=False,
+    ),
+    Column(
+        "channel_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.agency_channels.id"),
+        nullable=False,
+    ),
+    Column("active_package_version", Integer, nullable=False, server_default=text("1")),
+    Column(
+        "dispatch_status",
+        Text,
+        nullable=False,
+        server_default=text("'awaiting_approval'"),
+    ),
+    Column(
+        "registration_status", Text, nullable=False, server_default=text("'unverified'")
+    ),
+    Column(
+        "handling_status", Text, nullable=False, server_default=text("'unassigned'")
+    ),
+    Column("external_reference", Text),
+    Column("evidence_reference", Text),
+    Column("is_simulated", Boolean, nullable=False, server_default=text("true")),
+    Column("created_by", Text, nullable=False),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+)
+
+referral_packages = Table(
+    "referral_packages",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "referral_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.report_referrals.id"),
+        nullable=False,
+    ),
+    Column("package_version", Integer, nullable=False),
+    Column("package_hash", Text, nullable=False),
+    Column("request_key", UUID(as_uuid=True), nullable=False, unique=True),
+    Column("request_payload_hash", Text, nullable=False),
+    Column("snapshot", JSONB, nullable=False),
+    Column("created_by", Text, nullable=False),
+    Column("approved_by", Text),
+    Column("approved_at", DateTime(timezone=True)),
+    Column("approval_reason", Text),
+    Column("approval_revoked_at", DateTime(timezone=True)),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+)
+
+referral_events = Table(
+    "referral_events",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "referral_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.report_referrals.id"),
+        nullable=False,
+    ),
+    Column("event_type", Text, nullable=False),
+    Column("actor_identifier", Text, nullable=False),
+    Column("event_key", Text),
+    Column("before_state", JSONB),
+    Column("after_state", JSONB),
+    Column("evidence_reference", Text),
+    Column(
+        "occurred_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column(
+        "observed_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+)
+
+referral_outbox = Table(
+    "referral_outbox",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "referral_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.report_referrals.id"),
+        nullable=False,
+    ),
+    Column(
+        "package_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.referral_packages.id"),
+        nullable=False,
+    ),
+    Column("operation_key", UUID(as_uuid=True), nullable=False, unique=True),
+    Column("status", Text, nullable=False, server_default=text("'pending'")),
+    Column("attempt_count", Integer, nullable=False, server_default=text("0")),
+    Column("max_attempts", Integer, nullable=False, server_default=text("3")),
+    Column(
+        "next_attempt_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column("lease_token", UUID(as_uuid=True)),
+    Column("leased_at", DateTime(timezone=True)),
+    Column("last_error", Text),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+)
+
+case_tasks = Table(
+    "case_tasks",
+    metadata,
+    Column(
+        "id",
+        UUID(as_uuid=True),
+        primary_key=True,
+        server_default=text("gen_random_uuid()"),
+    ),
+    Column(
+        "referral_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.report_referrals.id"),
+        nullable=False,
+    ),
+    Column("task_type", Text, nullable=False),
+    Column("dedup_key", Text, nullable=False, unique=True),
+    Column("status", Text, nullable=False, server_default=text("'open'")),
+    Column("assigned_to", Text),
+    Column("next_action", Text, nullable=False),
+    Column("due_at", DateTime(timezone=True)),
+    Column("blocked_reason", Text),
+    Column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+)
+
+mock_delivery_ledger = Table(
+    "mock_delivery_ledger",
+    metadata,
+    Column("operation_key", UUID(as_uuid=True), primary_key=True),
+    Column(
+        "channel_id",
+        UUID(as_uuid=True),
+        ForeignKey("public.agency_channels.id"),
+        nullable=False,
+    ),
+    Column("package_hash", Text, nullable=False),
+    Column("transport_outcome", Text, nullable=False),
+    Column("external_reference", Text),
+    Column("registration_outcome", Text, nullable=False),
+    Column("handling_outcome", Text, nullable=False),
+    Column("evidence_reference", Text),
+    Column(
+        "occurred_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+    Column(
+        "observed_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("now()"),
+    ),
+)

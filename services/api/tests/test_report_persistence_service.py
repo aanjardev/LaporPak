@@ -17,6 +17,7 @@ from app.services.exceptions import (
     DuplicateOperationError,
     InvalidSenderIdentityError,
     InvalidStatusTransitionError,
+    ReferralAcceptanceRequiredError,
     ReportNotFoundError,
     ReportPersistenceError,
     ReportRateLimitError,
@@ -101,6 +102,7 @@ class FakeRepository:
         self.lock_key = None
         self.queued_documents = []
         self.recent_report_count = 0
+        self.accepted_referral = False
 
     def acquire_idempotency_lock(self, lock_key):
         self.lock_key = lock_key
@@ -188,6 +190,9 @@ class FakeRepository:
                 "created_at": datetime(2026, 9, 16, 14, tzinfo=UTC),
             }
         ]
+
+    def has_accepted_referral(self, report_id):
+        return self.accepted_referral
 
 
 def valid_payload(**overrides):
@@ -325,7 +330,6 @@ def test_status_update_rejects_missing_report_inside_transaction():
         (ReportStatus.PENDING_VERIFICATION, ReportStatus.VERIFIED),
         (ReportStatus.PENDING_VERIFICATION, ReportStatus.REJECTED),
         (ReportStatus.VERIFIED, ReportStatus.IN_PROGRESS),
-        (ReportStatus.IN_PROGRESS, ReportStatus.FORWARDED),
         (ReportStatus.IN_PROGRESS, ReportStatus.RESOLVED),
         (ReportStatus.FORWARDED, ReportStatus.RESOLVED),
     ],
@@ -384,6 +388,33 @@ def test_invalid_status_transitions_are_rejected_without_update(
     assert error.value.new_status == new_status.value
     assert repository.updated_report is None
     assert repository.inserted_history is None
+
+
+def test_direct_forwarding_requires_accepted_referral_evidence():
+    session = TransactionSession()
+    repository = FakeRepository()
+    repository.locked_report = {
+        "id": repository.report["id"],
+        "status": ReportStatus.IN_PROGRESS.value,
+    }
+    service = ReportPersistenceService(session, repository)
+
+    with pytest.raises(ReferralAcceptanceRequiredError):
+        service.update_report_status(
+            report_id=repository.report["id"],
+            new_status=ReportStatus.FORWARDED,
+            reason="Forward manually",
+            actor_identifier="admin-desa-demo",
+        )
+
+    repository.accepted_referral = True
+    result = service.update_report_status(
+        report_id=repository.report["id"],
+        new_status=ReportStatus.FORWARDED,
+        reason="Accepted by recipient",
+        actor_identifier="admin-desa-demo",
+    )
+    assert result.status is ReportStatus.FORWARDED
 
 
 def test_sqlalchemy_error_is_wrapped_without_fake_success():
@@ -670,6 +701,17 @@ def test_detail_aggregates_attachments_and_ordered_history():
     assert "storage_bucket" not in dumped
     assert detail.status_history[0].new_status.value == "pending_verification"
     assert detail.citizen.display_name == "Warga"
+
+
+def test_legacy_forwarded_report_is_marked_unverified_without_receipt():
+    repository = FakeRepository()
+    repository.report["status"] = "forwarded"
+    detail = ReportPersistenceService(TransactionSession(), repository).get_report_detail(
+        repository.report["id"]
+    )
+
+    assert detail.forwarding_verification == "unverified_legacy"
+    assert detail.allowed_transitions == [ReportStatus.RESOLVED]
 
 
 def test_private_attachment_download_uses_scoped_record_and_backend_key(monkeypatch):
