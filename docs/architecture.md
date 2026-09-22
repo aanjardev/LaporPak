@@ -1,7 +1,7 @@
 # LaporPak — Architecture
 
 > **Document status:** Canonical architecture baseline.  
-> **Contract version:** `0.2.0`
+> **Contract version:** `0.3.0`
 
 ---
 
@@ -850,3 +850,48 @@ Admin Desa. Next.js hanya menampilkan response dan meneruskan sesi server.
 Endpoint monitoring Super Admin tidak digunakan untuk dashboard Admin Desa.
 Tidak ada akses database dari frontend, migration analitik baru, atau hitungan
 berdasarkan satu halaman pagination. Rincian: [dashboard desa](village-analytics-dashboard.md).
+## Referral worker M1
+
+Referral REPORT tetap berada di modular monolith FastAPI. PostgreSQL menyimpan
+direktori kanal, snapshot paket immutable, approval, outbox, event, ledger
+penerima mock, dan tugas tindak lanjut. Pembuatan job dan perubahan referral
+berada dalam satu transaksi; worker mengklaim job dengan row lock serta lease,
+lalu melakukan transport di luar transaksi panjang.
+
+Worker M1 hanya menerima kanal mock sintetis. Ledger mock memakai
+`operation_key` unik sehingga proses baru dapat melakukan lookup atas hasil
+lama. Lease yang kedaluwarsa dipindahkan ke rekonsiliasi dan tidak menyebabkan
+blind resend. Hasil transport, registrasi, dan handling disimpan terpisah.
+Hanya handling `accepted` dengan bukti yang memproyeksikan report
+`in_progress -> forwarded`; `completed` tidak memproyeksikan `resolved`.
+
+OpenClaw/Gemini belum memperoleh tool referral pada M1. Backend memperoleh
+aktor dan scope dari autentikasi Admin Desa, bukan payload atau keluaran model.
+Tidak ada koneksi ke kanal pemerintah dalam implementasi ini.
+
+## Referral agent tools M2
+
+M2 memakai endpoint referral M1 tanpa database atau service baru. Plugin
+OpenClaw mendaftarkan tool baca konteks/kandidat/progres, pembuatan draft, dan
+permintaan dispatch. Capability ini nonaktif secara default dan tidak masuk
+allowlist agent WhatsApp desa. Runtime operator internal harus memakai bearer
+token Supabase; FastAPI tetap memetakan akun, role, membership, serta desa aktif.
+
+Model tidak memperoleh tool approval. Payload tool juga tidak menerima aktor,
+scope desa, status approval, credential, URL tujuan, atau izin berbagi identitas
+warga. Tool dispatch hanya meminta backend memeriksa approval manusia yang
+tersimpan untuk versi/hash aktif. Connector tetap mock sintetis pada M2.
+
+## Referral dashboard M3
+
+Detail REPORT memuat panel referral hanya pada mode API. Panel membaca kandidat
+dan progres melalui endpoint M1, lalu mengirim approval serta permintaan
+dispatch sebagai tindakan Admin Desa. Approval tetap menyertakan versi dan hash
+paket aktif. Satu operation key dipertahankan selama percobaan dispatch pada
+halaman yang sama agar timeout tidak mendorong operasi logis baru.
+
+Polling hanya berlaku ketika dispatch berstatus `queued` atau `sending`, berjalan
+satu request pada satu waktu, berhenti setelah dua menit, dan tidak berjalan saat
+tab tersembunyi. Status transport, registrasi, dan penanganan ditampilkan
+terpisah. Label simulasi berasal dari response backend dan tidak boleh dihapus
+oleh UI.

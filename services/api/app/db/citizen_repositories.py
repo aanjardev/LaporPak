@@ -65,6 +65,29 @@ class CitizenRepository:
             sql = "select service_request_id item_id, new_status, created_at from public.service_request_status_history where service_request_id = any(:ids) order by created_at"
         return list(self.session.execute(text(sql), {"ids": item_ids}).mappings().all())
 
+    def track_referrals(self, report_ids: list[UUID], unit_id: UUID) -> list[dict]:
+        if not report_ids:
+            return []
+        return list(
+            self.session.execute(
+                text("""
+                select distinct on (r.report_id)
+                       r.report_id,
+                       r.dispatch_status,
+                       r.registration_status,
+                       r.handling_status,
+                       r.updated_at
+                from public.report_referrals r
+                where r.report_id = any(:report_ids)
+                  and r.source_unit_id = :unit
+                order by r.report_id, r.updated_at desc, r.id desc
+                """),
+                {"report_ids": report_ids, "unit": unit_id},
+            )
+            .mappings()
+            .all()
+        )
+
     def hybrid_search(
         self,
         question: str,

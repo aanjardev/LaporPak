@@ -86,3 +86,20 @@ setelah mutasi mengarahkan pengguna memuat data terbaru tanpa submit ulang.
   mengarahkan ke tab baru dan mempertahankan parameter feedback yang dikenal.
 - Form akun dan knowledge memperingatkan sebelum navigasi ketika ada perubahan
   yang belum disimpan. Tidak ada data form yang disimpan di browser storage.
+## Referral REPORT M0-M3
+
+Spesifikasi tambahan berada di
+[`docs/LAPORPAK_CODEX_IMPLEMENTATION_PLAN.md`](docs/LAPORPAK_CODEX_IMPLEMENTATION_PLAN.md).
+M0-M1 menambah penerusan backend melalui kanal mock sintetis, paket berversi,
+approval terikat hash, outbox persisten, rekonsiliasi, dan guard status
+`forwarded`. M2 menambah lima tool operator OpenClaw yang opt-in, schema output,
+prompt clarification, serta evaluasi keselamatan. Tidak ada tool approval,
+tool referral tidak tersedia pada sesi WhatsApp warga, dan kanal live tetap
+nonaktif. Bagian awal M3 menambahkan panel review referral pada detail REPORT:
+kandidat backend, versi/hash paket, approval manusia, dispatch idempoten,
+rekonsiliasi hasil ambigu, tiga dimensi status, bukti, next action, serta
+`case_tasks` yang dibatasi scope desa. Petugas dapat mengambil, melepas, dan
+menyelesaikan tugasnya sendiri tanpa mengekspos identifier PIC. Worker referral
+kini mencatat satu event reminder lokal untuk task terbuka yang memiliki
+`due_at`; tidak ada pesan keluar atau tenggat buatan. Perubahan due date,
+notifikasi, dan connector resmi tetap berada di roadmap M4-M5.

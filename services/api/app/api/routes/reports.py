@@ -34,6 +34,7 @@ from app.services.exceptions import (
     InvalidAttachmentError,
     InvalidSenderIdentityError,
     InvalidStatusTransitionError,
+    ReferralAcceptanceRequiredError,
     ReportNotFoundError,
     ReportPersistenceError,
     ReportRateLimitError,
@@ -264,6 +265,12 @@ def update_report_status(
                 "old_status": exc.old_status,
                 "new_status": exc.new_status,
             },
+        ) from exc
+    except ReferralAcceptanceRequiredError as exc:
+        raise APIError(
+            status_code=409,
+            code="REFERRAL_ACCEPTANCE_REQUIRED",
+            message="Forwarded status requires accepted referral evidence",
         ) from exc
     except ReportPersistenceError as exc:
         raise APIError(

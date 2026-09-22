@@ -56,3 +56,8 @@ class ReportRateLimitError(ReportServiceError):
 class DocumentDeliveryUnknownError(ReportServiceError):
     def __init__(self) -> None:
         super().__init__("Document delivery outcome requires operator review")
+
+
+class ReferralAcceptanceRequiredError(ReportServiceError):
+    def __init__(self) -> None:
+        super().__init__("Forwarded status requires accepted referral evidence")

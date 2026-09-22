@@ -3,6 +3,10 @@
 OpenClaw plugin for LaporPak citizen service gateway. Provides tools for ASK,
 REPORT, TRACK, and enhanced AI-powered features through the FastAPI boundary.
 
+The same plugin also registers five operator-only referral tools. They are
+disabled by default, reject WhatsApp citizen contexts, and use a Supabase admin
+access token so FastAPI derives village scope from server-side membership.
+
 ## Core Tools
 
 ### `laporpak_create_report`
@@ -47,12 +51,37 @@ duplicates and informs citizens about existing reports in the area.
 Records citizen's confirmation when a report is marked resolved.
 If rejected, records a human-review request without changing official status.
 
+## Operator Referral Tools (M2)
+
+- `laporpak_get_case_context`
+- `laporpak_get_routing_candidates`
+- `laporpak_prepare_referral`
+- `laporpak_request_referral_dispatch`
+- `laporpak_get_referral_progress`
+
+There is deliberately no approval tool. Draft creation always sets
+`share_citizen_identity=false`; actor, village, approval state, credential, and
+destination URL never come from model input. A dispatch request succeeds only
+after FastAPI finds a valid human approval for the active package version/hash.
+
+Enable these tools only in a dedicated internal operator agent:
+
+```env
+LAPORPAK_REFERRAL_TOOLS_ENABLED=true
+LAPORPAK_OPERATOR_ACCESS_TOKEN=<short-lived-supabase-admin-access-token>
+```
+
+Do not add the five tools to the village WhatsApp agent allowlist. Rotate the
+operator token through the host secret mechanism and keep it out of Git.
+
 ## Runtime Configuration
 
 ```env
 LAPORPAK_API_URL=http://localhost:8000
 LAPORPAK_API_KEY=<internal-key>
 LAPORPAK_CHANNEL_ACCOUNT_ID=<authenticated-whatsapp-account-id>
+LAPORPAK_REFERRAL_TOOLS_ENABLED=false
+LAPORPAK_OPERATOR_ACCESS_TOKEN=
 ```
 
 The plugin does not read Supabase or Gemini credentials and never accepts

@@ -37,6 +37,7 @@ from app.services.exceptions import (
     InvalidAttachmentError,
     InvalidSenderIdentityError,
     InvalidStatusTransitionError,
+    ReferralAcceptanceRequiredError,
     ReportNotFoundError,
     ReportPersistenceError,
     ReportRateLimitError,
@@ -282,7 +283,10 @@ class ReportPersistenceService:
                             "storage_path": storage_path,
                             "file_name": filename,
                             "mime_type": attachment.mime_type,
-                            "metadata": {"file_size": len(data)},
+                            "metadata": {
+                                "file_size": len(data),
+                                "sha256": hashlib.sha256(data).hexdigest(),
+                            },
                         }
                     )
                 self.repository.queue_document(report["id"], "receipt")
@@ -378,6 +382,7 @@ class ReportPersistenceService:
                 )
                 for row in self.repository.list_status_history(report_id)
             ]
+            has_accepted_referral = self.repository.has_accepted_referral(report_id)
         except ReportNotFoundError:
             raise
         except SQLAlchemyError as exc:
@@ -402,13 +407,27 @@ class ReportPersistenceService:
             attachments=attachments,
             status_history=history,
             allowed_transitions=(
-                list(ALLOWED_STATUS_TRANSITIONS[ReportStatus(report["status"])])
+                [
+                    transition
+                    for transition in ALLOWED_STATUS_TRANSITIONS[
+                        ReportStatus(report["status"])
+                    ]
+                    if transition is not ReportStatus.FORWARDED or has_accepted_referral
+                ]
                 if can_transition
                 else []
             ),
             verified_at=report["verified_at"],
             resolved_at=report["resolved_at"],
             updated_at=report["updated_at"],
+            forwarding_verification=(
+                "verified"
+                if report["status"] == ReportStatus.FORWARDED.value
+                and has_accepted_referral
+                else "unverified_legacy"
+                if report["status"] == ReportStatus.FORWARDED.value
+                else None
+            ),
         )
 
     def get_report_attachment(
@@ -497,6 +516,11 @@ class ReportPersistenceService:
                         current_status.value,
                         new_status.value,
                     )
+                if (
+                    new_status is ReportStatus.FORWARDED
+                    and not self.repository.has_accepted_referral(report_id)
+                ):
+                    raise ReferralAcceptanceRequiredError()
 
                 report_values: dict[str, Any] = {"status": new_status.value}
                 if new_status is ReportStatus.VERIFIED:
@@ -528,7 +552,11 @@ class ReportPersistenceService:
                     status=updated["status"],
                     updated_at=updated["updated_at"],
                 )
-        except InvalidStatusTransitionError, ReportNotFoundError:
+        except (
+            InvalidStatusTransitionError,
+            ReferralAcceptanceRequiredError,
+            ReportNotFoundError,
+        ):
             raise
         except SQLAlchemyError as exc:
             raise ReportPersistenceError("status update") from exc

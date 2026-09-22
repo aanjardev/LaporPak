@@ -84,6 +84,11 @@ node gap-tracker.js --stats
 | `laporpak_detect_emergency` | `plugins/laporpak-tools/index.js` | ✅ | |
 | `laporpak_check_similar` | `plugins/laporpak-tools/index.js` | ✅ | |
 | `laporpak_confirm_resolution` | `plugins/laporpak-tools/index.js` | ✅ | |
+| `laporpak_get_case_context` | `plugins/laporpak-tools/index.js` | ✅ | Operator only |
+| `laporpak_get_routing_candidates` | `plugins/laporpak-tools/index.js` | ✅ | Operator only |
+| `laporpak_prepare_referral` | `plugins/laporpak-tools/index.js` | ✅ | No approval |
+| `laporpak_request_referral_dispatch` | `plugins/laporpak-tools/index.js` | ✅ | Backend checks approval |
+| `laporpak_get_referral_progress` | `plugins/laporpak-tools/index.js` | ✅ | Operator only |
 
 ### 4. Agent Configuration
 

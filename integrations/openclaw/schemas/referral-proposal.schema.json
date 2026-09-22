@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://laporpak.local/schemas/referral-proposal.schema.json",
+  "title": "LaporPak referral proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "reason",
+    "candidate_channel_id",
+    "missing_fields",
+    "package",
+    "requires_human_approval"
+  ],
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": [
+        "clarify",
+        "prepare_referral",
+        "request_dispatch",
+        "get_progress",
+        "handoff"
+      ]
+    },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "candidate_channel_id": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+    },
+    "missing_fields": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["summary", "chronology", "requested_action", "candidate"]
+      }
+    },
+    "package": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["summary", "chronology", "requested_action", "attachment_ids"],
+          "properties": {
+            "summary": { "type": "string", "minLength": 1, "maxLength": 2000 },
+            "chronology": { "type": "string", "minLength": 1, "maxLength": 5000 },
+            "requested_action": { "type": "string", "minLength": 1, "maxLength": 2000 },
+            "attachment_ids": {
+              "type": "array",
+              "maxItems": 10,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "requires_human_approval": { "const": true }
+  }
+}

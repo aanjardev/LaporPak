@@ -32,6 +32,7 @@ from app.schemas.admin import (
     VillageOnboardingCreate,
 )
 from app.services.openclaw_gateway import OpenClawGateway, OpenClawGatewayError
+from app.services.regions import validate_village_region
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 SessionDep = Annotated[Session, Depends(get_db_session)]
@@ -173,6 +174,13 @@ def onboard(
         return _me_response(
             dict(existing), _load_villages(session, existing["id"]), identity
         )
+    validate_village_region(
+        village_code=payload.village_code,
+        village_name=payload.village_name,
+        province=payload.province,
+        regency=payload.regency,
+        district=payload.district,
+    )
 
     now = datetime.now(UTC)
     account_id, village_id = uuid4(), uuid4()

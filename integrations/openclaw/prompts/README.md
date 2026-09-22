@@ -17,7 +17,8 @@ prompts/
 ├── clarification.md          # Smart questioning
 ├── confidence.md             # Uncertainty calibration
 ├── context-recovery.md       # Multi-turn memory
-└── datetime-extraction.md    # Temporal parsing
+├── datetime-extraction.md    # Temporal parsing
+└── referral-preparation.md   # Operator-only referral preparation
 ```
 
 ---

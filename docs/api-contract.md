@@ -1,6 +1,6 @@
 # LaporPak — API & Data Contract
 
-> **Contract version:** `0.3.0`
+> **Contract version:** `0.4.0`
 > **Status:** Day 1 baseline  
 > **Base API:** `/api/v1`
 
@@ -162,9 +162,12 @@ Suggested HTTP mapping:
 | 409 | `INVALID_STATUS_TRANSITION` |
 | 409 | `DUPLICATE_OPERATION` |
 | 422 | `VALIDATION_ERROR` |
+| 422 | `INVALID_REGION` |
+| 422 | `INVALID_REGION_CODE` |
 | 503 | `DATABASE_UNAVAILABLE` |
 | 503 | `ATTACHMENT_UNAVAILABLE` |
 | 503 | `AI_UNAVAILABLE` |
+| 503 | `REGION_SERVICE_UNAVAILABLE` |
 | 500 | `INTERNAL_ERROR` |
 
 ### Autentikasi dan izin REPORT
@@ -180,7 +183,9 @@ Authorization: Bearer <supabase_access_token>
 FastAPI memverifikasi token melalui Supabase Auth, memetakan UUID pengguna ke
 `admin_accounts`, menolak akun nonaktif, dan memakai UUID tersebut sebagai
 identitas audit. `system_admin` memiliki cakupan global; `village_admin`
-dibatasi oleh `admin_unit_memberships`. Pendaftaran admin publik tidak tersedia.
+dibatasi oleh `admin_unit_memberships`. Akun `system_admin` hanya dibuat lewat
+provisioning server; calon `village_admin` dapat mendaftar mandiri atau menerima
+undangan lalu tetap melewati verifikasi email dan aktivasi desa.
 Fallback `DASHBOARD_ADMIN_UNIT_ID` hanya untuk development legacy ketika
 `ALLOW_LEGACY_ADMIN_FALLBACK=true`; default-nya nonaktif dan tidak boleh dipakai
 sebagai mekanisme izin production.
@@ -763,6 +768,13 @@ untuk kegagalan database. Konfirmasi penyelesaian mengembalikan
 `422 VALIDATION_ERROR` untuk input tidak valid, dan
 `503 DATABASE_UNAVAILABLE` untuk kegagalan persistence.
 
+Untuk item REPORT yang memiliki rujukan, TRACK boleh menyertakan `referral`
+yang hanya berisi `dispatch_status`, `registration_status`,
+`handling_status`, `next_step`, dan `updated_at`. Response ini tidak memuat
+nama/URL kanal, tujuan internal, referensi eksternal, bukti internal, actor,
+atau identitas petugas. Rujukan dicari setelah ownership REPORT dan scope desa
+terverifikasi; REQUEST tidak menerima field ini.
+
 ---
 
 ## 17. Production Backend Extensions
@@ -785,6 +797,10 @@ POST  /api/v1/admin/villages/{village_id}/activation-submission
 GET   /api/v1/admin/activation-queue
 PATCH /api/v1/admin/villages/{village_id}/activation
 GET   /api/v1/admin/monitoring
+GET   /api/v1/regions/provinces
+GET   /api/v1/regions/regencies?province_code={code}
+GET   /api/v1/regions/districts?regency_code={code}
+GET   /api/v1/regions/villages?district_code={code}
 ```
 
 Self-registration requires a verified Supabase identity and always creates a
@@ -797,6 +813,13 @@ Activation status is `draft`, `pending_review`, `changes_requested`, or
 province, regency/city, district, address, service contact, and office hours.
 Only `system_admin` can return `approved` or `changes_requested`; a reason is
 required for requested changes. Approved villages have `is_active=true`.
+
+Endpoint wilayah membutuhkan identitas Supabase terverifikasi dan meneruskan
+data referensi wilayah.id. `village_code` memakai format kode Kemendagri level
+desa (`NN.NN.NN.NNNN`). Pada onboarding atau perubahan pilihan wilayah,
+FastAPI memeriksa kecocokan kode, nama desa, kecamatan, kabupaten/kota, dan
+provinsi. Nomor kontak memakai 8–15 digit dengan satu tanda `+` opsional di
+awal.
 
 ```http
 POST /api/v1/villages/{village_id}/whatsapp/pairing
@@ -1007,3 +1030,85 @@ KPI masuk dan daily mengikuti periode. Tidak ada PII atau detail dokumen.
 401/403/404/422/503 mengikuti envelope standar. Desa di luar membership memakai
 scoped `404 VILLAGE_NOT_FOUND`; desa dalam membership yang belum aktif/approved
 memakai `403 VILLAGE_INACTIVE`.
+## Referral REPORT (M1, synthetic mock only)
+
+Referral memisahkan transport, registrasi, dan penanganan dari `reports.status`.
+Seluruh endpoint pada bagian ini hanya menerima Admin Desa aktif dan selalu
+dibatasi oleh membership desa dari token. Super Admin dan OpenClaw tidak dapat
+menyetujui atau mengirim referral pada M1.
+
+```text
+GET  /api/v1/reports/{report_id}/routing-options
+POST /api/v1/reports/{report_id}/referrals
+GET  /api/v1/reports/{report_id}/referrals
+POST /api/v1/referrals/{referral_id}/approve
+POST /api/v1/referrals/{referral_id}/dispatch
+POST /api/v1/referrals/{referral_id}/reconcile
+POST /api/v1/referrals/{referral_id}/cancel
+```
+
+`POST .../referrals` menerima `channel_id`, `request_key`, dan paket berisi
+`summary`, `chronology`, `requested_action`, `attachment_ids`, serta
+`share_citizen_identity`. Field aktor, desa, URL tujuan, dan status persetujuan
+ditolak. Laporan harus berstatus `in_progress`. Respons adalah referral dengan
+versi dan SHA-256 paket, label `is_simulated`, serta tiga status berikut:
+
+```text
+dispatch_status: draft | awaiting_approval | approved | queued | sending |
+                 sent | delivery_unknown | failed | cancelled
+registration_status: unverified | pending | registered | rejected
+handling_status: unassigned | awaiting_acceptance | accepted | in_progress |
+                 declined | completed
+```
+
+Approval menerima `package_version`, `package_hash`, dan `reason`. Perubahan
+paket membuat versi baru dan mencabut approval versi sebelumnya. Dispatch
+menerima satu `operation_key`; respons `202` hanya membuktikan job tersimpan,
+bukan laporan telah diterima. Replay key untuk paket yang sama mengembalikan
+job yang sama. Key sama untuk operasi lain atau operasi kedua untuk paket yang
+sama menghasilkan `409 REFERRAL_CONFLICT`.
+
+M1 hanya menjalankan `agency_channels.mode=mock` yang `synthetic=true` dan
+`approved_for_production=false`. Referensi mock memakai prefix `MOCK-` dan
+tidak boleh disebut nomor pengaduan resmi.
+
+Response referral juga menyertakan `package_snapshot` bila snapshot tersimpan
+valid. Field ini hanya berisi `summary`, `chronology`, `requested_action`,
+`attachment_count`, dan `share_citizen_identity`; tidak ada path Storage,
+metadata lampiran internal, actor UUID, atau credential. Nilai `null` berarti
+snapshot lama tidak memenuhi bentuk tampilan aman dan tidak boleh dianggap
+sebagai paket kosong.
+
+Admin detail juga dapat membaca dan menangani tugas tindak lanjut secara aman:
+
+```text
+GET   /api/v1/reports/{report_id}/tasks
+PATCH /api/v1/referral-tasks/{task_id}
+```
+
+Response memuat `id`, `referral_id`, `task_type`, `status`, `assigned`,
+`assigned_to_me`, `next_action`, `due_at`, `blocked_reason`, `created_at`, dan
+`updated_at`. Dua field assignment berbentuk boolean; `assigned_to`, `dedup_key`,
+dan identifier aktor internal tidak pernah dikembalikan.
+
+PATCH menerima `action: claim | release | complete`. Claim selalu menugaskan
+caller terautentikasi dan ditolak bila tugas sedang dimiliki petugas lain.
+Release dan complete hanya dapat dilakukan pemilik tugas serta membutuhkan
+`reason` sepanjang 1–1000 karakter. Replay claim oleh pemilik, release atas
+tugas kosong, dan complete yang sudah dilakukan pemilik bersifat idempoten.
+Scope desa selalu dihitung dari membership pada bearer token; konflik ownership
+atau status menghasilkan `409 REFERRAL_CONFLICT`.
+
+Error tambahan:
+
+| HTTP | Kode | Arti |
+|---|---|---|
+| 404 | `REFERRAL_NOT_FOUND` | Kasus berada di luar scope atau tidak ada. |
+| 409 | `REFERRAL_CONFLICT` | State, versi, hash, atau idempotency bertentangan. |
+| 409 | `REFERRAL_ACCEPTANCE_REQUIRED` | PATCH langsung ke `forwarded` tanpa bukti penerimaan. |
+| 503 | `REFERRAL_UNAVAILABLE` | Penyimpanan referral tidak tersedia. |
+
+`ReportDetail.forwarding_verification` bernilai `verified` bila status
+`forwarded` didukung referral accepted dan bukti, `unverified_legacy` untuk
+data lama tanpa bukti, atau `null` pada status lain. Transisi `forwarded`
+tidak ditawarkan dan ditolak backend sampai bukti penerimaan tersimpan.

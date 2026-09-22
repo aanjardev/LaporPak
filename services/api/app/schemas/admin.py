@@ -114,19 +114,19 @@ class VillageAdminRemoval(StrictSchema):
 
 class AdminSelfUpdate(StrictSchema):
     display_name: Annotated[str, StringConstraints(min_length=2, max_length=120)] | None = None
-    contact_phone: Annotated[str, StringConstraints(min_length=8, max_length=30)] | None = None
+    contact_phone: Annotated[str, StringConstraints(pattern=r"^\+?[0-9]{8,15}$")] | None = None
 
 
 class VillageOnboardingCreate(StrictSchema):
     display_name: Annotated[str, StringConstraints(min_length=2, max_length=120)]
-    contact_phone: Annotated[str, StringConstraints(min_length=8, max_length=30)]
+    contact_phone: Annotated[str, StringConstraints(pattern=r"^\+?[0-9]{8,15}$")]
     village_name: Annotated[str, StringConstraints(min_length=2, max_length=200)]
-    village_code: Annotated[str, StringConstraints(min_length=2, max_length=50)]
+    village_code: Annotated[str, StringConstraints(pattern=r"^\d{2}\.\d{2}\.\d{2}\.\d{4}$")]
     province: Annotated[str, StringConstraints(min_length=2, max_length=120)]
     regency: Annotated[str, StringConstraints(min_length=2, max_length=120)]
     district: Annotated[str, StringConstraints(min_length=2, max_length=120)]
     address: Annotated[str, StringConstraints(min_length=5, max_length=500)]
-    service_contact_phone: Annotated[str, StringConstraints(min_length=8, max_length=30)]
+    service_contact_phone: Annotated[str, StringConstraints(pattern=r"^\+?[0-9]{8,15}$")]
     contact_email: Annotated[str, StringConstraints(pattern=r"^[^@]+@[^@]+$", max_length=255)] | None = None
     office_hours: Annotated[str, StringConstraints(min_length=3, max_length=300)]
 

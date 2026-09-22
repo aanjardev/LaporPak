@@ -176,6 +176,48 @@ async function callBackend(fetchImpl, env, path, body) {
   return { response, result };
 }
 
+function requireOperatorContext(context, env, toolName) {
+  if (env.LAPORPAK_REFERRAL_TOOLS_ENABLED !== "true") {
+    throw new Error(`${toolName} is disabled for this OpenClaw runtime`);
+  }
+  if (context.messageChannel === "whatsapp") {
+    throw new Error(`${toolName} is not available in citizen WhatsApp sessions`);
+  }
+}
+
+function operatorConfig(env) {
+  const apiUrl = env.LAPORPAK_API_URL?.trim();
+  const accessToken = env.LAPORPAK_OPERATOR_ACCESS_TOKEN?.trim();
+  if (!apiUrl || !accessToken) {
+    throw new Error("LaporPak operator environment is not configured");
+  }
+  return { apiUrl, accessToken };
+}
+
+async function callOperatorBackend(
+  fetchImpl,
+  env,
+  path,
+  { method = "GET", body } = {},
+) {
+  const { apiUrl, accessToken } = operatorConfig(env);
+  const response = await fetchImpl(apiEndpoint(apiUrl, path), {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const result = await responseJson(response);
+  if (!response.ok) {
+    const code = result?.error?.code ?? "REQUEST_FAILED";
+    throw new Error(`LaporPak API rejected the request (${response.status} ${code})`);
+  }
+  return result;
+}
+
 async function responseJson(response) {
   try {
     return await response.json();
@@ -608,10 +650,215 @@ export function buildConfirmResolutionTool(context, fetchImpl = globalThis.fetch
   };
 }
 
+const reportIdParameters = {
+  type: "object",
+  additionalProperties: false,
+  required: ["report_id"],
+  properties: {
+    report_id: { type: "string", pattern: UUID_PATTERN.source },
+  },
+};
+
+function operatorToolResult(result) {
+  return {
+    content: [{ type: "text", text: JSON.stringify(result) }],
+    details: result,
+  };
+}
+
+export function buildCaseContextTool(
+  context,
+  fetchImpl = globalThis.fetch,
+  env = process.env,
+) {
+  return {
+    name: "laporpak_get_case_context",
+    label: "Get scoped report context",
+    description:
+      "Read one report in the authenticated village operator scope. Use facts from this result; never infer missing case data.",
+    parameters: reportIdParameters,
+    async execute(_toolCallId, input) {
+      requireOperatorContext(context, env, "laporpak_get_case_context");
+      const result = await callOperatorBackend(
+        fetchImpl,
+        env,
+        `/api/v1/reports/${encodeURIComponent(input.report_id)}`,
+      );
+      return operatorToolResult(result);
+    },
+  };
+}
+
+export function buildRoutingCandidatesTool(
+  context,
+  fetchImpl = globalThis.fetch,
+  env = process.env,
+) {
+  return {
+    name: "laporpak_get_routing_candidates",
+    label: "Get referral routing candidates",
+    description:
+      "Read backend-approved referral candidates for one report. An empty list requires operator review; never invent a destination.",
+    parameters: reportIdParameters,
+    async execute(_toolCallId, input) {
+      requireOperatorContext(context, env, "laporpak_get_routing_candidates");
+      const result = await callOperatorBackend(
+        fetchImpl,
+        env,
+        `/api/v1/reports/${encodeURIComponent(input.report_id)}/routing-options`,
+      );
+      return operatorToolResult(result);
+    },
+  };
+}
+
+export function buildPrepareReferralTool(
+  context,
+  fetchImpl = globalThis.fetch,
+  env = process.env,
+) {
+  return {
+    name: "laporpak_prepare_referral",
+    label: "Prepare referral draft",
+    description:
+      "Create or revise a referral draft for an in-progress report using a candidate returned by the backend. This never approves or dispatches the package.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "report_id",
+        "channel_id",
+        "summary",
+        "chronology",
+        "requested_action",
+      ],
+      properties: {
+        report_id: { type: "string", pattern: UUID_PATTERN.source },
+        channel_id: { type: "string", pattern: UUID_PATTERN.source },
+        summary: { type: "string", minLength: 1, maxLength: 2000 },
+        chronology: { type: "string", minLength: 1, maxLength: 5000 },
+        requested_action: { type: "string", minLength: 1, maxLength: 2000 },
+        attachment_ids: {
+          type: "array",
+          maxItems: 10,
+          uniqueItems: true,
+          items: { type: "string", pattern: UUID_PATTERN.source },
+        },
+      },
+    },
+    async execute(_toolCallId, input) {
+      requireOperatorContext(context, env, "laporpak_prepare_referral");
+      const packageInput = {
+        summary: input.summary,
+        chronology: input.chronology,
+        requested_action: input.requested_action,
+        attachment_ids: input.attachment_ids ?? [],
+        share_citizen_identity: false,
+      };
+      const requestKey = uuidFromFingerprint(
+        stableJson({
+          action: "prepare_referral",
+          report_id: input.report_id,
+          channel_id: input.channel_id,
+          package: packageInput,
+        }),
+      );
+      const result = await callOperatorBackend(
+        fetchImpl,
+        env,
+        `/api/v1/reports/${encodeURIComponent(input.report_id)}/referrals`,
+        {
+          method: "POST",
+          body: {
+            channel_id: input.channel_id,
+            request_key: requestKey,
+            package: packageInput,
+          },
+        },
+      );
+      return operatorToolResult(result);
+    },
+  };
+}
+
+export function buildRequestReferralDispatchTool(
+  context,
+  fetchImpl = globalThis.fetch,
+  env = process.env,
+) {
+  return {
+    name: "laporpak_request_referral_dispatch",
+    label: "Request approved referral dispatch",
+    description:
+      "Ask the backend to queue one referral. The backend rejects packages without valid human approval; this tool cannot approve them.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      required: ["report_id", "referral_id"],
+      properties: {
+        report_id: { type: "string", pattern: UUID_PATTERN.source },
+        referral_id: { type: "string", pattern: UUID_PATTERN.source },
+      },
+    },
+    async execute(_toolCallId, input) {
+      requireOperatorContext(context, env, "laporpak_request_referral_dispatch");
+      const referrals = await callOperatorBackend(
+        fetchImpl,
+        env,
+        `/api/v1/reports/${encodeURIComponent(input.report_id)}/referrals`,
+      );
+      const active = Array.isArray(referrals)
+        ? referrals.find((item) => item.id === input.referral_id)
+        : null;
+      if (!active) {
+        throw new Error("Referral is not available in the scoped report");
+      }
+      const operationKey = uuidFromFingerprint(
+        stableJson({
+          action: "dispatch_referral",
+          referral_id: input.referral_id,
+          package_version: active.active_package_version,
+          package_hash: active.package_hash,
+        }),
+      );
+      const result = await callOperatorBackend(
+        fetchImpl,
+        env,
+        `/api/v1/referrals/${encodeURIComponent(input.referral_id)}/dispatch`,
+        { method: "POST", body: { operation_key: operationKey } },
+      );
+      return operatorToolResult(result);
+    },
+  };
+}
+
+export function buildReferralProgressTool(
+  context,
+  fetchImpl = globalThis.fetch,
+  env = process.env,
+) {
+  return {
+    name: "laporpak_get_referral_progress",
+    label: "Get referral progress",
+    description:
+      "Read persisted referral progress and evidence for one report in the authenticated operator scope.",
+    parameters: reportIdParameters,
+    async execute(_toolCallId, input) {
+      requireOperatorContext(context, env, "laporpak_get_referral_progress");
+      const result = await callOperatorBackend(
+        fetchImpl,
+        env,
+        `/api/v1/reports/${encodeURIComponent(input.report_id)}/referrals`,
+      );
+      return operatorToolResult(result);
+    },
+  };
+}
+
 export default {
   id: "laporpak-tools",
   name: "LaporPak Tools",
-  description: "ASK, REPORT, TRACK, and citizen support tools through the FastAPI boundary.",
+  description: "Citizen tools plus opt-in operator referral tools through the FastAPI boundary.",
   register(api) {
     api.on("message_received", (event) => {
       pruneMediaCache();
@@ -670,6 +917,26 @@ export default {
     });
     api.registerTool((context) => buildConfirmResolutionTool(context), {
       name: "laporpak_confirm_resolution",
+      optional: true,
+    });
+    api.registerTool((context) => buildCaseContextTool(context), {
+      name: "laporpak_get_case_context",
+      optional: true,
+    });
+    api.registerTool((context) => buildRoutingCandidatesTool(context), {
+      name: "laporpak_get_routing_candidates",
+      optional: true,
+    });
+    api.registerTool((context) => buildPrepareReferralTool(context), {
+      name: "laporpak_prepare_referral",
+      optional: true,
+    });
+    api.registerTool((context) => buildRequestReferralDispatchTool(context), {
+      name: "laporpak_request_referral_dispatch",
+      optional: true,
+    });
+    api.registerTool((context) => buildReferralProgressTool(context), {
+      name: "laporpak_get_referral_progress",
       optional: true,
     });
   },

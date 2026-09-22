@@ -7,9 +7,14 @@ import test from "node:test";
 import plugin from "./index.js";
 import {
   buildAskTool,
+  buildCaseContextTool,
   buildConfirmResolutionTool,
   buildCreateReportTool,
+  buildPrepareReferralTool,
+  buildReferralProgressTool,
   buildReportDocumentTool,
+  buildRequestReferralDispatchTool,
+  buildRoutingCandidatesTool,
   buildServiceRequestTool,
   buildTrackTool,
 } from "./index.js";
@@ -30,6 +35,21 @@ test("manifest tool contract matches every registered tool", async () => {
     Object.keys(manifest.toolMetadata).sort(),
     [...manifest.contracts.tools].sort(),
   );
+  assert.equal(manifest.contracts.tools.some((name) => name.includes("approve")), false);
+});
+
+test("referral output schema keeps approval human-only", async () => {
+  const schema = JSON.parse(
+    await readFile(
+      new URL("../../schemas/referral-proposal.schema.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.equal(schema.properties.requires_human_approval.const, true);
+  assert.equal(schema.properties.action.enum.includes("approve"), false);
+  assert.equal("actor" in schema.properties, false);
+  assert.equal("tenant_id" in schema.properties, false);
+  assert.equal("destination_url" in schema.properties, false);
 });
 
 const input = {
@@ -45,6 +65,11 @@ const testEnv = {
   LAPORPAK_API_URL: "http://localhost:8000",
   LAPORPAK_API_KEY: "secret",
   LAPORPAK_CHANNEL_ACCOUNT_ID: "whatsapp-demo",
+};
+const operatorEnv = {
+  LAPORPAK_API_URL: "http://localhost:8000",
+  LAPORPAK_REFERRAL_TOOLS_ENABLED: "true",
+  LAPORPAK_OPERATOR_ACCESS_TOKEN: "operator-token",
 };
 const testAttachments = async () => [
   {
@@ -406,5 +431,203 @@ test("REQUEST does not return success when persistence fails", async () => {
       purpose: "Keperluan uji",
     }),
     /503 DATABASE_UNAVAILABLE/,
+  );
+});
+
+const referralIds = {
+  report: "20000000-0000-4000-8000-000000000001",
+  channel: "50000000-0000-4000-8000-000000000001",
+  referral: "30000000-0000-4000-8000-000000000001",
+  attachment: "a0000000-0000-4000-8000-000000000001",
+};
+
+test("operator referral reads use bearer scope and GET only", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url: String(url), options });
+    return Response.json({ items: [] });
+  };
+  const context = { messageChannel: "internal" };
+
+  await buildCaseContextTool(context, fetchImpl, operatorEnv).execute("case", {
+    report_id: referralIds.report,
+  });
+  await buildRoutingCandidatesTool(context, fetchImpl, operatorEnv).execute(
+    "routes",
+    { report_id: referralIds.report },
+  );
+  await buildReferralProgressTool(context, fetchImpl, operatorEnv).execute(
+    "progress",
+    { report_id: referralIds.report },
+  );
+
+  assert.deepEqual(
+    calls.map((call) => call.url),
+    [
+      `http://localhost:8000/api/v1/reports/${referralIds.report}`,
+      `http://localhost:8000/api/v1/reports/${referralIds.report}/routing-options`,
+      `http://localhost:8000/api/v1/reports/${referralIds.report}/referrals`,
+    ],
+  );
+  for (const call of calls) {
+    assert.equal(call.options.method, "GET");
+    assert.equal(call.options.headers.Authorization, "Bearer operator-token");
+    assert.equal("body" in call.options, false);
+    assert.equal("X-OpenClaw-API-Key" in call.options.headers, false);
+  }
+});
+
+test("referral draft omits authority fields and derives a stable request key", async () => {
+  const requests = [];
+  const tool = buildPrepareReferralTool(
+    { messageChannel: "internal" },
+    async (url, options) => {
+      requests.push({ url: String(url), options, body: JSON.parse(options.body) });
+      return Response.json({
+        id: referralIds.referral,
+        report_id: referralIds.report,
+        dispatch_status: "awaiting_approval",
+      }, { status: 201 });
+    },
+    operatorEnv,
+  );
+  const draft = {
+    report_id: referralIds.report,
+    channel_id: referralIds.channel,
+    summary: "Jalan rusak di RT 03.",
+    chronology: "Kerusakan terlihat sejak kemarin.",
+    requested_action: "Mohon pemeriksaan.",
+    attachment_ids: [referralIds.attachment],
+  };
+
+  await tool.execute("draft-1", draft);
+  await tool.execute("draft-1-replay", draft);
+
+  assert.equal(
+    requests[0].url,
+    `http://localhost:8000/api/v1/reports/${referralIds.report}/referrals`,
+  );
+  assert.equal(requests[0].body.request_key, requests[1].body.request_key);
+  assert.equal(requests[0].body.package.share_citizen_identity, false);
+  for (const forbidden of [
+    "actor",
+    "approved",
+    "tenant_id",
+    "administrative_unit_id",
+    "destination_url",
+  ]) {
+    assert.equal(forbidden in requests[0].body, false);
+  }
+});
+
+test("dispatch request is stable and still depends on backend approval", async () => {
+  const requests = [];
+  const tool = buildRequestReferralDispatchTool(
+    { messageChannel: "internal" },
+    async (url, options) => {
+      if (options.method === "GET") {
+        return Response.json([{
+          id: referralIds.referral,
+          active_package_version: 2,
+          package_hash: "a".repeat(64),
+        }]);
+      }
+      const body = JSON.parse(options.body);
+      requests.push({ url: String(url), body });
+      return Response.json({
+        referral: { id: referralIds.referral, dispatch_status: "queued" },
+        operation_key: body.operation_key,
+        job_status: "pending",
+        replayed: requests.length > 1,
+      }, { status: 202 });
+    },
+    operatorEnv,
+  );
+
+  const input = {
+    report_id: referralIds.report,
+    referral_id: referralIds.referral,
+  };
+  await tool.execute("dispatch-1", input);
+  await tool.execute("dispatch-1-replay", input);
+
+  assert.equal(requests[0].body.operation_key, requests[1].body.operation_key);
+  assert.deepEqual(Object.keys(requests[0].body), ["operation_key"]);
+  assert.equal(
+    requests[0].url,
+    `http://localhost:8000/api/v1/referrals/${referralIds.referral}/dispatch`,
+  );
+
+  const rejected = buildRequestReferralDispatchTool(
+    { messageChannel: "internal" },
+    async (_url, options) => options.method === "GET"
+      ? Response.json([{
+          id: referralIds.referral,
+          active_package_version: 2,
+          package_hash: "a".repeat(64),
+        }])
+      : Response.json(
+          { error: { code: "REFERRAL_CONFLICT" } },
+          { status: 409 },
+        ),
+    operatorEnv,
+  );
+  await assert.rejects(
+    rejected.execute("unapproved", input),
+    /409 REFERRAL_CONFLICT/,
+  );
+});
+
+test("dispatch derives a new operation key from a new persisted package version", async () => {
+  let version = 1;
+  const operationKeys = [];
+  const tool = buildRequestReferralDispatchTool(
+    { messageChannel: "internal" },
+    async (_url, options) => {
+      if (options.method === "GET") {
+        return Response.json([{
+          id: referralIds.referral,
+          active_package_version: version,
+          package_hash: String(version).repeat(64),
+        }]);
+      }
+      const body = JSON.parse(options.body);
+      operationKeys.push(body.operation_key);
+      return Response.json({ operation_key: body.operation_key }, { status: 202 });
+    },
+    operatorEnv,
+  );
+  const input = {
+    report_id: referralIds.report,
+    referral_id: referralIds.referral,
+  };
+
+  await tool.execute("version-1", input);
+  version = 2;
+  await tool.execute("version-2", input);
+
+  assert.notEqual(operationKeys[0], operationKeys[1]);
+});
+
+test("referral tools are disabled for citizen WhatsApp and opt-in runtimes", async () => {
+  const neverFetch = async () => assert.fail("fetch should not run");
+  const citizenTool = buildRoutingCandidatesTool(
+    { messageChannel: "whatsapp", requesterSenderId: "6281234567890" },
+    neverFetch,
+    operatorEnv,
+  );
+  await assert.rejects(
+    citizenTool.execute("citizen", { report_id: referralIds.report }),
+    /not available in citizen WhatsApp sessions/,
+  );
+
+  const disabledTool = buildRoutingCandidatesTool(
+    { messageChannel: "internal" },
+    neverFetch,
+    { ...operatorEnv, LAPORPAK_REFERRAL_TOOLS_ENABLED: "false" },
+  );
+  await assert.rejects(
+    disabledTool.execute("disabled", { report_id: referralIds.report }),
+    /disabled for this OpenClaw runtime/,
   );
 });
