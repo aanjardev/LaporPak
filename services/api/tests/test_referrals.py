@@ -229,6 +229,31 @@ def test_full_draft_approval_and_idempotent_dispatch_flow():
     assert len(repository.jobs) == 1
 
 
+def test_list_tasks_is_scoped_and_hides_assignment_identifier():
+    class TaskRepository(Repository):
+        def list_tasks_for_report(self, report_id, unit_ids):
+            assert report_id == REPORT_ID
+            assert unit_ids == (UNIT_A,)
+            return [{
+                "id": UUID("90000000-0000-4000-8000-000000000001"),
+                "referral_id": REFERRAL_ID,
+                "task_type": "reconcile_delivery",
+                "status": "open",
+                "assigned_to": "supabase:private-actor",
+                "next_action": "Periksa bukti penerima.",
+                "due_at": None,
+                "blocked_reason": "Timeout ambigu",
+                "created_at": NOW,
+                "updated_at": NOW,
+            }]
+
+    tasks = ReferralService(Session(), TaskRepository()).list_tasks(REPORT_ID, (UNIT_A,))
+
+    assert tasks[0].next_action == "Periksa bukti penerima."
+    assert tasks[0].assigned is True
+    assert not hasattr(tasks[0], "assigned_to")
+
+
 def test_village_b_cannot_observe_or_create_village_a_referral():
     service = ReferralService(Session(), Repository())
     with pytest.raises(ReferralNotFoundError):

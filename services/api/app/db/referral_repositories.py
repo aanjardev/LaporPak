@@ -334,6 +334,39 @@ class ReferralRepository:
             .values(status="completed", updated_at=func.now())
         )
 
+    def list_tasks_for_report(
+        self, report_id: UUID, unit_ids: tuple[UUID, ...]
+    ) -> list[RowMapping]:
+        statement = (
+            select(
+                case_tasks.c.id,
+                case_tasks.c.referral_id,
+                case_tasks.c.task_type,
+                case_tasks.c.status,
+                case_tasks.c.assigned_to,
+                case_tasks.c.next_action,
+                case_tasks.c.due_at,
+                case_tasks.c.blocked_reason,
+                case_tasks.c.created_at,
+                case_tasks.c.updated_at,
+            )
+            .join(
+                report_referrals,
+                report_referrals.c.id == case_tasks.c.referral_id,
+            )
+            .where(
+                report_referrals.c.report_id == report_id,
+                report_referrals.c.source_unit_id.in_(unit_ids),
+            )
+            .order_by(
+                case_tasks.c.status.asc(),
+                case_tasks.c.due_at.asc().nulls_last(),
+                case_tasks.c.created_at.asc(),
+                case_tasks.c.id.asc(),
+            )
+        )
+        return list(self.session.execute(statement).mappings().all())
+
     def lock_next_job(self, now: datetime, lease_token: UUID) -> RowMapping | None:
         candidate = (
             select(referral_outbox.c.id)

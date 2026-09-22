@@ -11,6 +11,7 @@ from app.schemas.referrals import (
     ReferralDispatch,
     ReferralDispatchResponse,
     ReferralProgress,
+    ReferralTask,
     RoutingOptionsResponse,
 )
 from app.services.dependencies import ReferralServiceDependency
@@ -94,6 +95,18 @@ def list_referrals(
 ) -> list[ReferralProgress]:
     try:
         return service.list_for_report(report_id, _scope(caller))
+    except (ReferralNotFoundError, ReferralUnavailableError) as exc:
+        _raise_api_error(exc)
+
+
+@router.get("/reports/{report_id}/tasks", response_model=list[ReferralTask])
+def list_referral_tasks(
+    report_id: UUID,
+    caller: AdminCaller,
+    service: ReferralServiceDependency,
+) -> list[ReferralTask]:
+    try:
+        return service.list_tasks(report_id, _scope(caller))
     except (ReferralNotFoundError, ReferralUnavailableError) as exc:
         _raise_api_error(exc)
 

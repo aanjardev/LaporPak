@@ -67,11 +67,27 @@ export type RoutingOptionsResponse = {
   needs_review: boolean;
 };
 
+export type ReferralTask = {
+  id: string;
+  referral_id: string;
+  task_type: string;
+  status: string;
+  assigned: boolean;
+  next_action: string;
+  due_at: string | null;
+  blocked_reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export const getReportReferrals = (reportId: string, signal?: AbortSignal) =>
   apiFetch<ReferralProgress[]>(`/api/v1/reports/${encodeURIComponent(reportId)}/referrals`, { signal });
 
 export const getRoutingOptions = (reportId: string, signal?: AbortSignal) =>
   apiFetch<RoutingOptionsResponse>(`/api/v1/reports/${encodeURIComponent(reportId)}/routing-options`, { signal });
+
+export const getReportTasks = (reportId: string, signal?: AbortSignal) =>
+  apiFetch<ReferralTask[]>(`/api/v1/reports/${encodeURIComponent(reportId)}/tasks`, { signal });
 
 export const approveReferral = (
   referralId: string,

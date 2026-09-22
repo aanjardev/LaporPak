@@ -1063,6 +1063,13 @@ metadata lampiran internal, actor UUID, atau credential. Nilai `null` berarti
 snapshot lama tidak memenuhi bentuk tampilan aman dan tidak boleh dianggap
 sebagai paket kosong.
 
+Admin detail juga dapat membaca tugas tindak lanjut secara aman:
+`GET /api/v1/reports/{report_id}/tasks`. Response memuat `id`, `referral_id`,
+`task_type`, `status`, `assigned` (boolean), `next_action`, `due_at`,
+`blocked_reason`, `created_at`, dan `updated_at`. Field mentah `assigned_to`,
+`dedup_key`, serta identifier aktor internal tidak pernah dikembalikan. Scope
+desa selalu dihitung dari membership pada bearer token.
+
 Error tambahan:
 
 | HTTP | Kode | Arti |

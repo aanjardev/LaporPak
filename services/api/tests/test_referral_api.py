@@ -42,6 +42,10 @@ class FakeService:
             updated_at=datetime(2026, 9, 21, 12, tzinfo=UTC),
         )
 
+    def list_tasks(self, report_id, unit_ids):
+        self.calls.append(("tasks", report_id, unit_ids))
+        return []
+
 
 @pytest.fixture
 def client(monkeypatch):
@@ -80,6 +84,18 @@ def test_approval_requires_admin_and_uses_server_scope(client):
     assert admin.status_code == 200
     assert service.calls[0][3] == (UNIT_ID,)
     assert service.calls[0][2].startswith("supabase:")
+
+
+def test_tasks_use_server_scope(client):
+    http, service = client
+    response = http.get(
+        f"/api/v1/reports/{REPORT_ID}/tasks",
+        headers={"Authorization": "Bearer admin-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert service.calls == [("tasks", REPORT_ID, (UNIT_ID,))]
 
 
 def test_draft_rejects_client_supplied_scope_actor_and_approval(client):

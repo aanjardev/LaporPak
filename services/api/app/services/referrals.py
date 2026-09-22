@@ -24,6 +24,7 @@ from app.schemas.referrals import (
     ReferralDispatchResponse,
     ReferralPackageSnapshot,
     ReferralProgress,
+    ReferralTask,
     ReferralWorkerResult,
     RoutingOption,
     RoutingOptionsResponse,
@@ -435,6 +436,32 @@ class ReferralService:
                     package_snapshot=package_snapshot_view(row.get("package_snapshot")),
                 )
                 for row in self.repository.list_scoped_referrals(report_id, unit_ids)
+            ]
+        except ReferralNotFoundError:
+            raise
+        except SQLAlchemyError as exc:
+            raise ReferralUnavailableError from exc
+
+    def list_tasks(
+        self, report_id: UUID, unit_ids: tuple[UUID, ...]
+    ) -> list[ReferralTask]:
+        try:
+            if self.repository.get_scoped_report(report_id, unit_ids) is None:
+                raise ReferralNotFoundError
+            return [
+                ReferralTask(
+                    id=row["id"],
+                    referral_id=row["referral_id"],
+                    task_type=row["task_type"],
+                    status=row["status"],
+                    assigned=row["assigned_to"] is not None,
+                    next_action=row["next_action"],
+                    due_at=row["due_at"],
+                    blocked_reason=row["blocked_reason"],
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                )
+                for row in self.repository.list_tasks_for_report(report_id, unit_ids)
             ]
         except ReferralNotFoundError:
             raise

@@ -121,6 +121,19 @@ class ReferralPackageSnapshot(StrictSchema):
     share_citizen_identity: bool
 
 
+class ReferralTask(StrictSchema):
+    id: UUID
+    referral_id: UUID
+    task_type: str
+    status: str
+    assigned: bool
+    next_action: str
+    due_at: datetime | None
+    blocked_reason: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class ReferralProgress(StrictSchema):
     id: UUID
     report_id: UUID

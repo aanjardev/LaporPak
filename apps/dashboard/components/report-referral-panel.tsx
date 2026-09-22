@@ -8,9 +8,11 @@ import {
   approveReferral,
   dispatchReferral,
   getReportReferrals,
+  getReportTasks,
   getRoutingOptions,
   reconcileReferral,
   type ReferralProgress,
+  type ReferralTask,
   type RoutingOption,
 } from "@/lib/referrals";
 
@@ -48,6 +50,11 @@ function formatDate(value: string) {
 
 function StatusLine({ label, value }: { label: string; value: string }) {
   return <div className="flex items-start justify-between gap-4 border-b border-border py-2 last:border-0"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-semibold text-foreground">{value}</dd></div>;
+}
+
+function TaskList({ tasks }: { tasks: ReferralTask[] }) {
+  if (tasks.length === 0) return null;
+  return <div className="mt-5 rounded-lg border border-border p-4"><div className="flex items-center justify-between gap-3"><h3 className="font-semibold">Tugas tindak lanjut</h3><span className="text-xs text-muted-foreground">{tasks.filter((task) => task.status === "open").length} terbuka</span></div><ul className="mt-3 space-y-2">{tasks.map((task) => <li key={task.id} className="rounded-md bg-muted p-3 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold">{task.task_type.replaceAll("_", " ")}</span><span className={task.status === "open" ? "text-amber-800" : "text-emerald-800"}>{task.status === "open" ? "Terbuka" : "Selesai"}</span></div><p className="mt-1 leading-6">{task.next_action}</p><p className="mt-1 text-xs text-muted-foreground">{task.assigned ? "PIC ditetapkan" : "PIC belum ditetapkan"}{task.due_at ? ` · Tenggat ${formatDate(task.due_at)}` : ""}</p>{task.blocked_reason && <p className="mt-2 text-xs leading-5 text-rose-700">Hambatan: {task.blocked_reason}</p>}</li>)}</ul></div>;
 }
 
 function ReferralCard({
@@ -91,6 +98,7 @@ function ReferralCard({
 export function ReportReferralPanel({ reportId, reportStatus, disabled = false }: { reportId: string; reportStatus: string; disabled?: boolean }) {
   const toast = useToast();
   const [items, setItems] = useState<ReferralProgress[]>([]);
+  const [tasks, setTasks] = useState<ReferralTask[]>([]);
   const [candidates, setCandidates] = useState<RoutingOption[]>([]);
   const [needsReview, setNeedsReview] = useState(false);
   const [loading, setLoading] = useState(!disabled);
@@ -110,8 +118,9 @@ export function ReportReferralPanel({ reportId, reportStatus, disabled = false }
     if (manual) setRefreshing(true);
       setError("");
     try {
-      const result = await getReportReferrals(reportId);
+      const [result, taskResult] = await Promise.all([getReportReferrals(reportId), getReportTasks(reportId)]);
       setItems(result);
+      setTasks(taskResult);
       setPollingStopped(false);
       if (result.length === 0 && reportStatus === "in_progress") {
         const routing = await getRoutingOptions(reportId);
@@ -134,9 +143,10 @@ export function ReportReferralPanel({ reportId, reportStatus, disabled = false }
   useEffect(() => {
     if (disabled) return;
     const controller = new AbortController();
-    getReportReferrals(reportId, controller.signal)
-      .then(async (result) => {
+    Promise.all([getReportReferrals(reportId, controller.signal), getReportTasks(reportId, controller.signal)])
+      .then(async ([result, taskResult]) => {
         setItems(result);
+        setTasks(taskResult);
         if (result.length === 0 && reportStatus === "in_progress") {
           const routing = await getRoutingOptions(reportId, controller.signal);
           setCandidates(routing.items);
@@ -180,6 +190,7 @@ export function ReportReferralPanel({ reportId, reportStatus, disabled = false }
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 id="rujukan-laporan" className="text-lg font-semibold">Rujukan laporan</h2><p className="mt-1 text-sm text-muted-foreground">Paket, persetujuan petugas, dan progres penerima ditampilkan terpisah.</p></div><button type="button" onClick={() => void refresh(true)} disabled={refreshing} className="inline-flex min-h-11 items-center gap-2 rounded-md border border-input px-3 text-sm font-semibold text-brand disabled:opacity-60"><RefreshCw size={16} className={refreshing ? "animate-spin" : ""} aria-hidden="true" />{refreshing ? "Memperbarui…" : "Perbarui"}</button></div>
     {error && <div className="mt-4"><InlineFeedback kind="error" title="Rujukan belum dapat diperbarui" detail={error} action={<button type="button" onClick={() => void refresh(true)} className="min-h-11 font-semibold underline underline-offset-4">Coba periksa lagi</button>} /></div>}
     {pollingStopped && <div className="mt-4"><InlineFeedback kind="warning" title="Pemeriksaan otomatis dihentikan" detail="Proses dapat tetap berjalan. Periksa status secara manual agar tidak mengirim ulang paket yang sama." action={<button type="button" onClick={() => { pollStartedAt.current = Date.now(); setPollingStopped(false); void refresh(true); }} className="min-h-11 font-semibold underline underline-offset-4">Periksa sekarang</button>} /></div>}
+    <TaskList tasks={tasks} />
     {loading ? <p role="status" className="mt-5 flex items-center gap-2 text-sm text-muted-foreground"><LoaderCircle size={16} className="animate-spin" />Memuat progres rujukan…</p> : items.length > 0 ? <ul className="mt-5 space-y-3">{items.map((item) => <ReferralCard key={item.id} item={item} working={working} onApprove={setApprovalItem} onDispatch={setDispatchItem} onReconcile={(current) => void perform(current.id, () => reconcileReferral(current.id), "Hasil pengiriman diperbarui")} />)}</ul> : <div className="mt-5 space-y-3"><p className="text-sm text-muted-foreground">Belum ada paket rujukan untuk laporan ini.</p>{reportStatus !== "in_progress" ? <p className="rounded-md bg-muted p-3 text-sm leading-6 text-brand">Rujukan hanya dapat disiapkan ketika laporan sedang dalam penanganan.</p> : candidates.length === 0 ? <p className={`rounded-md p-3 text-sm leading-6 ${needsReview ? "bg-amber-50 text-amber-950" : "bg-muted text-brand"}`}>{needsReview ? "Belum ada kandidat kanal yang tersedia. Tinjau tujuan secara manual." : "Kandidat rujukan belum tersedia."}</p> : <div><p className="text-sm font-semibold">Kandidat kanal yang tersedia</p><ul className="mt-2 space-y-2">{candidates.map((candidate) => <li key={candidate.channel_id} className="flex items-center gap-2 rounded-md border border-border p-3 text-sm"><CheckCircle2 size={16} className="shrink-0 text-emerald-700" aria-hidden="true" /><span>{candidate.target_name} · {candidate.channel_name}{candidate.is_simulated ? " · Simulasi" : ""}</span></li>)}</ul><p className="mt-3 text-xs leading-5 text-muted-foreground">Pembuatan paket dilakukan melalui alur operator yang berwenang; kandidat ini berasal dari backend.</p></div>}</div>}
     <SlowStatus active={working !== null} />
     <ConfirmationDialog open={approvalItem !== null} onOpenChange={(open) => { if (!open) setApprovalItem(null); }} title="Setujui paket rujukan?" description={approvalItem ? `Paket v${approvalItem.active_package_version} untuk ${approvalItem.target_name} akan dapat dikirim setelah persetujuan ini.` : ""} confirmLabel="Setujui paket" reasonLabel="Alasan persetujuan" reasonRequired pending={approvalItem ? working === approvalItem.id : false} onConfirm={async (reason) => { if (!approvalItem) return; const current = approvalItem; await perform(current.id, () => approveReferral(current.id, { package_version: current.active_package_version, package_hash: current.package_hash, reason }), "Paket rujukan disetujui"); setApprovalItem(null); }} />
