@@ -33,9 +33,9 @@ ditampilkan sebagai tidak tersedia.
    slice M3; tetap perlu verifikasi visual.)
 2. Tambahkan pengelolaan `case_tasks` dengan PIC, due date, retry/reconcile, dan
    feedback kegagalan yang sudah dipakai dashboard.
-3. Tambahkan respons TRACK warga yang hanya menampilkan progres aman dan
-   berbasis bukti; sembunyikan detail routing internal, identitas petugas, dan
-   data desa lain.
+3. Selesai pada slice ini: TRACK warga menampilkan progres referral yang aman
+   dan berbasis status tersimpan; detail routing internal, bukti privat,
+   identitas petugas, dan data desa lain tetap disembunyikan.
 4. Jalankan scheduler sederhana berbasis PostgreSQL untuk reminder/tugas tanpa
    duplikasi. Notifikasi keluar tetap mock.
 5. Uji desktop/ponsel, auth dua desa, konflik versi, error worker, polling, dan
