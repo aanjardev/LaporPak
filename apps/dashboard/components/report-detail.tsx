@@ -9,6 +9,7 @@ import { saveReportDecision } from "@/app/reports/[id]/actions";
 import { categoryLabels, formatLocation, formatReportDate, StatusBadge, statusLabels, urgencyLabels } from "@/components/report-display";
 import type { ReportAttachment, ReportDetail, ReportStatus } from "@/lib/reports";
 import { ReportDocumentsPanel } from "@/components/report-documents-panel";
+import { ReportReferralPanel } from "@/components/report-referral-panel";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { SlowStatus, useToast } from "@/components/action-feedback";
 
@@ -170,6 +171,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
             )}
           </section>
           <ReportDocumentsPanel reportId={report.id} disabled={isMock} />
+          <ReportReferralPanel reportId={report.id} reportStatus={report.status} disabled={isMock} />
           <section aria-labelledby="riwayat-status" className="ui-panel p-5 sm:p-6">
             <h2 id="riwayat-status" className="text-lg font-semibold">Riwayat status</h2>
             {report.status_history.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">Belum ada riwayat status.</p> : (

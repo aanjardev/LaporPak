@@ -881,3 +881,17 @@ Model tidak memperoleh tool approval. Payload tool juga tidak menerima aktor,
 scope desa, status approval, credential, URL tujuan, atau izin berbagi identitas
 warga. Tool dispatch hanya meminta backend memeriksa approval manusia yang
 tersimpan untuk versi/hash aktif. Connector tetap mock sintetis pada M2.
+
+## Referral dashboard M3
+
+Detail REPORT memuat panel referral hanya pada mode API. Panel membaca kandidat
+dan progres melalui endpoint M1, lalu mengirim approval serta permintaan
+dispatch sebagai tindakan Admin Desa. Approval tetap menyertakan versi dan hash
+paket aktif. Satu operation key dipertahankan selama percobaan dispatch pada
+halaman yang sama agar timeout tidak mendorong operasi logis baru.
+
+Polling hanya berlaku ketika dispatch berstatus `queued` atau `sending`, berjalan
+satu request pada satu waktu, berhenti setelah dua menit, dan tidak berjalan saat
+tab tersembunyi. Status transport, registrasi, dan penanganan ditampilkan
+terpisah. Label simulasi berasal dari response backend dan tidak boleh dihapus
+oleh UI.

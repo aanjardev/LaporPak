@@ -20,9 +20,15 @@ model dibedakan dari hasil stub.
 
 ## P2 — M3: review operator dan progres warga
 
-1. Tambahkan panel referral pada detail REPORT: kandidat, snapshot paket,
-   versi/hash, approval manusia, tiga dimensi status, bukti, serta next action.
-2. Tambahkan antrean `case_tasks` dengan PIC, due date, retry/reconcile, dan
+Status saat ini: slice dashboard pertama selesai. Detail REPORT sudah
+menampilkan kandidat backend, versi/hash paket, approval manusia, dispatch,
+rekonsiliasi, tiga dimensi status, bukti, dan next action. Polling dibatasi dua
+menit dan hasil mock tetap berlabel simulasi. Isi snapshot paket belum diekspos
+oleh kontrak response M1 sehingga belum ditampilkan.
+
+1. Tambahkan response review paket yang aman agar operator dapat membandingkan
+   isi snapshot sebelum approval tanpa membuka metadata internal.
+2. Tambahkan pengelolaan `case_tasks` dengan PIC, due date, retry/reconcile, dan
    feedback kegagalan yang sudah dipakai dashboard.
 3. Tambahkan respons TRACK warga yang hanya menampilkan progres aman dan
    berbasis bukti; sembunyikan detail routing internal, identitas petugas, dan
