@@ -97,39 +97,55 @@ class OpenClawGateway:
         self, account_id: str, display_name: str, agent_id: str = "laporpak"
     ) -> None:
         safe_name = re.sub(r"[^A-Za-z0-9 ._-]", "", display_name)[:80] or "Desa"
-        self._run(
-            "channels",
-            "add",
-            "--channel",
-            "whatsapp",
-            "--account",
-            account_id,
-            "--agent",
-            agent_id,
-            "--name",
-            safe_name,
+        account = None
+        try:
+            account = self.whatsapp_statuses()[0].get(account_id)
+        except OpenClawGatewayError:
+            # Keep the original provisioning path when status cannot be read.
+            # The subsequent CLI call will return the actionable gateway error.
+            pass
+        configured = (
+            account is not None
+            and account.get("dmPolicy") == "open"
+            and account.get("allowFrom") == ["*"]
+            # `channels status` omits groupPolicy on some OpenClaw versions;
+            # only reject it when the gateway explicitly reports another value.
+            and account.get("groupPolicy", "disabled") == "disabled"
         )
-        self._run(
-            "config",
-            "set",
-            f'channels.whatsapp.accounts["{account_id}"].dmPolicy',
-            '"open"',
-            "--strict-json",
-        )
-        self._run(
-            "config",
-            "set",
-            f'channels.whatsapp.accounts["{account_id}"].allowFrom',
-            '["*"]',
-            "--strict-json",
-        )
-        self._run(
-            "config",
-            "set",
-            f'channels.whatsapp.accounts["{account_id}"].groupPolicy',
-            '"disabled"',
-            "--strict-json",
-        )
+        if not configured:
+            self._run(
+                "channels",
+                "add",
+                "--channel",
+                "whatsapp",
+                "--account",
+                account_id,
+                "--agent",
+                agent_id,
+                "--name",
+                safe_name,
+            )
+            self._run(
+                "config",
+                "set",
+                f'channels.whatsapp.accounts["{account_id}"].dmPolicy',
+                '"open"',
+                "--strict-json",
+            )
+            self._run(
+                "config",
+                "set",
+                f'channels.whatsapp.accounts["{account_id}"].allowFrom',
+                '["*"]',
+                "--strict-json",
+            )
+            self._run(
+                "config",
+                "set",
+                f'channels.whatsapp.accounts["{account_id}"].groupPolicy',
+                '"disabled"',
+                "--strict-json",
+            )
         bindings = _json_output(self._run("agents", "bindings", "--json"))
         if not isinstance(bindings, list):
             raise OpenClawGatewayError("OpenClaw returned invalid bindings")
@@ -165,7 +181,8 @@ class OpenClawGateway:
         agents = _json_output(self._run("agents", "list", "--json"))
         if not isinstance(agents, list):
             raise OpenClawGatewayError("OpenClaw returned an invalid agent list")
-        if not any(item.get("id") == agent_id for item in agents):
+        created = not any(item.get("id") == agent_id for item in agents)
+        if created:
             self._run(
                 "agents",
                 "add",
@@ -189,13 +206,17 @@ class OpenClawGateway:
             "laporpak_check_similar",
             "laporpak_confirm_resolution",
         ]
-        self._run(
-            "config",
-            "set",
-            f'agents.entries["{agent_id}"].tools.allow',
-            json.dumps(allowed_tools, separators=(",", ":")),
-            "--strict-json",
-        )
+        if created:
+            # ponytail: do not rewrite an existing agent config on every QR
+            # request; OpenClaw's Windows config writer can block while the
+            # gateway is reloading the same file.
+            self._run(
+                "config",
+                "set",
+                f'agents.entries["{agent_id}"].tools.allow',
+                json.dumps(allowed_tools, separators=(",", ":")),
+                "--strict-json",
+            )
 
     def start_pairing(self, account_id: str) -> dict[str, Any]:
         payload = json.dumps(

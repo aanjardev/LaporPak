@@ -121,6 +121,31 @@ def test_whatsapp_binding_moves_exact_account_to_village_agent(monkeypatch, tmp_
     ) in calls
 
 
+def test_existing_whatsapp_account_is_not_rewritten_on_pairing(monkeypatch, tmp_path):
+    cli = tmp_path / "openclaw.exe"
+    cli.write_text("")
+    gateway = OpenClawGateway(str(cli))
+    calls = []
+
+    def fake_run(*args, **_kwargs):
+        calls.append(args)
+        if args[:3] == ("channels", "status", "--channel"):
+            return (
+                '{"gatewayReachable":true,"channelAccounts":{"whatsapp":'
+                '[{"accountId":"default","dmPolicy":"open","allowFrom":["*"]}]},'
+                '"channelDefaultAccountId":{"whatsapp":"default"}}'
+            )
+        if args[:3] == ("agents", "bindings", "--json"):
+            return "[]"
+        return "{}"
+
+    monkeypatch.setattr(gateway, "_run", fake_run)
+    gateway.ensure_whatsapp_account("default", "Desa Uji")
+
+    assert not any(call[:2] == ("config", "set") for call in calls)
+    assert ("agents", "bind", "--agent", "laporpak", "--bind", "whatsapp:default", "--json") in calls
+
+
 def test_openclaw_status_snapshot_is_reused_for_concurrent_dashboard_reads(
     monkeypatch, tmp_path
 ):
