@@ -16,6 +16,14 @@ class TrackEvent(StrictSchema):
     changed_at: datetime
 
 
+class TrackReferral(StrictSchema):
+    dispatch_status: str
+    registration_status: str
+    handling_status: str
+    next_step: str
+    updated_at: datetime
+
+
 class TrackedItem(StrictSchema):
     ticket_number: str
     kind: str
@@ -25,6 +33,7 @@ class TrackedItem(StrictSchema):
     created_at: datetime
     next_step: str
     timeline: list[TrackEvent]
+    referral: TrackReferral | None = None
 
 
 class TrackResponse(StrictSchema):

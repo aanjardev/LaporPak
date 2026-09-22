@@ -98,5 +98,6 @@ tool referral tidak tersedia pada sesi WhatsApp warga, dan kanal live tetap
 nonaktif. Bagian awal M3 menambahkan panel review referral pada detail REPORT:
 kandidat backend, versi/hash paket, approval manusia, dispatch idempoten,
 rekonsiliasi hasil ambigu, tiga dimensi status, bukti, dan next action. M3 belum
-mencakup TRACK warga, pengelolaan `case_tasks`, atau scheduler. M4-M5 tetap
+mencakup pengelolaan `case_tasks` atau scheduler. TRACK warga kini dapat
+menampilkan progres rujukan yang sudah disaring oleh backend. M4-M5 tetap
 roadmap dan belum diaktifkan.

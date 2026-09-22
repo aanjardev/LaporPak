@@ -52,3 +52,24 @@ def test_other_sender_cannot_track_report_ticket():
         CitizenService(None, Repository()).track(
             "+6281200000099", "LP-2026-0010", UNIT_ID
         )
+
+
+def test_owner_sees_safe_referral_progress_without_routing_details():
+    class ReferralRepository(Repository):
+        def track_referrals(self, report_ids, unit_id):
+            assert report_ids == [REPORT_ID]
+            assert unit_id == UNIT_ID
+            return [{
+                "report_id": REPORT_ID,
+                "dispatch_status": "sent",
+                "registration_status": "pending",
+                "handling_status": "awaiting_acceptance",
+                "updated_at": NOW,
+            }]
+
+    result = CitizenService(None, ReferralRepository()).track(
+        "+6281200000010", "LP-2026-0010", UNIT_ID
+    )
+
+    assert result.items[0].referral is not None
+    assert result.items[0].referral.next_step == "Menunggu penerimaan dari unit tujuan."

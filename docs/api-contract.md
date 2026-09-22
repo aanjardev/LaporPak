@@ -763,6 +763,13 @@ untuk kegagalan database. Konfirmasi penyelesaian mengembalikan
 `422 VALIDATION_ERROR` untuk input tidak valid, dan
 `503 DATABASE_UNAVAILABLE` untuk kegagalan persistence.
 
+Untuk item REPORT yang memiliki rujukan, TRACK boleh menyertakan `referral`
+yang hanya berisi `dispatch_status`, `registration_status`,
+`handling_status`, `next_step`, dan `updated_at`. Response ini tidak memuat
+nama/URL kanal, tujuan internal, referensi eksternal, bukti internal, actor,
+atau identitas petugas. Rujukan dicari setelah ownership REPORT dan scope desa
+terverifikasi; REQUEST tidak menerima field ini.
+
 ---
 
 ## 17. Production Backend Extensions

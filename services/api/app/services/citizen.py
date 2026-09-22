@@ -11,6 +11,7 @@ from app.schemas.citizen import (
     KnowledgeSource,
     TrackedItem,
     TrackEvent,
+    TrackReferral,
     TrackResponse,
 )
 from app.services.exceptions import (
@@ -31,6 +32,36 @@ NEXT_STEP = {
     "approved": "Pengajuan disetujui.",
     "completed": "Pengajuan selesai.",
 }
+
+
+def referral_next_step(row: dict) -> str:
+    if row["dispatch_status"] == "delivery_unknown":
+        return "Petugas perlu memeriksa hasil pengiriman."
+    if row["dispatch_status"] == "failed":
+        return "Petugas perlu meninjau kegagalan pengiriman."
+    if row["dispatch_status"] in {"queued", "sending"}:
+        return "Paket sedang dikirim ke kanal penerima."
+    if row["handling_status"] == "awaiting_acceptance":
+        return "Menunggu penerimaan dari unit tujuan."
+    if row["handling_status"] in {"accepted", "in_progress"}:
+        return "Sedang ditangani unit tujuan."
+    if row["handling_status"] == "completed":
+        return "Penanganan unit tujuan selesai; petugas desa akan memperbarui laporan."
+    if row["handling_status"] == "declined":
+        return "Unit tujuan menolak rujukan; petugas perlu meninjau langkah berikutnya."
+    return "Rujukan sedang disiapkan."
+
+
+def referral_view(row: dict | None) -> TrackReferral | None:
+    if row is None:
+        return None
+    return TrackReferral(
+        dispatch_status=row["dispatch_status"],
+        registration_status=row["registration_status"],
+        handling_status=row["handling_status"],
+        next_step=referral_next_step(row),
+        updated_at=row["updated_at"],
+    )
 
 
 class CitizenService:
@@ -57,6 +88,10 @@ class CitizenService:
             if ticket and not rows:
                 raise ReportNotFoundError(ticket)
             timelines: dict[UUID, list[TrackEvent]] = {row["id"]: [] for row in rows}
+            report_ids = [row["id"] for row in rows if row["kind"] == "report"]
+            track_referrals = getattr(self.repository, "track_referrals", None)
+            referral_rows = track_referrals(report_ids, unit_id) if callable(track_referrals) else []
+            referrals = {row["report_id"]: row for row in referral_rows}
             for kind in ("report", "service_request"):
                 ids = [row["id"] for row in rows if row["kind"] == kind]
                 for event in self.repository.history(kind, ids):
@@ -77,6 +112,7 @@ class CitizenService:
                         created_at=row["created_at"],
                         next_step=NEXT_STEP.get(row["status"], "Hubungi petugas."),
                         timeline=timelines[row["id"]],
+                        referral=referral_view(referrals.get(row["id"])),
                     )
                     for row in rows
                 ],

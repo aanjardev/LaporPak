@@ -23,11 +23,14 @@ model dibedakan dari hasil stub.
 Status saat ini: slice dashboard pertama selesai. Detail REPORT sudah
 menampilkan kandidat backend, versi/hash paket, approval manusia, dispatch,
 rekonsiliasi, tiga dimensi status, bukti, dan next action. Polling dibatasi dua
-menit dan hasil mock tetap berlabel simulasi. Isi snapshot paket belum diekspos
-oleh kontrak response M1 sehingga belum ditampilkan.
+menit dan hasil mock tetap berlabel simulasi. TRACK warga juga menampilkan
+progres referral yang sudah disaring tanpa routing atau identitas petugas.
+Snapshot paket yang aman kini tersedia untuk review; data lama yang tidak valid
+ditampilkan sebagai tidak tersedia.
 
 1. Tambahkan response review paket yang aman agar operator dapat membandingkan
-   isi snapshot sebelum approval tanpa membuka metadata internal.
+   isi snapshot sebelum approval tanpa membuka metadata internal. (Selesai pada
+   slice M3; tetap perlu verifikasi visual.)
 2. Tambahkan pengelolaan `case_tasks` dengan PIC, due date, retry/reconcile, dan
    feedback kegagalan yang sudah dipakai dashboard.
 3. Tambahkan respons TRACK warga yang hanya menampilkan progres aman dan
