@@ -113,6 +113,14 @@ class ReferralCancel(StrictSchema):
         return normalized
 
 
+class ReferralPackageSnapshot(StrictSchema):
+    summary: str
+    chronology: str
+    requested_action: str
+    attachment_count: int = Field(ge=0)
+    share_citizen_identity: bool
+
+
 class ReferralProgress(StrictSchema):
     id: UUID
     report_id: UUID
@@ -128,6 +136,7 @@ class ReferralProgress(StrictSchema):
     external_reference: str | None
     evidence_reference: str | None
     is_simulated: bool
+    package_snapshot: ReferralPackageSnapshot | None = None
     next_action: str | None = None
     updated_at: datetime
 

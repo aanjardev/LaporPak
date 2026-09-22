@@ -242,6 +242,7 @@ class ReferralRepository:
             select(
                 *report_referrals.c,
                 referral_packages.c.package_hash,
+                referral_packages.c.snapshot.label("package_snapshot"),
                 agency_channels.c.display_name.label("channel_name"),
                 target.c.name.label("target_name"),
                 next_action.label("next_action"),

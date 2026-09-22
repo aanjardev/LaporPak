@@ -40,6 +40,13 @@ export type ReferralProgress = {
   external_reference: string | null;
   evidence_reference: string | null;
   is_simulated: boolean;
+  package_snapshot: {
+    summary: string;
+    chronology: string;
+    requested_action: string;
+    attachment_count: number;
+    share_citizen_identity: boolean;
+  } | null;
   next_action: string | null;
   updated_at: string;
 };

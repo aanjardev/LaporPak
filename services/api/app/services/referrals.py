@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import ValidationError
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -21,6 +22,7 @@ from app.schemas.referrals import (
     ReferralCancel,
     ReferralCreate,
     ReferralDispatchResponse,
+    ReferralPackageSnapshot,
     ReferralProgress,
     ReferralWorkerResult,
     RoutingOption,
@@ -74,7 +76,31 @@ def canonical_hash(value: Mapping[str, Any]) -> str:
     ).hexdigest()
 
 
-def referral_state(row: Mapping[str, Any], package_hash: str, next_action=None):
+def package_snapshot_view(value: Any) -> ReferralPackageSnapshot | None:
+    if not isinstance(value, Mapping):
+        return None
+    package = value.get("package")
+    attachments = value.get("attachments")
+    if not isinstance(package, Mapping) or not isinstance(attachments, list):
+        return None
+    try:
+        return ReferralPackageSnapshot(
+            summary=package.get("summary", ""),
+            chronology=package.get("chronology", ""),
+            requested_action=package.get("requested_action", ""),
+            attachment_count=len(attachments),
+            share_citizen_identity=bool(package.get("share_citizen_identity", False)),
+        )
+    except ValidationError:
+        return None
+
+
+def referral_state(
+    row: Mapping[str, Any],
+    package_hash: str,
+    next_action=None,
+    package_snapshot: ReferralPackageSnapshot | None = None,
+):
     return ReferralProgress(
         id=row["id"],
         report_id=row["report_id"],
@@ -90,6 +116,7 @@ def referral_state(row: Mapping[str, Any], package_hash: str, next_action=None):
         external_reference=row["external_reference"],
         evidence_reference=row["evidence_reference"],
         is_simulated=row["is_simulated"],
+        package_snapshot=package_snapshot,
         next_action=next_action if next_action is not None else row.get("next_action"),
         updated_at=row["updated_at"],
     )
@@ -402,7 +429,11 @@ class ReferralService:
             if self.repository.get_scoped_report(report_id, unit_ids) is None:
                 raise ReferralNotFoundError
             return [
-                referral_state(row, row["package_hash"])
+                referral_state(
+                    row,
+                    row["package_hash"],
+                    package_snapshot=package_snapshot_view(row.get("package_snapshot")),
+                )
                 for row in self.repository.list_scoped_referrals(report_id, unit_ids)
             ]
         except ReferralNotFoundError:
@@ -497,7 +528,11 @@ class ReferralService:
         )
         if package is None:
             raise ReferralConflictError("Active referral package is missing")
-        return referral_state(referral, package["package_hash"])
+        return referral_state(
+            referral,
+            package["package_hash"],
+            package_snapshot=package_snapshot_view(package.get("snapshot")),
+        )
 
 
 def _mock_receipt(

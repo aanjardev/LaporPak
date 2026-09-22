@@ -1049,6 +1049,13 @@ M1 hanya menjalankan `agency_channels.mode=mock` yang `synthetic=true` dan
 `approved_for_production=false`. Referensi mock memakai prefix `MOCK-` dan
 tidak boleh disebut nomor pengaduan resmi.
 
+Response referral juga menyertakan `package_snapshot` bila snapshot tersimpan
+valid. Field ini hanya berisi `summary`, `chronology`, `requested_action`,
+`attachment_count`, dan `share_citizen_identity`; tidak ada path Storage,
+metadata lampiran internal, actor UUID, atau credential. Nilai `null` berarti
+snapshot lama tidak memenuhi bentuk tampilan aman dan tidak boleh dianggap
+sebagai paket kosong.
+
 Error tambahan:
 
 | HTTP | Kode | Arti |

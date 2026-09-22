@@ -218,6 +218,10 @@ def test_full_draft_approval_and_idempotent_dispatch_flow():
     replayed = service.dispatch(REFERRAL_ID, operation_key, "admin-a", (UNIT_A,))
 
     assert draft.dispatch_status == "awaiting_approval"
+    assert draft.package_snapshot is not None
+    assert draft.package_snapshot.summary == "Jalan rusak"
+    assert draft.package_snapshot.attachment_count == 0
+    assert draft.package_snapshot.share_citizen_identity is False
     assert approved.dispatch_status == "approved"
     assert dispatched.job_status == "pending"
     assert dispatched.replayed is False
