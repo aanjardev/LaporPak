@@ -17,8 +17,8 @@ import {
 import { InlineFeedback, PendingButton, SlowStatus, useToast } from "@/components/action-feedback";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard";
-
-const input = "ui-control mt-1.5 px-3";
+import { RegionFields } from "@/components/region-fields";
+import { ValidatedInput } from "@/components/validated-input";
 
 export function SettingsForm({ admin, village }: { admin: AdminMe; village: AdminVillage }) {
   const toast = useToast();
@@ -120,7 +120,7 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
       is_ai_enabled: data.is_ai_enabled === "on",
       whatsapp_business_name: String(data.whatsapp_business_name || ""),
       logo_url: metadata.logo_url, primary_color: metadata.primary_color,
-      contact_phone: String(data.service_phone), contact_email: String(data.service_email),
+      contact_phone: String(data.service_phone), contact_email: String(data.service_email) || undefined,
       address: String(data.address), village_code: String(data.village_code),
       province: String(data.province), regency: String(data.regency), district: String(data.district),
       office_hours: String(data.office_hours),
@@ -208,6 +208,7 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
       if (keys[target.name]) setMetadata((current) => ({ ...current, [keys[target.name]]: target.value }));
     }} className="space-y-6">
       <section className="ui-panel p-5 sm:p-6"><Header icon={UserRound} title="Akun" description="Identitas penanggung jawab desa." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <p className="text-xs font-normal text-muted-foreground sm:col-span-2"><span className="text-rose-600">*</span> Wajib diisi. Kolom lain ditandai opsional.</p>
         <Field label="Nama penanggung jawab" name="display_name" value={admin.display_name} required />
         <Field label="Email terverifikasi" name="email" value={admin.email} disabled />
         <Field label="Kontak penanggung jawab" name="contact_phone" value={admin.contact_phone} required />
@@ -215,11 +216,8 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
       </div></section>
 
       <section className="ui-panel p-5 sm:p-6"><Header icon={CheckCircle2} title="Profil Desa" description="Data wajib untuk aktivasi dan kop dokumen laporan." /><div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <Field label="Nama desa" name="village_name" value={villageName} required /><Field label="Kode desa" name="village_code" value={metadata.village_code} required />
-        <Field label="Provinsi" name="province" value={metadata.province} required />
-        <label className="block text-sm font-semibold">Jenis wilayah<span className="ml-1 text-rose-600">*</span><select name="regency_type" defaultValue={metadata.regency_type || "Kabupaten"} required className={`${input}`}><option>Kabupaten</option><option>Kota</option></select></label>
-        <Field label="Nama kabupaten/kota" name="regency" value={metadata.regency} required />
-        <Field label="Kecamatan" name="district" value={metadata.district} required /><Field label="Kontak layanan" name="service_phone" value={metadata.contact_phone} required />
+        <RegionFields initial={{ village_name: villageName, village_code: metadata.village_code, province: metadata.province, regency: metadata.regency, district: metadata.district, regency_type: metadata.regency_type }} onChange={(region) => { setDirty(true); setVillageName(region.village_name); setMetadata((current) => ({ ...current, village_code: region.village_code, province: region.province, regency: region.regency, district: region.district, regency_type: region.regency_type })); }} />
+        <Field label="Kontak layanan" name="service_phone" value={metadata.contact_phone} required />
         <Field label="Email layanan" name="service_email" value={metadata.contact_email} /><Field label="Jam pelayanan" name="office_hours" value={metadata.office_hours} required />
         <Field label="Alamat kantor" name="address" value={metadata.address} required /><Field label="Kode pos" name="postal_code" value={metadata.postal_code} required />
         <Field label="Nama penanggung jawab dokumen" name="document_official_name" value={metadata.document_official_name} required /><Field label="Jabatan" name="document_official_title" value={metadata.document_official_title || "Kepala Desa"} required />
@@ -272,4 +270,22 @@ export function SettingsForm({ admin, village }: { admin: AdminMe; village: Admi
 }
 
 function Header({ icon: Icon, title, description }: { icon: typeof UserRound; title: string; description: string }) { return <div className="flex gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-brand text-white"><Icon size={19} /></div><div><h2 className="font-bold">{title}</h2><p className="mt-1 text-sm text-muted-foreground">{description}</p></div></div>; }
-function Field({ label, name, value, required, disabled, wide }: { label: string; name: string; value?: string; required?: boolean; disabled?: boolean; wide?: boolean }) { return <label className={`block text-sm font-semibold ${wide ? "sm:col-span-2" : ""}`}>{label}{required && <span className="ml-1 text-rose-600">*</span>}<input name={name} defaultValue={value || ""} required={required} disabled={disabled} className={`${input} disabled:bg-muted`} /></label>; }
+function Field({ label, name, value, required, disabled, wide }: { label: string; name: string; value?: string; required?: boolean; disabled?: boolean; wide?: boolean }) {
+  const phone = name.includes("phone");
+  const email = name.includes("email");
+  const postal = name === "postal_code";
+  const limits: Record<string, number> = {
+    display_name: 120, village_name: 200, service_email: 255, office_hours: 300,
+    address: 500, postal_code: 5, document_official_name: 120, document_official_title: 120,
+    ai_name: 100, ai_emoji: 10, ai_tone: 200, ai_vibe: 500, welcome_message: 1000,
+  };
+  return <div className={wide ? "sm:col-span-2" : ""}><ValidatedInput
+    label={label} name={name} defaultValue={value || ""} required={required} disabled={disabled}
+    type={phone ? "tel" : email ? "email" : "text"} inputMode={phone ? "tel" : postal ? "numeric" : undefined}
+    pattern={phone ? "\\+?[0-9]{8,15}" : postal ? "[0-9]{5}" : undefined}
+    data-pattern-message={phone ? "Gunakan 8–15 angka; tanda + hanya boleh di awal." : postal ? "Kode pos harus terdiri dari 5 angka." : undefined}
+    minLength={name === "display_name" ? 2 : name === "address" ? 5 : name === "office_hours" ? 3 : undefined}
+    maxLength={phone ? 16 : limits[name]} sanitize={phone ? "phone" : postal ? "digits" : undefined}
+    optionalLabel={!disabled}
+  /></div>;
+}

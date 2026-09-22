@@ -672,7 +672,9 @@ verifikasi email Supabase
   ↓
 buat akun village_admin + administrative_unit + membership secara atomik
   ↓
-lengkapi akun dan profil desa
+pilih provinsi → kabupaten/kota → kecamatan → desa dari referensi wilayah
+  ↓
+lengkapi akun dan profil desa; kode desa terisi dan divalidasi otomatis
   ↓
 submit aktivasi
   ↓

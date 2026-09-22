@@ -5,7 +5,7 @@ import { acceptInvitationAction } from "@/app/auth-actions";
 import { PendingButton, SlowStatus } from "@/components/action-feedback";
 
 export function AcceptInvitationForm({ tokenHash, configured }: { tokenHash: string; configured: boolean }) {
-  const [state, action, pending] = useActionState(acceptInvitationAction, { message: "" });
+  const [state, action, pending] = useActionState(acceptInvitationAction, { message: "", status: "idle" as const });
 
   return (
     <form action={action} className="mt-7">

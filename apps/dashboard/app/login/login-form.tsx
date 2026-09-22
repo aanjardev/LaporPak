@@ -1,24 +1,22 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { loginAction } from "@/app/auth-actions";
 import Link from "next/link";
 import { PendingButton, SlowStatus } from "@/components/action-feedback";
+import { PasswordField } from "@/components/password-field";
+import { ValidatedInput } from "@/components/validated-input";
 
 export function LoginForm({ next, configured }: { next: string; configured: boolean }) {
-  const [state, action, pending] = useActionState(loginAction, { message: "" });
+  const [state, action, pending] = useActionState(loginAction, { message: "", status: "idle" as const });
+  const [password, setPassword] = useState("");
 
   return (
     <form action={action} className="mt-8 space-y-5">
       <input type="hidden" name="next" value={next} />
-      <div className="space-y-1.5">
-        <label htmlFor="email" className="block text-sm font-semibold text-foreground">Email petugas</label>
-        <input id="email" name="email" type="email" autoComplete="username" required disabled={!configured || pending} placeholder="nama@desa.go.id" className="ui-control px-3 disabled:bg-muted" />
-      </div>
-      <div className="space-y-1.5">
-        <label htmlFor="password" className="block text-sm font-semibold text-foreground">Kata sandi</label>
-        <input id="password" name="password" type="password" autoComplete="current-password" required disabled={!configured || pending} className="ui-control px-3 disabled:bg-muted" />
-      </div>
+      <p className="text-xs text-muted-foreground"><span className="text-rose-600">*</span> Wajib diisi</p>
+      <ValidatedInput label="Email petugas" name="email" type="email" autoComplete="username" maxLength={254} required disabled={!configured || pending} placeholder="nama@desa.go.id" optionalLabel={false} />
+      <PasswordField label="Kata sandi" name="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" disabled={!configured || pending} />
       {state.message && <p role="alert" className="ui-alert-error px-3 py-2 text-sm text-rose-900">{state.message}</p>}
       {!configured && <p role="alert" className="ui-alert-warning px-3 py-2 text-sm text-amber-900">Login belum dikonfigurasi. Hubungi pengelola sistem.</p>}
       <PendingButton type="submit" pending={pending} pendingLabel="Sedang masuk…" disabled={!configured} className="ui-primary w-full disabled:cursor-not-allowed disabled:bg-slate-400">Masuk</PendingButton>

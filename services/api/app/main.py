@@ -11,6 +11,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.knowledge import router as knowledge_router
 from app.api.routes.knowledge import tools_router as knowledge_tools_router
 from app.api.routes.referrals import router as referrals_router
+from app.api.routes.regions import router as regions_router
 from app.api.routes.report_documents import router as report_documents_router
 from app.api.routes.reports import router as reports_router
 from app.api.routes.service_requests import router as service_requests_router
@@ -62,6 +63,7 @@ app.include_router(health_router)
 app.include_router(reports_router)
 app.include_router(report_documents_router)
 app.include_router(referrals_router)
+app.include_router(regions_router)
 app.include_router(citizen_router)
 app.include_router(enhanced_router)
 app.include_router(service_requests_router)

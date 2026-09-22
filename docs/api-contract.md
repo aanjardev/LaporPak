@@ -162,9 +162,12 @@ Suggested HTTP mapping:
 | 409 | `INVALID_STATUS_TRANSITION` |
 | 409 | `DUPLICATE_OPERATION` |
 | 422 | `VALIDATION_ERROR` |
+| 422 | `INVALID_REGION` |
+| 422 | `INVALID_REGION_CODE` |
 | 503 | `DATABASE_UNAVAILABLE` |
 | 503 | `ATTACHMENT_UNAVAILABLE` |
 | 503 | `AI_UNAVAILABLE` |
+| 503 | `REGION_SERVICE_UNAVAILABLE` |
 | 500 | `INTERNAL_ERROR` |
 
 ### Autentikasi dan izin REPORT
@@ -180,7 +183,9 @@ Authorization: Bearer <supabase_access_token>
 FastAPI memverifikasi token melalui Supabase Auth, memetakan UUID pengguna ke
 `admin_accounts`, menolak akun nonaktif, dan memakai UUID tersebut sebagai
 identitas audit. `system_admin` memiliki cakupan global; `village_admin`
-dibatasi oleh `admin_unit_memberships`. Pendaftaran admin publik tidak tersedia.
+dibatasi oleh `admin_unit_memberships`. Akun `system_admin` hanya dibuat lewat
+provisioning server; calon `village_admin` dapat mendaftar mandiri atau menerima
+undangan lalu tetap melewati verifikasi email dan aktivasi desa.
 Fallback `DASHBOARD_ADMIN_UNIT_ID` hanya untuk development legacy ketika
 `ALLOW_LEGACY_ADMIN_FALLBACK=true`; default-nya nonaktif dan tidak boleh dipakai
 sebagai mekanisme izin production.
@@ -792,6 +797,10 @@ POST  /api/v1/admin/villages/{village_id}/activation-submission
 GET   /api/v1/admin/activation-queue
 PATCH /api/v1/admin/villages/{village_id}/activation
 GET   /api/v1/admin/monitoring
+GET   /api/v1/regions/provinces
+GET   /api/v1/regions/regencies?province_code={code}
+GET   /api/v1/regions/districts?regency_code={code}
+GET   /api/v1/regions/villages?district_code={code}
 ```
 
 Self-registration requires a verified Supabase identity and always creates a
@@ -804,6 +813,13 @@ Activation status is `draft`, `pending_review`, `changes_requested`, or
 province, regency/city, district, address, service contact, and office hours.
 Only `system_admin` can return `approved` or `changes_requested`; a reason is
 required for requested changes. Approved villages have `is_active=true`.
+
+Endpoint wilayah membutuhkan identitas Supabase terverifikasi dan meneruskan
+data referensi wilayah.id. `village_code` memakai format kode Kemendagri level
+desa (`NN.NN.NN.NNNN`). Pada onboarding atau perubahan pilihan wilayah,
+FastAPI memeriksa kecocokan kode, nama desa, kecamatan, kabupaten/kota, dan
+provinsi. Nomor kontak memakai 8–15 digit dengan satu tanda `+` opsional di
+awal.
 
 ```http
 POST /api/v1/villages/{village_id}/whatsapp/pairing

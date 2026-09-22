@@ -35,6 +35,7 @@ from app.schemas.village import (
 from app.services.dashboard import build_dashboard
 from app.services.openclaw_gateway import OpenClawGateway, OpenClawGatewayError
 from app.services.openclaw_workspace import get_openclaw_workspace_service
+from app.services.regions import validate_village_region
 from app.services.report_documents import (
     download_storage_object,
     upload_storage_object,
@@ -317,7 +318,22 @@ def update_village(
         values["name"] = payload.name
     if payload.metadata is not None:
         existing = row.get("metadata") or {}
-        incoming = payload.metadata.model_dump()
+        incoming = payload.metadata.model_dump(exclude_unset=True)
+        region_fields = {"village_code", "province", "regency", "district"}
+        region_changed = payload.name is not None and payload.name != row["name"]
+        region_changed = region_changed or any(
+            field in incoming and incoming[field] != existing.get(field)
+            for field in region_fields
+        )
+        if region_changed:
+            selection = {**existing, **incoming}
+            validate_village_region(
+                village_code=str(selection.get("village_code") or ""),
+                village_name=payload.name or row["name"],
+                province=str(selection.get("province") or ""),
+                regency=str(selection.get("regency") or ""),
+                district=str(selection.get("district") or ""),
+            )
         existing.update(incoming)
         values["metadata"] = existing
     if values:

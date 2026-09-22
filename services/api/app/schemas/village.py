@@ -52,18 +52,18 @@ class VillageMetadata(StrictSchema):
     whatsapp_business_name: str | None = None
     logo_url: str | None = None
     primary_color: str | None = None
-    contact_phone: str | None = None
-    contact_email: str | None = None
-    address: str | None = None
-    village_code: str | None = None
-    province: str | None = None
-    regency: str | None = None
-    district: str | None = None
-    office_hours: str | None = None
+    contact_phone: Annotated[str, StringConstraints(pattern=r"^\+?[0-9]{8,15}$")] | None = None
+    contact_email: Annotated[str, StringConstraints(pattern=r"^[^@]+@[^@]+$", max_length=255)] | None = None
+    address: Annotated[str, StringConstraints(min_length=5, max_length=500)] | None = None
+    village_code: Annotated[str, StringConstraints(pattern=r"^\d{2}\.\d{2}\.\d{2}\.\d{4}$")] | None = None
+    province: Annotated[str, StringConstraints(min_length=2, max_length=120)] | None = None
+    regency: Annotated[str, StringConstraints(min_length=2, max_length=120)] | None = None
+    district: Annotated[str, StringConstraints(min_length=2, max_length=120)] | None = None
+    office_hours: Annotated[str, StringConstraints(min_length=3, max_length=300)] | None = None
     regency_type: str | None = None
-    postal_code: str | None = None
-    document_official_name: str | None = None
-    document_official_title: str | None = None
+    postal_code: Annotated[str, StringConstraints(pattern=r"^\d{5}$")] | None = None
+    document_official_name: Annotated[str, StringConstraints(max_length=120)] | None = None
+    document_official_title: Annotated[str, StringConstraints(max_length=120)] | None = None
 
 
 # ============================================================================
