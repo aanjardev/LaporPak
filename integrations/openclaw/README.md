@@ -76,6 +76,24 @@ The OpenClaw host also needs `LAPORPAK_API_URL`, `LAPORPAK_API_KEY`, and
 as `X-Channel-Account-ID`, the API key as `X-OpenClaw-API-Key`, and a stable
 draft UUID as `Idempotency-Key` for create operations.
 
+Referral tools are a separate M2 operator capability. They remain absent from
+the WhatsApp village-agent allowlist above. A dedicated internal operator agent
+may opt in with `LAPORPAK_REFERRAL_TOOLS_ENABLED=true`, a short-lived
+`LAPORPAK_OPERATOR_ACCESS_TOKEN`, and only these tool names:
+
+```text
+laporpak_get_case_context
+laporpak_get_routing_candidates
+laporpak_prepare_referral
+laporpak_request_referral_dispatch
+laporpak_get_referral_progress
+```
+
+FastAPI validates the bearer token and village membership. The plugin exposes
+no approval tool, refuses these calls from WhatsApp contexts, never accepts a
+destination URL or village scope, and always omits citizen identity from a
+model-prepared package.
+
 The version-controlled plugin is in `plugins/laporpak-tools`. Install it on
 the OpenClaw host, enable it in `plugins.entries`, and allow only the tools
 listed above. Core tools require an authenticated WhatsApp context and take
@@ -116,7 +134,7 @@ scores exactly, and do not add real citizen data to this dataset.
 ## Current boundary
 
 Structured REPORT extraction, idempotent REPORT/REQUEST creation, grounded ASK,
-private TRACK, and supporting REPORT tools are implemented. Conversation state,
+private TRACK, supporting REPORT tools, and opt-in operator referral tools are implemented. Conversation state,
 citizen confirmation behavior, and WhatsApp channel setup remain OpenClaw host
 responsibilities. Administrative decisions remain human-only backend actions.
 

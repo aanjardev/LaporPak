@@ -868,3 +868,16 @@ Hanya handling `accepted` dengan bukti yang memproyeksikan report
 OpenClaw/Gemini belum memperoleh tool referral pada M1. Backend memperoleh
 aktor dan scope dari autentikasi Admin Desa, bukan payload atau keluaran model.
 Tidak ada koneksi ke kanal pemerintah dalam implementasi ini.
+
+## Referral agent tools M2
+
+M2 memakai endpoint referral M1 tanpa database atau service baru. Plugin
+OpenClaw mendaftarkan tool baca konteks/kandidat/progres, pembuatan draft, dan
+permintaan dispatch. Capability ini nonaktif secara default dan tidak masuk
+allowlist agent WhatsApp desa. Runtime operator internal harus memakai bearer
+token Supabase; FastAPI tetap memetakan akun, role, membership, serta desa aktif.
+
+Model tidak memperoleh tool approval. Payload tool juga tidak menerima aktor,
+scope desa, status approval, credential, URL tujuan, atau izin berbagi identitas
+warga. Tool dispatch hanya meminta backend memeriksa approval manusia yang
+tersimpan untuk versi/hash aktif. Connector tetap mock sintetis pada M2.

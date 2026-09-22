@@ -1,7 +1,7 @@
 {
   "id": "laporpak-tools",
   "name": "LaporPak Tools",
-  "description": "ASK, REPORT, TRACK, and citizen support tools through the FastAPI boundary.",
+  "description": "Citizen tools plus opt-in operator referral tools through the FastAPI boundary.",
   "version": "0.1.0",
   "configSchema": {
     "type": "object",
@@ -20,7 +20,12 @@
       "laporpak_create_service_request",
       "laporpak_detect_emergency",
       "laporpak_check_similar",
-      "laporpak_confirm_resolution"
+      "laporpak_confirm_resolution",
+      "laporpak_get_case_context",
+      "laporpak_get_routing_candidates",
+      "laporpak_prepare_referral",
+      "laporpak_request_referral_dispatch",
+      "laporpak_get_referral_progress"
     ]
   },
   "toolMetadata": {
@@ -53,6 +58,26 @@
       "replaySafe": true
     },
     "laporpak_confirm_resolution": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_get_case_context": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_get_routing_candidates": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_prepare_referral": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_request_referral_dispatch": {
+      "optional": true,
+      "replaySafe": true
+    },
+    "laporpak_get_referral_progress": {
       "optional": true,
       "replaySafe": true
     }
