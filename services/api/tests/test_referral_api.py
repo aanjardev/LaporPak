@@ -9,13 +9,14 @@ from app.core import security
 from app.core.config import settings
 from app.core.errors import APIError
 from app.main import app
-from app.schemas.referrals import ReferralProgress
+from app.schemas.referrals import ReferralProgress, ReferralTask
 from app.services.dependencies import get_referral_service
 
 REPORT_ID = UUID("20000000-0000-4000-8000-000000000001")
 REFERRAL_ID = UUID("30000000-0000-4000-8000-000000000001")
 CHANNEL_ID = UUID("50000000-0000-4000-8000-000000000001")
 UNIT_ID = UUID("00000000-0000-4000-8000-0000000000a1")
+TASK_ID = UUID("90000000-0000-4000-8000-000000000001")
 
 
 class FakeService:
@@ -42,9 +43,25 @@ class FakeService:
             updated_at=datetime(2026, 9, 21, 12, tzinfo=UTC),
         )
 
-    def list_tasks(self, report_id, unit_ids):
-        self.calls.append(("tasks", report_id, unit_ids))
+    def list_tasks(self, report_id, unit_ids, actor):
+        self.calls.append(("tasks", report_id, unit_ids, actor))
         return []
+
+    def update_task(self, task_id, payload, actor, unit_ids):
+        self.calls.append(("update-task", task_id, payload, actor, unit_ids))
+        return ReferralTask(
+            id=TASK_ID,
+            referral_id=REFERRAL_ID,
+            task_type="reconcile_delivery",
+            status="open",
+            assigned=True,
+            assigned_to_me=True,
+            next_action="Periksa bukti penerima.",
+            due_at=None,
+            blocked_reason="Timeout ambigu",
+            created_at=datetime(2026, 9, 21, 12, tzinfo=UTC),
+            updated_at=datetime(2026, 9, 21, 12, tzinfo=UTC),
+        )
 
 
 @pytest.fixture
@@ -95,7 +112,37 @@ def test_tasks_use_server_scope(client):
 
     assert response.status_code == 200
     assert response.json() == []
-    assert service.calls == [("tasks", REPORT_ID, (UNIT_ID,))]
+    assert service.calls[0][:3] == ("tasks", REPORT_ID, (UNIT_ID,))
+    assert service.calls[0][3].startswith("supabase:")
+
+
+def test_task_update_uses_authenticated_actor_and_scope(client):
+    http, service = client
+    response = http.patch(
+        f"/api/v1/referral-tasks/{TASK_ID}",
+        headers={"Authorization": "Bearer admin-token"},
+        json={"action": "claim"},
+    )
+
+    assert response.status_code == 200
+    call = service.calls[0]
+    assert call[:2] == ("update-task", TASK_ID)
+    assert call[2].action == "claim"
+    assert call[3].startswith("supabase:")
+    assert call[4] == (UNIT_ID,)
+
+
+def test_task_completion_requires_reason(client):
+    http, service = client
+    response = http.patch(
+        f"/api/v1/referral-tasks/{TASK_ID}",
+        headers={"Authorization": "Bearer admin-token"},
+        json={"action": "complete"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert service.calls == []
 
 
 def test_draft_rejects_client_supplied_scope_actor_and_approval(client):

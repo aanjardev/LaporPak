@@ -97,8 +97,9 @@ prompt clarification, serta evaluasi keselamatan. Tidak ada tool approval,
 tool referral tidak tersedia pada sesi WhatsApp warga, dan kanal live tetap
 nonaktif. Bagian awal M3 menambahkan panel review referral pada detail REPORT:
 kandidat backend, versi/hash paket, approval manusia, dispatch idempoten,
-rekonsiliasi hasil ambigu, tiga dimensi status, bukti, next action, serta daftar
-read-only `case_tasks` yang dibatasi scope desa. M3 belum mencakup mutation
-assignment/complete atau scheduler. TRACK warga kini dapat menampilkan progres
-rujukan yang sudah disaring oleh backend. M4-M5 tetap roadmap dan belum
+rekonsiliasi hasil ambigu, tiga dimensi status, bukti, next action, serta
+`case_tasks` yang dibatasi scope desa. Petugas dapat mengambil, melepas, dan
+menyelesaikan tugasnya sendiri tanpa mengekspos identifier PIC. M3 belum
+mencakup perubahan due date atau scheduler. TRACK warga kini dapat menampilkan
+progres rujukan yang sudah disaring oleh backend. M4-M5 tetap roadmap dan belum
 diaktifkan.

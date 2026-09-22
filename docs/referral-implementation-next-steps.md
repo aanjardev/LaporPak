@@ -26,22 +26,23 @@ rekonsiliasi, tiga dimensi status, bukti, dan next action. Polling dibatasi dua
 menit dan hasil mock tetap berlabel simulasi. TRACK warga juga menampilkan
 progres referral yang sudah disaring tanpa routing atau identitas petugas.
 Snapshot paket yang aman kini tersedia untuk review; data lama yang tidak valid
-ditampilkan sebagai tidak tersedia. Daftar `case_tasks` read-only juga sudah
-tersedia pada detail REPORT dan hanya mengembalikan status aman, next action,
-PIC boolean, due date, serta alasan blokir.
+ditampilkan sebagai tidak tersedia. Daftar `case_tasks` juga sudah tersedia
+pada detail REPORT dengan status aman, next action, PIC boolean, due date,
+serta alasan blokir. Admin Desa dapat mengambil tugas untuk dirinya sendiri,
+melepasnya dengan alasan, atau menyelesaikan tugas miliknya dengan alasan.
 
 1. Tambahkan response review paket yang aman agar operator dapat membandingkan
    isi snapshot sebelum approval tanpa membuka metadata internal. (Selesai pada
    slice M3; tetap perlu verifikasi visual.)
 2. Selesai pada slice ini: panel membaca `case_tasks` melalui endpoint yang
-   dibatasi scope desa. Mutation assignment/complete, retry/reconcile, dan
-   feedback kegagalan masih ditunda sampai kontrak PIC serta izin disepakati.
+   dibatasi scope desa dan mendukung claim/release/complete dengan aktor dari
+   token. Perubahan due date dan retry otomatis belum dibuat.
 3. Selesai pada slice ini: TRACK warga menampilkan progres referral yang aman
    dan berbasis status tersimpan; detail routing internal, bukti privat,
    identitas petugas, dan data desa lain tetap disembunyikan.
 4. Jalankan scheduler sederhana berbasis PostgreSQL untuk reminder/tugas tanpa
-   duplikasi setelah mutation task dan kontrak notifikasi tersedia. Notifikasi
-   keluar tetap mock.
+   duplikasi setelah kontrak due date dan notifikasi tersedia. Notifikasi keluar
+   tetap mock.
 5. Uji desktop/ponsel, auth dua desa, konflik versi, error worker, polling, dan
    akses warga lain.
 

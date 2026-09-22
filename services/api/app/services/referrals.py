@@ -25,6 +25,7 @@ from app.schemas.referrals import (
     ReferralPackageSnapshot,
     ReferralProgress,
     ReferralTask,
+    ReferralTaskUpdate,
     ReferralWorkerResult,
     RoutingOption,
     RoutingOptionsResponse,
@@ -442,28 +443,104 @@ class ReferralService:
         except SQLAlchemyError as exc:
             raise ReferralUnavailableError from exc
 
+    @staticmethod
+    def _task_view(row: Mapping[str, Any], actor: str) -> ReferralTask:
+        assigned_to = row["assigned_to"]
+        return ReferralTask(
+            id=row["id"],
+            referral_id=row["referral_id"],
+            task_type=row["task_type"],
+            status=row["status"],
+            assigned=assigned_to is not None,
+            assigned_to_me=assigned_to == actor,
+            next_action=row["next_action"],
+            due_at=row["due_at"],
+            blocked_reason=row["blocked_reason"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
     def list_tasks(
-        self, report_id: UUID, unit_ids: tuple[UUID, ...]
+        self, report_id: UUID, unit_ids: tuple[UUID, ...], actor: str
     ) -> list[ReferralTask]:
         try:
             if self.repository.get_scoped_report(report_id, unit_ids) is None:
                 raise ReferralNotFoundError
             return [
-                ReferralTask(
-                    id=row["id"],
-                    referral_id=row["referral_id"],
-                    task_type=row["task_type"],
-                    status=row["status"],
-                    assigned=row["assigned_to"] is not None,
-                    next_action=row["next_action"],
-                    due_at=row["due_at"],
-                    blocked_reason=row["blocked_reason"],
-                    created_at=row["created_at"],
-                    updated_at=row["updated_at"],
-                )
+                self._task_view(row, actor)
                 for row in self.repository.list_tasks_for_report(report_id, unit_ids)
             ]
         except ReferralNotFoundError:
+            raise
+        except SQLAlchemyError as exc:
+            raise ReferralUnavailableError from exc
+
+    def update_task(
+        self,
+        task_id: UUID,
+        payload: ReferralTaskUpdate,
+        actor: str,
+        unit_ids: tuple[UUID, ...],
+    ) -> ReferralTask:
+        try:
+            with self.session.begin():
+                task = self.repository.get_scoped_task(task_id, unit_ids, lock=True)
+                if task is None:
+                    raise ReferralNotFoundError
+
+                assigned_to = task["assigned_to"]
+                if payload.action == "claim":
+                    if task["status"] != "open":
+                        raise ReferralConflictError("Task is no longer open")
+                    if assigned_to == actor:
+                        return self._task_view(task, actor)
+                    if assigned_to is not None:
+                        raise ReferralConflictError("Task is assigned to another operator")
+                    updated = self.repository.update_task(
+                        task_id, {"assigned_to": actor}
+                    )
+                elif payload.action == "release":
+                    if task["status"] != "open":
+                        raise ReferralConflictError("Task is no longer open")
+                    if assigned_to is None:
+                        return self._task_view(task, actor)
+                    if assigned_to != actor:
+                        raise ReferralConflictError("Task is assigned to another operator")
+                    updated = self.repository.update_task(
+                        task_id, {"assigned_to": None}
+                    )
+                else:
+                    if task["status"] == "completed" and assigned_to == actor:
+                        return self._task_view(task, actor)
+                    if task["status"] != "open":
+                        raise ReferralConflictError("Task is no longer open")
+                    if assigned_to != actor:
+                        raise ReferralConflictError("Claim the task before completing it")
+                    updated = self.repository.update_task(
+                        task_id, {"status": "completed", "blocked_reason": None}
+                    )
+
+                self.repository.insert_event(
+                    {
+                        "referral_id": task["referral_id"],
+                        "event_type": f"task_{payload.action}",
+                        "actor_identifier": actor,
+                        "event_key": None,
+                        "before_state": {
+                            "task_id": str(task_id),
+                            "status": task["status"],
+                            "assigned": assigned_to is not None,
+                        },
+                        "after_state": {
+                            "task_id": str(task_id),
+                            "status": updated["status"],
+                            "assigned": updated["assigned_to"] is not None,
+                            "reason": payload.reason,
+                        },
+                    }
+                )
+                return self._task_view(updated, actor)
+        except (ReferralConflictError, ReferralNotFoundError):
             raise
         except SQLAlchemyError as exc:
             raise ReferralUnavailableError from exc

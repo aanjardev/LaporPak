@@ -1063,12 +1063,25 @@ metadata lampiran internal, actor UUID, atau credential. Nilai `null` berarti
 snapshot lama tidak memenuhi bentuk tampilan aman dan tidak boleh dianggap
 sebagai paket kosong.
 
-Admin detail juga dapat membaca tugas tindak lanjut secara aman:
-`GET /api/v1/reports/{report_id}/tasks`. Response memuat `id`, `referral_id`,
-`task_type`, `status`, `assigned` (boolean), `next_action`, `due_at`,
-`blocked_reason`, `created_at`, dan `updated_at`. Field mentah `assigned_to`,
-`dedup_key`, serta identifier aktor internal tidak pernah dikembalikan. Scope
-desa selalu dihitung dari membership pada bearer token.
+Admin detail juga dapat membaca dan menangani tugas tindak lanjut secara aman:
+
+```text
+GET   /api/v1/reports/{report_id}/tasks
+PATCH /api/v1/referral-tasks/{task_id}
+```
+
+Response memuat `id`, `referral_id`, `task_type`, `status`, `assigned`,
+`assigned_to_me`, `next_action`, `due_at`, `blocked_reason`, `created_at`, dan
+`updated_at`. Dua field assignment berbentuk boolean; `assigned_to`, `dedup_key`,
+dan identifier aktor internal tidak pernah dikembalikan.
+
+PATCH menerima `action: claim | release | complete`. Claim selalu menugaskan
+caller terautentikasi dan ditolak bila tugas sedang dimiliki petugas lain.
+Release dan complete hanya dapat dilakukan pemilik tugas serta membutuhkan
+`reason` sepanjang 1–1000 karakter. Replay claim oleh pemilik, release atas
+tugas kosong, dan complete yang sudah dilakukan pemilik bersifat idempoten.
+Scope desa selalu dihitung dari membership pada bearer token; konflik ownership
+atau status menghasilkan `409 REFERRAL_CONFLICT`.
 
 Error tambahan:
 

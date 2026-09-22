@@ -367,6 +367,36 @@ class ReferralRepository:
         )
         return list(self.session.execute(statement).mappings().all())
 
+    def get_scoped_task(
+        self, task_id: UUID, unit_ids: tuple[UUID, ...], *, lock: bool = False
+    ) -> RowMapping | None:
+        statement = (
+            select(*case_tasks.c)
+            .join(
+                report_referrals,
+                report_referrals.c.id == case_tasks.c.referral_id,
+            )
+            .where(
+                case_tasks.c.id == task_id,
+                report_referrals.c.source_unit_id.in_(unit_ids),
+            )
+        )
+        if lock:
+            statement = statement.with_for_update(of=case_tasks)
+        return self.session.execute(statement).mappings().one_or_none()
+
+    def update_task(self, task_id: UUID, values: Mapping[str, Any]) -> RowMapping:
+        return (
+            self.session.execute(
+                update(case_tasks)
+                .where(case_tasks.c.id == task_id)
+                .values(**values, updated_at=func.now())
+                .returning(*case_tasks.c)
+            )
+            .mappings()
+            .one()
+        )
+
     def lock_next_job(self, now: datetime, lease_token: UUID) -> RowMapping | None:
         candidate = (
             select(referral_outbox.c.id)

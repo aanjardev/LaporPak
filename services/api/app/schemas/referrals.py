@@ -3,7 +3,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class StrictSchema(BaseModel):
@@ -127,11 +127,33 @@ class ReferralTask(StrictSchema):
     task_type: str
     status: str
     assigned: bool
+    assigned_to_me: bool
     next_action: str
     due_at: datetime | None
     blocked_reason: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class ReferralTaskUpdate(StrictSchema):
+    action: str = Field(pattern=r"^(claim|release|complete)$")
+    reason: str | None = Field(default=None, min_length=1, max_length=1000)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("reason must not be blank")
+        return normalized
+
+    @model_validator(mode="after")
+    def require_reason_for_terminal_action(self):
+        if self.action in {"release", "complete"} and self.reason is None:
+            raise ValueError("reason is required for release and complete")
+        return self
 
 
 class ReferralProgress(StrictSchema):

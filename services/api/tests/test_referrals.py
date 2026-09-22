@@ -9,6 +9,7 @@ from app.schemas.referrals import (
     ReferralCancel,
     ReferralCreate,
     ReferralPackageInput,
+    ReferralTaskUpdate,
 )
 from app.services.referrals import (
     DeliveryUnknownError,
@@ -29,6 +30,7 @@ REPORT_ID = UUID("20000000-0000-4000-8000-000000000001")
 REFERRAL_ID = UUID("30000000-0000-4000-8000-000000000001")
 PACKAGE_ID = UUID("40000000-0000-4000-8000-000000000001")
 CHANNEL_ID = UUID("50000000-0000-4000-8000-000000000001")
+TASK_ID = UUID("90000000-0000-4000-8000-000000000001")
 UNIT_A = UUID("00000000-0000-4000-8000-0000000000a1")
 UNIT_B = UUID("00000000-0000-4000-8000-0000000000b1")
 NOW = datetime(2026, 9, 21, 12, tzinfo=UTC)
@@ -69,6 +71,18 @@ class Repository:
         self.packages = {}
         self.jobs = []
         self.events = []
+        self.task = {
+            "id": TASK_ID,
+            "referral_id": REFERRAL_ID,
+            "task_type": "reconcile_delivery",
+            "status": "open",
+            "assigned_to": None,
+            "next_action": "Periksa bukti penerima.",
+            "due_at": None,
+            "blocked_reason": "Timeout ambigu",
+            "created_at": NOW,
+            "updated_at": NOW,
+        }
 
     def get_scoped_report(self, report_id, unit_ids, lock=False):
         return self.report if report_id == REPORT_ID and UNIT_A in unit_ids else None
@@ -184,6 +198,15 @@ class Repository:
             if job["referral_id"] == referral_id and job["status"] == "pending":
                 job["status"] = "cancelled"
 
+    def get_scoped_task(self, task_id, unit_ids, lock=False):
+        return self.task if task_id == TASK_ID and UNIT_A in unit_ids else None
+
+    def update_task(self, task_id, values):
+        assert task_id == TASK_ID
+        self.task.update(values)
+        self.task["updated_at"] = NOW
+        return self.task
+
 
 def payload(request_key, summary="Jalan rusak"):
     return ReferralCreate(
@@ -247,11 +270,58 @@ def test_list_tasks_is_scoped_and_hides_assignment_identifier():
                 "updated_at": NOW,
             }]
 
-    tasks = ReferralService(Session(), TaskRepository()).list_tasks(REPORT_ID, (UNIT_A,))
+    tasks = ReferralService(Session(), TaskRepository()).list_tasks(
+        REPORT_ID, (UNIT_A,), "supabase:other-actor"
+    )
 
     assert tasks[0].next_action == "Periksa bukti penerima."
     assert tasks[0].assigned is True
+    assert tasks[0].assigned_to_me is False
     assert not hasattr(tasks[0], "assigned_to")
+
+
+def test_task_can_only_be_completed_by_operator_who_claimed_it():
+    repository = Repository()
+    service = ReferralService(Session(), repository)
+    actor = "supabase:admin-a"
+
+    claimed = service.update_task(
+        TASK_ID, ReferralTaskUpdate(action="claim"), actor, (UNIT_A,)
+    )
+    assert claimed.assigned_to_me is True
+
+    with pytest.raises(ReferralConflictError):
+        service.update_task(
+            TASK_ID,
+            ReferralTaskUpdate(action="complete", reason="Sudah diperiksa"),
+            "supabase:admin-b",
+            (UNIT_A,),
+        )
+
+    completed = service.update_task(
+        TASK_ID,
+        ReferralTaskUpdate(action="complete", reason="Bukti telah diperiksa"),
+        actor,
+        (UNIT_A,),
+    )
+    assert completed.status == "completed"
+    assert completed.blocked_reason is None
+    assert [event["event_type"] for event in repository.events] == [
+        "task_claim",
+        "task_complete",
+    ]
+
+
+def test_task_update_is_scoped_to_village():
+    service = ReferralService(Session(), Repository())
+
+    with pytest.raises(ReferralNotFoundError):
+        service.update_task(
+            TASK_ID,
+            ReferralTaskUpdate(action="claim"),
+            "supabase:admin-b",
+            (UNIT_B,),
+        )
 
 
 def test_village_b_cannot_observe_or_create_village_a_referral():

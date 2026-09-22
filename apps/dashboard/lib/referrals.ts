@@ -73,6 +73,7 @@ export type ReferralTask = {
   task_type: string;
   status: string;
   assigned: boolean;
+  assigned_to_me: boolean;
   next_action: string;
   due_at: string | null;
   blocked_reason: string | null;
@@ -88,6 +89,14 @@ export const getRoutingOptions = (reportId: string, signal?: AbortSignal) =>
 
 export const getReportTasks = (reportId: string, signal?: AbortSignal) =>
   apiFetch<ReferralTask[]>(`/api/v1/reports/${encodeURIComponent(reportId)}/tasks`, { signal });
+
+export const updateReferralTask = (
+  taskId: string,
+  payload: { action: "claim" | "release" | "complete"; reason?: string },
+) => apiFetch<ReferralTask>(`/api/v1/referral-tasks/${encodeURIComponent(taskId)}`, {
+  method: "PATCH",
+  body: JSON.stringify(payload),
+});
 
 export const approveReferral = (
   referralId: string,
