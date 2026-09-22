@@ -24,6 +24,8 @@ from app.services.referrals import (
     _requires_reconciliation_lookup,
     _store_mock_delivery,
     canonical_hash,
+    process_due_referral_task_reminders,
+    task_reminder_event_key,
 )
 
 REPORT_ID = UUID("20000000-0000-4000-8000-000000000001")
@@ -322,6 +324,51 @@ def test_task_update_is_scoped_to_village():
             "supabase:admin-b",
             (UNIT_B,),
         )
+
+
+def test_task_reminder_scheduler_deduplicates_local_events(monkeypatch):
+    task_id = TASK_ID
+    due_at = NOW
+    events = set()
+
+    class FakeSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def begin(self):
+            return Transaction()
+
+    class ReminderRepository:
+        def __init__(self, _session):
+            pass
+
+        def list_due_tasks(self, now, limit):
+            assert now == NOW
+            assert limit == 10
+            return [{
+                "id": task_id,
+                "referral_id": REFERRAL_ID,
+                "task_type": "verify_registration",
+                "next_action": "Periksa registrasi.",
+                "due_at": due_at,
+            }]
+
+        def insert_event_once(self, values):
+            key = values["event_key"]
+            if key in events:
+                return None
+            events.add(key)
+            return UUID("91000000-0000-4000-8000-000000000001")
+
+    monkeypatch.setattr("app.services.referrals.SessionLocal", lambda: FakeSession())
+    monkeypatch.setattr("app.services.referrals.ReferralRepository", ReminderRepository)
+
+    assert task_reminder_event_key(task_id, due_at).startswith("task-reminder:")
+    assert process_due_referral_task_reminders(NOW, 10) == 1
+    assert process_due_referral_task_reminders(NOW, 10) == 0
 
 
 def test_village_b_cannot_observe_or_create_village_a_referral():

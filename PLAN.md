@@ -99,7 +99,7 @@ nonaktif. Bagian awal M3 menambahkan panel review referral pada detail REPORT:
 kandidat backend, versi/hash paket, approval manusia, dispatch idempoten,
 rekonsiliasi hasil ambigu, tiga dimensi status, bukti, next action, serta
 `case_tasks` yang dibatasi scope desa. Petugas dapat mengambil, melepas, dan
-menyelesaikan tugasnya sendiri tanpa mengekspos identifier PIC. M3 belum
-mencakup perubahan due date atau scheduler. TRACK warga kini dapat menampilkan
-progres rujukan yang sudah disaring oleh backend. M4-M5 tetap roadmap dan belum
-diaktifkan.
+menyelesaikan tugasnya sendiri tanpa mengekspos identifier PIC. Worker referral
+kini mencatat satu event reminder lokal untuk task terbuka yang memiliki
+`due_at`; tidak ada pesan keluar atau tenggat buatan. Perubahan due date,
+notifikasi, dan connector resmi tetap berada di roadmap M4-M5.

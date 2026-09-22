@@ -397,6 +397,37 @@ class ReferralRepository:
             .one()
         )
 
+    def list_due_tasks(self, now: datetime, limit: int = 50) -> list[RowMapping]:
+        statement = (
+            select(
+                case_tasks.c.id,
+                case_tasks.c.referral_id,
+                case_tasks.c.task_type,
+                case_tasks.c.next_action,
+                case_tasks.c.due_at,
+            )
+            .where(
+                case_tasks.c.status == "open",
+                case_tasks.c.due_at.is_not(None),
+                case_tasks.c.due_at <= now,
+            )
+            .order_by(case_tasks.c.due_at.asc(), case_tasks.c.id.asc())
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        )
+        return list(self.session.execute(statement).mappings().all())
+
+    def insert_event_once(self, values: Mapping[str, Any]) -> UUID | None:
+        statement = (
+            postgresql_insert(referral_events)
+            .values(**values)
+            .on_conflict_do_nothing(
+                index_elements=[referral_events.c.referral_id, referral_events.c.event_key]
+            )
+            .returning(referral_events.c.id)
+        )
+        return self.session.execute(statement).scalar_one_or_none()
+
     def lock_next_job(self, now: datetime, lease_token: UUID) -> RowMapping | None:
         candidate = (
             select(referral_outbox.c.id)

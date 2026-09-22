@@ -804,6 +804,43 @@ def process_next_referral_job(
     return _record_receipt(context, lease_token, receipt)
 
 
+def task_reminder_event_key(task_id: UUID, due_at: datetime) -> str:
+    return f"task-reminder:{task_id}:{due_at.astimezone(UTC).isoformat()}"
+
+
+def process_due_referral_task_reminders(
+    now: datetime | None = None, limit: int = 50
+) -> int:
+    """Record local reminder events without sending outbound notifications."""
+    now = now or datetime.now(UTC)
+    reminders = 0
+    with SessionLocal() as session, session.begin():
+        repository = ReferralRepository(session)
+        for task in repository.list_due_tasks(now, limit):
+            due_at = task["due_at"]
+            if due_at is None:
+                continue
+            event_id = repository.insert_event_once(
+                {
+                    "referral_id": task["referral_id"],
+                    "event_type": "task_reminder_due",
+                    "actor_identifier": "referral-scheduler",
+                    "event_key": task_reminder_event_key(task["id"], due_at),
+                    "after_state": {
+                        "task_id": str(task["id"]),
+                        "task_type": task["task_type"],
+                        "next_action": task["next_action"],
+                        "due_at": due_at.isoformat(),
+                        "delivery": "local_mock",
+                    },
+                    "occurred_at": now,
+                    "observed_at": now,
+                }
+            )
+            reminders += event_id is not None
+    return reminders
+
+
 def _record_worker_problem(context, lease_token, outcome, error, now):
     with SessionLocal() as session, session.begin():
         repository = ReferralRepository(session)
@@ -951,6 +988,7 @@ async def referral_worker_loop(interval_seconds: float = 5) -> None:
     while True:
         try:
             await asyncio.to_thread(process_next_referral_job)
+            await asyncio.to_thread(process_due_referral_task_reminders)
         except SQLAlchemyError as exc:
             logger.error(
                 "Referral worker iteration failed (type=%s)", type(exc).__name__

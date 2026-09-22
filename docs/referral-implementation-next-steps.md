@@ -40,9 +40,9 @@ melepasnya dengan alasan, atau menyelesaikan tugas miliknya dengan alasan.
 3. Selesai pada slice ini: TRACK warga menampilkan progres referral yang aman
    dan berbasis status tersimpan; detail routing internal, bukti privat,
    identitas petugas, dan data desa lain tetap disembunyikan.
-4. Jalankan scheduler sederhana berbasis PostgreSQL untuk reminder/tugas tanpa
-   duplikasi setelah kontrak due date dan notifikasi tersedia. Notifikasi keluar
-   tetap mock.
+4. Selesai pada slice ini: worker referral menjalankan scheduler PostgreSQL
+   sederhana untuk task terbuka yang memiliki `due_at`. Event reminder memakai
+   dedup key dan tetap lokal/mock; tidak ada pesan keluar atau tenggat buatan.
 5. Uji desktop/ponsel, auth dua desa, konflik versi, error worker, polling, dan
    akses warga lain.
 
