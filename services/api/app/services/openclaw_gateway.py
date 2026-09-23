@@ -9,6 +9,9 @@ import time
 from pathlib import Path
 from threading import Lock
 from typing import Any
+from urllib.parse import urlsplit
+
+import httpx
 
 from app.core.config import settings
 
@@ -57,7 +60,28 @@ def _last_json(value: str) -> dict[str, Any]:
 
 
 class OpenClawGateway:
+    remote = False
+
     def __init__(self, cli_path: str | None = None) -> None:
+        self.remote = bool(settings.openclaw_api_url.strip())
+        if self.remote:
+            url = urlsplit(settings.openclaw_api_url)
+            if (
+                url.scheme != "https"
+                or not url.hostname
+                or url.username
+                or url.password
+                or url.query
+                or url.fragment
+                or not settings.openclaw_gateway_token
+                or not settings.openclaw_gateway_token.get_secret_value().strip()
+                or not settings.cf_access_client_id
+                or not settings.cf_access_client_secret
+                or not settings.cf_access_client_secret.get_secret_value().strip()
+            ):
+                raise OpenClawGatewayError("Remote gateway configuration is invalid")
+            self.rpc_url = settings.openclaw_api_url.rstrip("/") + "/api/v1/admin/rpc"
+            return
         configured = cli_path or settings.openclaw_cli_path
         resolved = shutil.which(configured) or (
             configured if Path(configured).is_file() else None
@@ -67,6 +91,10 @@ class OpenClawGateway:
         self.cli_path = str(resolved)
 
     def _run(self, *args: str, timeout: int = 40) -> str:
+        if self.remote:
+            raise OpenClawGatewayError(
+                "Local gateway operations are unavailable in remote mode"
+            )
         command: str | list[str] = [self.cli_path, *args]
         use_shell = False
         if os.name == "nt" and self.cli_path.lower().endswith((".cmd", ".bat")):
@@ -92,6 +120,64 @@ class OpenClawGateway:
         if completed.returncode != 0:
             raise OpenClawGatewayError("OpenClaw operation failed")
         return completed.stdout
+
+    def _rpc(self, method: str, params: dict | None = None) -> dict:
+        if method not in {
+            "health",
+            "channels.status",
+            "channels.start",
+            "channels.stop",
+            "channels.logout",
+            "web.login.start",
+            "web.login.wait",
+        }:
+            raise OpenClawGatewayError("Unsupported gateway operation")
+        try:
+            response = httpx.post(
+                self.rpc_url,
+                headers={
+                    "Authorization": f"Bearer {settings.openclaw_gateway_token.get_secret_value()}",
+                    "CF-Access-Client-Id": settings.cf_access_client_id,
+                    "CF-Access-Client-Secret": settings.cf_access_client_secret.get_secret_value(),
+                },
+                json={"method": method, "params": params or {}},
+                timeout=httpx.Timeout(40, connect=5),
+                follow_redirects=False,
+            )
+            response.raise_for_status()
+            body = response.json()
+            if not isinstance(body, dict) or body.get("ok") is not True:
+                raise OpenClawGatewayError("Remote gateway operation failed")
+            payload = body.get("payload")
+            if not isinstance(payload, dict):
+                raise OpenClawGatewayError("Remote gateway response is invalid")
+            return payload
+        except httpx.TimeoutException as exc:
+            raise OpenClawGatewayTimeoutError("Remote gateway timed out") from exc
+        except (httpx.HTTPError, ValueError) as exc:
+            raise OpenClawGatewayError("Remote gateway is unavailable") from exc
+
+    def health(self) -> None:
+        if self.remote:
+            self._rpc("health")
+        else:
+            self.whatsapp_statuses()
+
+    def start_channel(self, account_id: str) -> None:
+        self._rpc("channels.start", {"channel": "whatsapp", "accountId": account_id})
+
+    def stop_channel(self, account_id: str) -> None:
+        self._rpc("channels.stop", {"channel": "whatsapp", "accountId": account_id})
+
+    def wait_pairing(self, account_id: str, session_key: str | None = None) -> None:
+        params = {"channel": "whatsapp", "accountId": account_id, "timeoutMs": 30000}
+        if session_key:
+            params["sessionKey"] = session_key
+        try:
+            self._rpc("web.login.wait", params)
+        except OpenClawGatewayError:
+            # A later status probe exposes failure; never mark the channel connected here.
+            return
 
     def ensure_whatsapp_account(
         self, account_id: str, display_name: str, agent_id: str = "laporpak"
@@ -219,6 +305,24 @@ class OpenClawGateway:
             )
 
     def start_pairing(self, account_id: str) -> dict[str, Any]:
+        if self.remote:
+            result = self._rpc(
+                "web.login.start",
+                {
+                    "channel": "whatsapp",
+                    "accountId": account_id,
+                    "force": True,
+                    "timeoutMs": 30000,
+                },
+            )
+            if "connected" in result and not isinstance(result["connected"], bool):
+                raise OpenClawGatewayError("Invalid pairing status")
+            for key in ("qrDataUrl", "sessionKey"):
+                if result.get(key) is not None and not isinstance(result[key], str):
+                    raise OpenClawGatewayError("Invalid pairing response")
+            if not result.get("connected") and not result.get("qrDataUrl"):
+                raise OpenClawGatewayError("No pairing result available")
+            return result
         payload = json.dumps(
             {
                 "channel": "whatsapp",
@@ -267,6 +371,36 @@ class OpenClawGateway:
             _gateway_restart_lock.release()
 
     def whatsapp_statuses(self) -> tuple[dict[str, dict[str, Any]], str | None]:
+        if self.remote:
+            snapshot = self._rpc("channels.status", {"probe": True, "timeoutMs": 10000})
+            channel_accounts = snapshot.get("channelAccounts")
+            if not isinstance(channel_accounts, dict):
+                raise OpenClawGatewayError("Invalid channel response")
+            accounts = channel_accounts.get("whatsapp", [])
+            if not isinstance(accounts, list):
+                raise OpenClawGatewayError("Invalid channel response")
+            result = {}
+            for account in accounts:
+                if not isinstance(account, dict) or not isinstance(
+                    account.get("accountId"), str
+                ):
+                    raise OpenClawGatewayError("Invalid channel identity")
+                if any(
+                    key in account and not isinstance(account[key], bool)
+                    for key in ("connected", "linked", "running")
+                ):
+                    raise OpenClawGatewayError("Invalid channel status")
+                identity = account.get("self")
+                if identity is not None and (
+                    not isinstance(identity, dict)
+                    or (
+                        identity.get("e164") is not None
+                        and not isinstance(identity["e164"], str)
+                    )
+                ):
+                    raise OpenClawGatewayError("Invalid channel identity")
+                result[account["accountId"]] = account
+            return result, None
         global _status_cache
         with _status_cache_lock:
             now = time.monotonic()
@@ -312,6 +446,11 @@ class OpenClawGateway:
         return result
 
     def logout(self, account_id: str) -> None:
+        if self.remote:
+            self._rpc(
+                "channels.logout", {"channel": "whatsapp", "accountId": account_id}
+            )
+            return
         payload = json.dumps(
             {"channel": "whatsapp", "accountId": account_id},
             separators=(",", ":"),

@@ -345,9 +345,10 @@ def update_village(
         )
         session.commit()
     updated = get_village_or_404(session, village_id)
-    get_openclaw_workspace_service().create_workspace_from_village_config(
-        village_id, updated
-    )
+    if not settings.openclaw_api_url.strip():
+        get_openclaw_workspace_service().create_workspace_from_village_config(
+            village_id, updated
+        )
     return row_to_village_response(updated)
 
 

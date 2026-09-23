@@ -31,9 +31,13 @@ def _require_owner(caller: AdminCaller, village_id: UUID) -> None:
 
 
 def _village(session: Session, village_id: UUID) -> dict:
-    row = session.execute(
-        select(administrative_units).where(administrative_units.c.id == village_id)
-    ).mappings().one_or_none()
+    row = (
+        session.execute(
+            select(administrative_units).where(administrative_units.c.id == village_id)
+        )
+        .mappings()
+        .one_or_none()
+    )
     if row is None:
         raise APIError(
             status_code=404,
@@ -44,12 +48,16 @@ def _village(session: Session, village_id: UUID) -> dict:
 
 
 def _channel(session: Session, village_id: UUID):
-    return session.execute(
-        select(channel_integrations).where(
-            channel_integrations.c.administrative_unit_id == village_id,
-            channel_integrations.c.channel == "whatsapp",
+    return (
+        session.execute(
+            select(channel_integrations).where(
+                channel_integrations.c.administrative_unit_id == village_id,
+                channel_integrations.c.channel == "whatsapp",
+            )
         )
-    ).mappings().one_or_none()
+        .mappings()
+        .one_or_none()
+    )
 
 
 def _gateway() -> OpenClawGateway:
@@ -76,7 +84,10 @@ def _gateway_error() -> APIError:
     response_model=WhatsAppPairingResponse,
 )
 def start_pairing(
-    village_id: UUID, caller: AdminCaller, session: SessionDep
+    village_id: UUID,
+    caller: AdminCaller,
+    session: SessionDep,
+    background_tasks: BackgroundTasks,
 ) -> WhatsAppPairingResponse:
     _require_owner(caller, village_id)
     village = _village(session, village_id)
@@ -87,6 +98,14 @@ def start_pairing(
     gateway = _gateway()
     agent_id = f"laporpak-{village_id.hex[:12]}"
     try:
+        if gateway.remote and (
+            channel is None or account_id not in gateway.whatsapp_statuses()[0]
+        ):
+            raise APIError(
+                status_code=409,
+                code="OPENCLAW_PROVISIONING_REQUIRED",
+                message="WhatsApp account must be provisioned on the gateway host.",
+            )
         # A stored channel means agent/account provisioning completed on an
         # earlier pairing attempt. Repeating five CLI calls added ~45 seconds
         # before OpenClaw could return a fresh QR.
@@ -98,6 +117,10 @@ def start_pairing(
             )
             gateway.ensure_whatsapp_account(account_id, village["name"], agent_id)
         result = gateway.start_pairing(account_id)
+        if gateway.remote and not result.get("connected"):
+            background_tasks.add_task(
+                gateway.wait_pairing, account_id, result.get("sessionKey")
+            )
     except OpenClawGatewayError as exc:
         raise _gateway_error() from exc
 
@@ -166,7 +189,12 @@ def whatsapp_status(
     except OpenClawGatewayError as exc:
         raise _gateway_error() from exc
     if snapshot.get("linked") and not snapshot.get("running"):
-        background_tasks.add_task(gateway.restart)
+        if gateway.remote:
+            background_tasks.add_task(
+                gateway.start_channel, channel["external_account_id"]
+            )
+        else:
+            background_tasks.add_task(gateway.restart)
     connected = bool(snapshot.get("connected") and snapshot.get("linked"))
     session.execute(
         channel_integrations.update()
@@ -190,7 +218,9 @@ def whatsapp_status(
         message=(
             "WhatsApp tertaut; gateway sedang mengaktifkan kanal."
             if snapshot.get("linked") and not snapshot.get("running")
-            else snapshot.get("lastError")
+            else "Kanal WhatsApp mengalami kendala. Silakan coba lagi."
+            if snapshot.get("lastError")
+            else None
         ),
     )
 
