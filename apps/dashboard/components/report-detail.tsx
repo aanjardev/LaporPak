@@ -12,6 +12,7 @@ import { ReportDocumentsPanel } from "@/components/report-documents-panel";
 import { ReportReferralPanel } from "@/components/report-referral-panel";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { SlowStatus, useToast } from "@/components/action-feedback";
+import { LazyPanel } from "@/components/lazy-panel";
 
 function ReportPhoto({ attachment, reportId, ticketNumber, index, isMock }: {
   attachment: ReportAttachment;
@@ -170,9 +171,9 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
               </ul>
             )}
           </section>
-          <ReportDocumentsPanel reportId={report.id} disabled={isMock} />
-          <ReportReferralPanel reportId={report.id} reportStatus={report.status} disabled={isMock} />
-          <section aria-labelledby="riwayat-status" className="ui-panel p-5 sm:p-6">
+          <LazyPanel label="Memuat dokumen laporan"><ReportDocumentsPanel reportId={report.id} disabled={isMock} /></LazyPanel>
+          <LazyPanel label="Memuat progres rujukan"><ReportReferralPanel reportId={report.id} reportStatus={report.status} disabled={isMock} /></LazyPanel>
+          <section aria-labelledby="riwayat-status" className="defer-render ui-panel p-5 sm:p-6">
             <h2 id="riwayat-status" className="text-lg font-semibold">Riwayat status</h2>
             {report.status_history.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">Belum ada riwayat status.</p> : (
               <ol className="mt-6 space-y-5 border-l-2 border-border pl-5">

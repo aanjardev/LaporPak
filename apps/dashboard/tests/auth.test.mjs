@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { ApiRequestError, apiFetch, requestTimeoutFor } from "../lib/admin.ts";
+import { clearRegionCache, getRegions } from "../lib/regions.ts";
 import { safeReturnPath } from "../lib/safe-return-path.ts";
 
 test("tujuan login hanya boleh menuju portal lokal sesuai role", () => {
@@ -55,6 +56,25 @@ test("API client menggabungkan GET identik yang masih berjalan", async () => {
     assert.deepEqual(second, { ok: true });
     assert.equal(calls, 1);
   } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test("referensi wilayah memakai cache singkat setelah request pertama", async () => {
+  const originalFetch = global.fetch;
+  let regionCalls = 0;
+  global.fetch = async (url) => {
+    if (url === "/api/auth/token") return Response.json({ token: "region-token" });
+    regionCalls += 1;
+    return Response.json({ items: [{ code: "11", name: "Aceh" }] });
+  };
+  clearRegionCache();
+  try {
+    assert.deepEqual(await getRegions("provinces"), [{ code: "11", name: "Aceh" }]);
+    assert.deepEqual(await getRegions("provinces"), [{ code: "11", name: "Aceh" }]);
+    assert.equal(regionCalls, 1);
+  } finally {
+    clearRegionCache();
     global.fetch = originalFetch;
   }
 });

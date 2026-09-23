@@ -19,6 +19,7 @@ from app.api.routes.villages import router as villages_router
 from app.api.routes.whatsapp_setup import router as whatsapp_setup_router
 from app.core.config import settings
 from app.core.errors import register_error_handlers
+from app.middleware import RequestTimingMiddleware
 from app.services.referrals import referral_worker_loop
 from app.services.report_documents import document_worker_loop
 
@@ -56,6 +57,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestTimingMiddleware)
 
 register_error_handlers(app)
 
