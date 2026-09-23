@@ -7,6 +7,11 @@ Meta Cloud API access token, phone number ID, or public webhook.
 Use a dedicated WhatsApp number when possible. Keep the backend and OpenClaw
 on the same Windows host during local development.
 
+For the deployed demo, follow [the deployment runbook](deployment-runbook.md).
+Railway and the persistent Windows OpenClaw host are separate. Remote support
+is a planned release-gate change until its implementation PR is merged; the
+local CLI steps below do not establish remote connectivity.
+
 ## 1. Verify the local services
 
 Open PowerShell and verify Node.js, OpenClaw, and FastAPI:
@@ -126,10 +131,14 @@ draft UUID must be reused for retries.
 
 ## 6. Run ASK and TRACK tests
 
-After REPORT works, test ASK with an approved synthetic knowledge source and
-TRACK with the ticket created by the same WhatsApp sender. The current TRACK
-tool accepts `LP-*`; backend support for `REQ-*` is not exposed through the
-plugin yet. REQUEST submission is also not an OpenClaw tool at this stage.
+After REPORT works, test ASK with a canonical synthetic source marked `demo`
+and TRACK with the ticket created by the same WhatsApp sender. The plugin
+supports both `LP-*` and `REQ-*`, and `laporpak_create_service_request` submits
+residency-letter requests after citizen confirmation. Synthetic knowledge must
+remain visibly labelled; do not approve it as official content. The planned
+`ALLOW_DEMO_KNOWLEDGE` flag controls its retrieval and embedding after that
+backend change is deployed. Test two villages with distinct trusted channel
+bindings and verify that neither can retrieve the other's data.
 
 ## 7. Troubleshooting
 

@@ -1,5 +1,21 @@
 # P0 REPORT Verification Evidence
 
+## Release gate documentation — 2026-09-23
+
+Baseline inspected: `85587a9` (local main matched origin/main). This round
+prepares [the demo release gate](mvp-demo-release-checklist.md) and
+[deployment runbook](deployment-runbook.md). It does not record new live E2E
+passes. The team reports two test identities/villages and a persistent Windows
+HTTPS host are available; connectivity, isolation and deployed behavior still
+require the release matrix. ASK sources remain synthetic and REQUEST SOP is
+not official. Historical evidence below retains its original environment/SHA.
+
+For the next execution, record timestamp, FE/BE/plugin SHAs, Node/OpenClaw
+versions, environment, anonymized village/admin aliases, synthetic ticket IDs,
+expected/actual result, and evidence type (live API, WhatsApp, browser or
+simulation). Leave unexecuted scenarios open; never substitute hybrid fixture
+results for a full WhatsApp/Gemini run.
+
 ## Demo-readiness attachment recheck — 2026-09-19
 
 Baseline `main`: `81417b0`. GitHub Actions run `35424935073` completed

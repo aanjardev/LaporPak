@@ -10,6 +10,14 @@ mandiri mengikuti [rencana admin](../PLAN.md).
 
 ## 1. Acuan dan arti selesai
 
+Putaran aktif 2026-09-23 mengikuti
+[release gate MVP demo](mvp-demo-release-checklist.md): kontrak lebih dahulu,
+remote gateway, hardening backend/frontend, lalu E2E deployment dua desa.
+Target hackathon memakai sumber ASK sintetis berlabel demo dan REQUEST prototipe;
+keduanya tidak diklaim sebagai SOP/informasi resmi. Uji otomatis atau deployment
+yang berhasil belum menutup acceptance. Persyaratan sumber resmi di tahap berikut
+tetap berlaku untuk produksi, bukan syarat mengganti data demo menjadi approved.
+
 - [PRD V3](prd/PRD_V3_AI_Village_Service_Agent.md) menetapkan cakupan dan
   Definition of Done MVP. REPORT dan ASK termasuk **MUST HAVE**; TRACK dan
   prototipe REQUEST satu layanan termasuk **SHOULD HAVE**. Definition of Done

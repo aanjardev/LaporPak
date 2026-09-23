@@ -6,6 +6,78 @@
 
 Dokumen ini adalah canonical contract untuk Frontend, Backend, AI integration, dan mock data.
 
+## Kontrak penutupan demo 2026-09-23
+
+Status bagian ini: **target implementasi untuk review**, belum bukti runtime.
+Baseline `0.4.0` di bawah tetap berlaku sampai implementasi terkait masuk main.
+[Release gate](mvp-demo-release-checklist.md) menetapkan urutan dan bukti selesai.
+
+### Gateway remote
+
+API browser pairing/status/logout tetap memakai route desa yang sudah ada.
+Mode remote ditentukan oleh `OPENCLAW_API_URL` HTTPS yang dikonfigurasi server,
+bukan URL input pengguna. Backend memakai Admin HTTP RPC OpenClaw melalui
+Cloudflare Access. `OPENCLAW_GATEWAY_TOKEN` dan kredensial Access hanya server;
+`OPENCLAW_API_KEY` tetap khusus autentikasi tool ke FastAPI.
+
+Pairing remote hanya menerima desa dengan channel terdaftar dan akun yang sudah
+dipra-konfigurasi pada host. Bila tidak tersedia: `409 OPENCLAW_PROVISIONING_REQUIRED`.
+Status gagal/timeout/payload invalid: `503 OPENCLAW_UNAVAILABLE`. Akun belum
+tersedia tidak boleh menyebabkan provisioning filesystem pada Railway.
+
+### Kill switch per desa
+
+Setelah API key dan scope kanal terverifikasi, metadata desa
+`is_ai_enabled=false` menolak semua tool warga dengan HTTP `503`:
+
+```json
+{"error":{"code":"AI_DISABLED","message":"Layanan otomatis desa sedang nonaktif."}}
+```
+
+Gunakan envelope error standar, termasuk field standar lain bila ada. Berlaku
+untuk REPORT, ASK, TRACK, REQUEST, deteksi darurat, similar reports, konfirmasi
+penyelesaian dan permintaan pengiriman dokumen. Tidak ada read/write operasional
+atau klaim tiket setelah penolakan. Pemeriksaan admin tidak memakai kill switch.
+Worker embedding merupakan pemrosesan pengetahuan internal, bukan tool warga;
+tetap tunduk pada scope/review dokumen.
+
+### ASK demo dan agregasi
+
+`ALLOW_DEMO_KNOWLEDGE` default `false`, terlepas dari `APP_ENV`. Deployment demo
+dapat mengaktifkan flag dengan `APP_ENV=production`. Saat false, retrieval dan
+embedding hanya approved; saat true, demo juga diterima. `trust_level` dan label
+simulasi tetap dipertahankan. Kebijakan ini menggantikan izin demo implisit dari
+environment development setelah implementasi masuk.
+
+Agregasi knowledge dan antrean wajib memakai kriteria canonical yang sama dengan
+daftar sumber: scope desa tersedia, `source_type` paste/markdown/pdf, content
+tidak kosong. `ask_ready` tetap active + approved + ready; demo tidak dihitung
+sebagai kesiapan sumber resmi. Tidak ada perubahan bentuk response dashboard.
+
+### Lampiran dan readiness
+
+REPORT menerima JPEG/PNG/WebP maksimal 5 MiB per foto, maksimal tiga foto.
+Implementasi baru memverifikasi decode penuh, maksimal 25 juta pixel dan 10.000
+pixel per sisi, menolak multiframe/animasi, lalu encode ulang tanpa metadata atau
+trailing data. Ukuran hasil juga dibatasi. Foto invalid memakai error validasi
+attachment yang sudah ada; tidak boleh menciptakan laporan parsial.
+
+`GET /health` tetap liveness. Target endpoint `GET /ready`:
+
+```json
+{"status":"ready","checks":{"database":"ok","configuration":"ok","openclaw":"ok"}}
+```
+
+`checks` berisi `ok|failed` untuk database/configuration dan `ok|degraded` untuk
+OpenClaw. Database/configuration gagal: HTTP 503, status `not_ready`.
+Hanya OpenClaw gagal: HTTP 200, status `degraded`; lainnya HTTP 200 `ready`.
+Respons tidak memuat alamat internal, konfigurasi rahasia atau exception.
+Gunakan timeout probe terbatas dan jangan memasang `/ready` sebagai liveness Railway.
+
+Proxy gambar/logo/PDF tanpa sesi mengembalikan 401. Seluruh file privat memakai
+`Cache-Control: private, no-store`, `X-Content-Type-Options: nosniff` dan
+`Cross-Origin-Resource-Policy: same-origin`.
+
 ---
 
 ## 1. General Conventions
