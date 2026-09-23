@@ -5,6 +5,11 @@ nomor WhatsApp pribadi, QR, atau percakapan warga di Git dan bukti demo.
 
 ## 1. Baseline
 
+Putaran penutupan terbaru memakai [release gate](mvp-demo-release-checklist.md)
+dan [runbook deployment](deployment-runbook.md). Checklist tersebut belum lulus
+hanya karena kode/deployment tersedia. Gunakan sumber ASK berstatus demo dan
+label REQUEST prototipe; jangan mengubahnya menjadi informasi resmi.
+
 Gunakan commit `main` yang sama, terapkan seluruh migration dan seed, lalu
 jalankan FastAPI dan dashboard dengan `REPORTS_DATA_SOURCE=api`. Pastikan
 `/health` mengembalikan `200`.

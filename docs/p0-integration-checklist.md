@@ -7,6 +7,13 @@
 
 ## Pembaruan terverifikasi 2026-09-19
 
+> Catatan putaran baru 2026-09-23: gunakan
+> [release gate MVP demo](mvp-demo-release-checklist.md) untuk pengujian deployment
+> dua desa pada release candidate baru. Semua hasil di bawah adalah historis.
+> Kesiapan dua set akun dilaporkan tim, tetapi isolasi runtime belum diverifikasi
+> ulang. Canonical `review_status` menggantikan metadata `approval_status` pada
+> runtime terbaru; jangan memakai catatan lama sebagai aturan retrieval sekarang.
+
 - [x] Schema, constraint, index, RLS, extension, seed akses, dan bucket private
   development diaudit read-only; konfigurasi bucket `report-attachments`
   diperbaiki sesuai migration `0013`.

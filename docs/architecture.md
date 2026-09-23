@@ -66,6 +66,21 @@ WhatsApp ↔ OpenClaw ── Gemini
 
 Docker bukan dependency Day 1.
 
+### Penutupan deployment demo (target, belum diverifikasi)
+
+[Release gate demo](mvp-demo-release-checklist.md) menambahkan arah kontrol
+Railway -> Cloudflare Tunnel + Access -> OpenClaw Windows yang selalu aktif.
+Gateway bind loopback; Admin HTTP RPC hanya melalui ingress terautentikasi.
+Tidak ada control-plane credential pada browser. Secret arah kontrol terpisah
+dari API key OpenClaw -> FastAPI. Dua desa dipra-konfigurasi; Railway tidak
+menulis workspace/config lokal ketika mode remote aktif.
+
+Backend membaca kill switch desa sebelum tool warga berjalan. Dashboard admin
+tetap dapat memproses layanan manual. Gangguan gateway tidak membuat liveness
+FastAPI gagal; `/ready` membedakan dependency inti dan OpenClaw degraded.
+Sumber demo diizinkan hanya oleh flag eksplisit, bukan environment development.
+Target ini baru dianggap tersedia setelah PR implementasi dan E2E lulus.
+
 ---
 
 ## 3. Component Boundaries
