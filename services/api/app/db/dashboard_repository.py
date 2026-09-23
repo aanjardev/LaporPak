@@ -7,6 +7,15 @@ from sqlalchemy.orm import Session
 from app.db.tables import knowledge_documents, reports, service_requests
 
 
+def canonical_knowledge():
+    return and_(
+        knowledge_documents.c.administrative_unit_id.is_not(None),
+        knowledge_documents.c.source_type.in_(("paste", "markdown", "pdf")),
+        knowledge_documents.c.content.is_not(None),
+        func.btrim(knowledge_documents.c.content) != "",
+    )
+
+
 class DashboardRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -81,7 +90,10 @@ class DashboardRepository:
                         ),
                     )
                     .label("processing"),
-                ).where(knowledge_documents.c.administrative_unit_id == village_id)
+                ).where(
+                    knowledge_documents.c.administrative_unit_id == village_id,
+                    canonical_knowledge(),
+                )
             )
             .mappings()
             .one()
@@ -93,6 +105,7 @@ class DashboardRepository:
 
     def attention_counts(self, village_id: UUID) -> dict[str, int]:
         knowledge_attention = and_(
+            canonical_knowledge(),
             knowledge_documents.c.is_active.is_(True),
             (
                 (knowledge_documents.c.review_status == "draft")
@@ -165,6 +178,7 @@ class DashboardRepository:
             knowledge_documents.c.created_at,
         ).where(
             knowledge_documents.c.administrative_unit_id == village_id,
+            canonical_knowledge(),
             knowledge_documents.c.is_active.is_(True),
             (
                 (knowledge_documents.c.review_status == "draft")

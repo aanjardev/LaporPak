@@ -48,6 +48,9 @@ app = FastAPI(
     description="Backend API for LaporPak",
     version="0.1.0",
     lifespan=lifespan,
+    docs_url=None if settings.app_env == "production" else "/docs",
+    redoc_url=None if settings.app_env == "production" else "/redoc",
+    openapi_url=None if settings.app_env == "production" else "/openapi.json",
 )
 
 app.add_middleware(

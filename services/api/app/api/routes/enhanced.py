@@ -23,7 +23,10 @@ router = APIRouter(prefix="/api/v1", tags=["Citizen"])
 def detect_emergency_endpoint(
     payload: EmergencyDetectionRequest,
     _caller: OpenClawCaller,
+    channel_account_id: Annotated[str, Header(alias="X-Channel-Account-ID")],
+    session: Annotated[Session, Depends(get_db_session)],
 ):
+    resolve_channel_unit(session, channel_account_id)
     return detect_emergency(payload.text)
 
 

@@ -23,7 +23,12 @@ def configure_dependencies(monkeypatch):
     app.dependency_overrides.clear()
 
 
-def test_detect_emergency_is_deterministic():
+def test_detect_emergency_is_deterministic(monkeypatch):
+    monkeypatch.setattr(
+        enhanced_routes,
+        "resolve_channel_unit",
+        lambda *args: UUID("00000000-0000-4000-8000-000000000002"),
+    )
     response = TestClient(app).post(
         "/api/v1/detect-emergency",
         json={"text": "Ada kebakaran di pasar"},

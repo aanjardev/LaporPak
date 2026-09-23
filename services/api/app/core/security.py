@@ -284,7 +284,9 @@ def require_admin(
     return caller
 
 
-def require_village_operator(caller: AuthenticatedCallerDependency) -> AuthenticatedCaller:
+def require_village_operator(
+    caller: AuthenticatedCallerDependency,
+) -> AuthenticatedCaller:
     operational = (
         caller.unit_ids
         if caller.operational_unit_ids is None
@@ -315,7 +317,10 @@ def operator_scope(caller: AuthenticatedCaller) -> tuple[UUID, ...]:
 def resolve_channel_unit(session: Session, external_account_id: str) -> UUID:
     try:
         row = session.execute(
-            select(channel_integrations.c.administrative_unit_id)
+            select(
+                channel_integrations.c.administrative_unit_id,
+                administrative_units.c.metadata,
+            )
             .join(
                 administrative_units,
                 administrative_units.c.id
@@ -328,7 +333,7 @@ def resolve_channel_unit(session: Session, external_account_id: str) -> UUID:
                 administrative_units.c.is_active.is_(True),
                 administrative_units.c.activation_status == "approved",
             )
-        ).scalar_one_or_none()
+        ).one_or_none()
     except SQLAlchemyError as exc:
         session.rollback()
         raise APIError(
@@ -344,4 +349,11 @@ def resolve_channel_unit(session: Session, external_account_id: str) -> UUID:
         raise APIError(
             status_code=403, code="FORBIDDEN", message="Channel is not authorized"
         )
-    return row
+    unit_id, metadata = row
+    if (metadata or {}).get("is_ai_enabled") is False:
+        raise APIError(
+            status_code=503,
+            code="AI_DISABLED",
+            message="Layanan otomatis sedang nonaktif. Silakan hubungi petugas desa.",
+        )
+    return unit_id

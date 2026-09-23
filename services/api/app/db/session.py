@@ -31,6 +31,8 @@ if not settings.database_url:
 engine = create_engine(
     normalize_database_url(settings.database_url),
     pool_pre_ping=True,
+    pool_timeout=5,
+    connect_args={"connect_timeout": 5},
 )
 
 

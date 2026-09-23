@@ -110,16 +110,6 @@ def advisory_lock_key(idempotency_key: UUID) -> int:
     return unsigned - (1 << 64) if unsigned >= (1 << 63) else unsigned
 
 
-def validate_image_signature(data: bytes, mime_type: str) -> None:
-    signatures = {
-        "image/jpeg": data.startswith(b"\xff\xd8\xff"),
-        "image/png": data.startswith(b"\x89PNG\r\n\x1a\n"),
-        "image/webp": data.startswith(b"RIFF") and data[8:12] == b"WEBP",
-    }
-    if not signatures.get(mime_type, False):
-        raise ValueError("attachment bytes do not match the declared image type")
-
-
 def upload_report_attachment(report_id: UUID, data: bytes, mime_type: str) -> str:
     from app.core.config import settings
 
@@ -264,7 +254,9 @@ class ReportPersistenceService:
                     if len(data) > MAX_ATTACHMENT_BYTES:
                         raise InvalidAttachmentError("attachment exceeds 5 MB")
                     try:
-                        validate_image_signature(data, attachment.mime_type)
+                        from app.services.image_validation import sanitize_image
+
+                        data = sanitize_image(data, attachment.mime_type)
                     except ValueError as exc:
                         raise InvalidAttachmentError(str(exc)) from exc
                     storage_path = upload_report_attachment(

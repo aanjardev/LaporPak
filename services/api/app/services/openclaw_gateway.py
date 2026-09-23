@@ -121,7 +121,9 @@ class OpenClawGateway:
             raise OpenClawGatewayError("OpenClaw operation failed")
         return completed.stdout
 
-    def _rpc(self, method: str, params: dict | None = None) -> dict:
+    def _rpc(
+        self, method: str, params: dict | None = None, *, timeout: float = 40
+    ) -> dict:
         if method not in {
             "health",
             "channels.status",
@@ -141,7 +143,7 @@ class OpenClawGateway:
                     "CF-Access-Client-Secret": settings.cf_access_client_secret.get_secret_value(),
                 },
                 json={"method": method, "params": params or {}},
-                timeout=httpx.Timeout(40, connect=5),
+                timeout=httpx.Timeout(timeout, connect=5),
                 follow_redirects=False,
             )
             response.raise_for_status()
@@ -159,7 +161,7 @@ class OpenClawGateway:
 
     def health(self) -> None:
         if self.remote:
-            self._rpc("health")
+            self._rpc("health", timeout=5)
         else:
             self.whatsapp_statuses()
 
