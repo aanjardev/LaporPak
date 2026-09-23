@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { logoutAction } from "@/app/auth-actions";
 import { BrandLogo } from "@/components/brand-logo";
 import { MobileNavigation } from "@/components/mobile-navigation";
+import { NavigationFeedback } from "@/components/navigation-feedback";
 import { ReportsNav } from "@/components/reports-nav";
 import { getCurrentAdmin, requireSignedIn } from "@/lib/auth";
 
@@ -18,6 +19,7 @@ export default async function ReportsLayout({ children }: { children: React.Reac
   const isMock = process.env.REPORTS_DATA_SOURCE !== "api";
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <NavigationFeedback />
       <a href="#konten-utama" className="sr-only rounded-md bg-card px-4 py-3 focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60]">Lewati ke konten</a>
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col overflow-y-auto bg-brand px-5 py-6 text-white lg:flex">
         <Link href="/reports/dashboard" className="block rounded-md bg-card p-3 focus-visible:outline-primary"><BrandLogo /></Link>

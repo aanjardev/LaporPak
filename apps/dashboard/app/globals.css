@@ -67,7 +67,14 @@
   .auth-background-waves { @apply absolute inset-x-0 bottom-0 h-24 w-full text-card sm:h-36; }
   .auth-panel { @apply relative w-full max-w-md rounded-lg border border-border bg-card p-6 sm:p-9; box-shadow: 0 4px 20px rgb(23 35 63 / 6%); }
   .auth-panel h1 { @apply text-2xl leading-tight; }
+  .defer-render { content-visibility: auto; contain-intrinsic-size: 1px 480px; }
 
+}
+
+@keyframes navigation-progress {
+  0% { transform: scaleX(0.08); }
+  50% { transform: scaleX(0.62); }
+  100% { transform: scaleX(0.92); }
 }
 
 @media (prefers-reduced-motion: reduce) {

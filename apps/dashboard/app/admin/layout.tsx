@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react";
 import { logoutAction } from "@/app/auth-actions";
 import { AdminNavigation } from "@/components/admin-navigation";
 import { BrandLogo } from "@/components/brand-logo";
+import { NavigationFeedback } from "@/components/navigation-feedback";
 import { getCurrentAdmin, requireSignedIn } from "@/lib/auth";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const admin = await getCurrentAdmin();
   if (!admin) redirect("/onboarding");
   if (admin.role !== "system_admin") redirect("/reports");
-  return <div className="min-h-screen bg-background text-foreground">
+  return <div className="min-h-screen bg-background text-foreground"><NavigationFeedback />
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-brand px-5 py-6 text-white lg:flex">
       <Link href="/admin" className="rounded-md bg-card p-3"><BrandLogo /></Link>
       <p className="mt-8 text-[11px] font-semibold uppercase tracking-[.12em] text-white/60">Super Admin</p>

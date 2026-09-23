@@ -62,6 +62,7 @@ async function getToken(forceRefresh = false): Promise<string> {
 async function requestApi<T>(endpoint: string, options: RequestInit, timeoutMs?: number): Promise<T> {
   const method = (options.method || "GET").toUpperCase();
   const isMutation = method !== "GET" && method !== "HEAD";
+  const started = typeof performance === "undefined" ? 0 : performance.now();
   const controller = new AbortController();
   const timer = globalThis.setTimeout(() => controller.abort("timeout"), timeoutMs ?? requestTimeoutFor(method, options.body));
   const signal = options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal;
@@ -108,6 +109,10 @@ async function requestApi<T>(endpoint: string, options: RequestInit, timeoutMs?:
     );
   } finally {
     globalThis.clearTimeout(timer);
+    if (started && process.env.NODE_ENV === "development") {
+      const safeEndpoint = endpoint.split("?", 1)[0].replace(/\/[0-9a-f]{8}-[0-9a-f-]{27,}(?=\/|$)/gi, "/:id");
+      console.debug(`[perf] api ${method} ${safeEndpoint} ${Math.round(performance.now() - started)}ms`);
+    }
   }
 }
 
