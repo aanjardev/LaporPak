@@ -1,8 +1,19 @@
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager
 from datetime import UTC, datetime
+from io import BytesIO
 from threading import Barrier, Lock
 from uuid import UUID
+
+from PIL import Image
+
+
+def real_jpeg():
+    output = BytesIO()
+    Image.new("RGB", (2, 2), "white").save(output, format="JPEG")
+    return base64.b64encode(output.getvalue()).decode()
+
 
 import httpx
 import pytest
@@ -209,7 +220,7 @@ def valid_payload(**overrides):
         },
         "attachments": [
             {
-                "data_base64": "/9j/AA==",
+                "data_base64": real_jpeg(),
                 "mime_type": "image/jpeg",
                 "filename": "jalan.jpg",
                 "size": 4,
@@ -706,9 +717,9 @@ def test_detail_aggregates_attachments_and_ordered_history():
 def test_legacy_forwarded_report_is_marked_unverified_without_receipt():
     repository = FakeRepository()
     repository.report["status"] = "forwarded"
-    detail = ReportPersistenceService(TransactionSession(), repository).get_report_detail(
-        repository.report["id"]
-    )
+    detail = ReportPersistenceService(
+        TransactionSession(), repository
+    ).get_report_detail(repository.report["id"])
 
     assert detail.forwarding_verification == "unverified_legacy"
     assert detail.allowed_transitions == [ReportStatus.RESOLVED]

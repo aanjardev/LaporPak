@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     public_verification_url: str = "http://localhost:3000"
     report_rate_limit_per_hour: int = 5
     allow_legacy_admin_fallback: bool = False
+    allow_demo_knowledge: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

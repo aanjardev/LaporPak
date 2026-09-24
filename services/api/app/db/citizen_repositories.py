@@ -97,7 +97,7 @@ class CitizenRepository:
     ) -> list[dict]:
         review_filter = (
             "d.review_status in ('approved','demo')"
-            if settings.app_env == "development"
+            if settings.allow_demo_knowledge
             else "d.review_status='approved'"
         )
         if embedding is None:

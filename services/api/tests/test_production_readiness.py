@@ -52,8 +52,8 @@ def test_channel_resolution_ends_implicit_read_transaction():
     unit_id = UUID("00000000-0000-4000-8000-000000000002")
 
     class Result:
-        def scalar_one_or_none(self):
-            return unit_id
+        def one_or_none(self):
+            return unit_id, {}
 
     class Session:
         rolled_back = False

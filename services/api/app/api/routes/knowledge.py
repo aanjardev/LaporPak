@@ -88,7 +88,7 @@ def can_review(caller) -> bool:
 
 def embedding_review_sql(alias: str | None = None) -> str:
     prefix = f"{alias}." if alias else ""
-    if settings.app_env == "development":
+    if settings.allow_demo_knowledge:
         return f"{prefix}review_status in ('approved','demo')"
     return f"{prefix}review_status='approved'"
 

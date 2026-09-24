@@ -23,7 +23,8 @@ class CapturingSession:
         return EmptyResult()
 
 
-def test_knowledge_queries_support_natural_language_fts_and_safe_filters():
+def test_knowledge_queries_support_natural_language_fts_and_safe_filters(monkeypatch):
+    monkeypatch.setattr(settings, "allow_demo_knowledge", True)
     session = CapturingSession()
     repository = CitizenRepository(session)
     unit_id = UUID("00000000-0000-4000-8000-000000000002")
@@ -44,6 +45,7 @@ def test_knowledge_queries_support_natural_language_fts_and_safe_filters():
 
 def test_production_search_excludes_demo_sources(monkeypatch):
     monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(settings, "allow_demo_knowledge", False)
     session = CapturingSession()
     CitizenRepository(session).hybrid_search(
         "jam kantor",
