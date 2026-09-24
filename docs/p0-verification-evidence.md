@@ -329,3 +329,19 @@ Baseline kontrak `0be203d` (PR #40). Implementasi berurutan: gateway `0689337`, 
 | Status WhatsApp desa dari pengaturan admin | Gagal memuat, layanan bermasalah | UI deployment nyata dengan sesi admin; tidak membuktikan perangkat logout atau host mati |
 
 Tidak ada mutasi laporan, keputusan warga, perubahan kill switch deployment, pairing/logout WhatsApp, upload sumber ASK, atau embedding live dalam pemeriksaan ini. Secret Railway dinyatakan sudah terpasang oleh pengguna, tetapi tidak tersedia dalam environment lokal. Status dua akun WhatsApp/host belum terverifikasi. E2E dua desa, ASK/TRACK live, pengujian CSP browser authenticated, dan review masing-masing role tetap terbuka.
+
+## Deployment setelah PR #41–#45 digabung — 24 September 2026
+
+Release candidate repository: `38ae13c62e3a1f5a0399078a2366a2b2e367c3e1` pada `main`. Kelima PR sudah digabung berurutan setelah tim menyatakan review selesai. SHA persis yang dijalankan tiap platform belum dibuktikan dari halaman deployment; probe HTTP di bawah membuktikan fitur baru tersedia pada URL publik.
+
+| Probe tanpa sesi | Hasil nyata |
+|---|---|
+| Railway `/health` | 200 `ok` |
+| Railway `/ready` | 200 `degraded`; `configuration=ok`, `database=ok`, `openclaw=degraded` |
+| Railway `/docs`, `/openapi.json` | 404 |
+| Railway daftar REPORT | 401 |
+| Vercel `/login` | 200; CSP dan `nosniff` ada; `X-Powered-By` tidak ada |
+| Vercel `/reports` dan `/reports/dashboard` tanpa sesi | Kembali ke login |
+| Proxy PDF, logo, foto tanpa sesi | Ketiganya 401; PDF/logo memiliki CORP pada respons gagal. Perbaikan CORP foto ada pada branch susulan, belum deployment. |
+
+Konfigurasi OpenClaw masih gagal dilaporkan oleh `/ready`; status host, Cloudflare Tunnel, dan dua akun WhatsApp menunggu pemeriksaan Farel/Anjar. Tidak ada E2E dua desa, mutasi laporan/permohonan, uji isolasi admin, embedding live, atau kill switch live yang diklaim dari probe ini. Tes localhost pada branch susulan membuktikan tautan kembali login mempertahankan `/reports/dashboard?days=7` dan respons foto tanpa sesi mengirim 401+CORP.

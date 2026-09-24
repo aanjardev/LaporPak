@@ -2,6 +2,7 @@ import { reportsDataSource } from "@/lib/reports-data-source";
 import Link from "next/link";
 import { LogOut, Settings } from "lucide-react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 
 import { logoutAction } from "@/app/auth-actions";
 import { BrandLogo } from "@/components/brand-logo";
@@ -11,7 +12,7 @@ import { ReportsNav } from "@/components/reports-nav";
 import { getCurrentAdmin, requireSignedIn } from "@/lib/auth";
 
 export default async function ReportsLayout({ children }: { children: React.ReactNode }) {
-  await requireSignedIn("/reports");
+  await requireSignedIn((await headers()).get("x-laporpak-return-path") ?? "/reports/dashboard");
   const admin = await getCurrentAdmin();
   if (!admin) redirect("/onboarding");
   if (admin.role === "system_admin") redirect("/admin");
