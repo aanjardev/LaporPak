@@ -345,3 +345,10 @@ Release candidate repository: `38ae13c62e3a1f5a0399078a2366a2b2e367c3e1` pada `m
 | Proxy PDF, logo, foto tanpa sesi | Ketiganya 401; PDF/logo memiliki CORP pada respons gagal. Perbaikan CORP foto ada pada branch susulan, belum deployment. |
 
 Konfigurasi OpenClaw masih gagal dilaporkan oleh `/ready`; status host, Cloudflare Tunnel, dan dua akun WhatsApp menunggu pemeriksaan Farel/Anjar. Tidak ada E2E dua desa, mutasi laporan/permohonan, uji isolasi admin, embedding live, atau kill switch live yang diklaim dari probe ini. Tes localhost pada branch susulan membuktikan tautan kembali login mempertahankan `/reports/dashboard?days=7` dan respons foto tanpa sesi mengirim 401+CORP.
+
+
+## Probe susulan setelah PR #46 ? 24 September 2026
+
+Commit `main` repository: `1634e5fb0a82579e5dbceded92931da8f648a473`. Pemeriksaan tanpa sesi pada URL publik Vercel membuktikan perilaku susulan sudah terpasang: `/reports/dashboard?days=7` mengarah ke `/login?next=%2Freports%2Fdashboard%3Fdays%3D7`; proxy foto UUID sintetis mengembalikan `401` dan `Cross-Origin-Resource-Policy: same-origin`. Lint, TypeScript, test auth (6 lulus), dan build lulus pada perubahan PR #46. SHA deployment dari panel Vercel belum dicocokkan; tidak ada klaim uji login atau media authenticated.
+
+Railway `/ready` tetap `200 degraded` dengan database dan konfigurasi `ok`, OpenClaw `degraded`. Sampai Gateway sehat dan kedua akun uji terkonfirmasi, matriks WhatsApp dan isolasi dua desa tetap terbuka.

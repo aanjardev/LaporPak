@@ -150,3 +150,8 @@ hanya berdasarkan decode/re-encode gambar.
 ## Progres implementasi 24 September 2026
 
 Adapter remote, backend readiness, frontend hardening, dan plugin kill switch telah dibuat pada branch terpisah yang saling bergantung. Bukti lokal dan pemeriksaan deployment dicatat di `p0-verification-evidence.md`. Sumber sintetis A/B tersedia di `data/knowledge-base/demo/`, belum diunggah atau di-embedding. Semua checkbox deployment tetap terbuka sampai release candidate yang sama terpasang di Vercel, Railway, dan host OpenClaw.
+
+
+## Status merge dan deployment 24 September 2026
+
+PR #41, #42, #43, #44, #45, dan perbaikan susulan #46 telah digabung ke `main` (`1634e5f`). Probe HTTP publik membuktikan `/ready`, penutupan dokumentasi backend, CSP, proteksi tanpa sesi, serta koreksi tujuan login dan CORP foto tersedia. `/ready` melaporkan OpenClaw `degraded`; status host dan dua kanal belum terbukti. Sumber sintetis A/B baru berupa berkas di repository. Matriks E2E tetap terbuka sampai dilakukan pada deployment yang sama.
