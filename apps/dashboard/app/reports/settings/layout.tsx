@@ -8,7 +8,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       <h1>Pengaturan Akun</h1>
       <p className="mt-2 text-sm text-muted-foreground">Kelola profil, koneksi, dan pengetahuan layanan desa.</p>
     </header>
-    <div className="mt-5 max-w-xl"><SettingsTabs showKnowledge={reportsDataSource() === "api"} /></div>
+    <div data-guide="settings-tabs" className="mt-5 max-w-xl"><SettingsTabs showKnowledge={reportsDataSource() === "api"} /></div>
     <div className="mt-7">{children}</div>
   </div>;
 }
