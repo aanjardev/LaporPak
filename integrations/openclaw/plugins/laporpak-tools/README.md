@@ -91,6 +91,10 @@ On a two-village host, set `LAPORPAK_REQUIRE_RUNTIME_ACCOUNT=true` and leave
 `LAPORPAK_CHANNEL_ACCOUNT_ID` blank. Tools require `agentAccountId` or trusted
 delivery account metadata; inbound media requires the hook account ID. A host
 serving one account may retain `LAPORPAK_CHANNEL_ACCOUNT_ID` as fallback.
+Set `channels.whatsapp.accounts.<id>.pluginHooks.messageReceived=true` for
+each bot account so OpenClaw delivers inbound photos to the plugin. Confirm
+both context fields on the installed runtime with synthetic ASK and REPORT
+before activating both villages; keep the fallback blank during that probe.
 
 ## Tuning Guide
 

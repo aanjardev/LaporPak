@@ -644,6 +644,48 @@ test("trusted runtime account overrides single-account fallback", () => {
   assert.equal(channelEnvironment({ agentAccountId: "village-b" }, twoVillages).LAPORPAK_CHANNEL_ACCOUNT_ID, "village-b");
 });
 
+test("registered citizen tool sends the runtime account for each village", async () => {
+  const previous = {
+    url: process.env.LAPORPAK_API_URL,
+    key: process.env.LAPORPAK_API_KEY,
+    account: process.env.LAPORPAK_CHANNEL_ACCOUNT_ID,
+    required: process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT,
+    fetch: globalThis.fetch,
+  };
+  Object.assign(process.env, {
+    LAPORPAK_API_URL: testEnv.LAPORPAK_API_URL,
+    LAPORPAK_API_KEY: testEnv.LAPORPAK_API_KEY,
+    LAPORPAK_CHANNEL_ACCOUNT_ID: "village-a",
+    LAPORPAK_REQUIRE_RUNTIME_ACCOUNT: "true",
+  });
+  const factories = new Map();
+  plugin.register({ on() {}, registerTool(factory, { name }) { factories.set(name, factory); } });
+  const accountHeaders = [];
+  globalThis.fetch = async (_url, options) => {
+    accountHeaders.push(options.headers["X-Channel-Account-ID"]);
+    return Response.json({ items: [] });
+  };
+  try {
+    const factory = factories.get("laporpak_track_report");
+    const sender = { messageChannel: "whatsapp", requesterSenderId: "6281000000001" };
+    await factory({ ...sender, agentAccountId: "village-a" }).execute("track-a", {});
+    await factory({ ...sender, agentAccountId: "village-b" }).execute("track-b", {});
+    assert.deepEqual(accountHeaders, ["village-a", "village-b"]);
+    assert.throws(() => factory(sender), /Trusted channel account is required/);
+  } finally {
+    globalThis.fetch = previous.fetch;
+    for (const [key, value] of Object.entries({
+      LAPORPAK_API_URL: previous.url,
+      LAPORPAK_API_KEY: previous.key,
+      LAPORPAK_CHANNEL_ACCOUNT_ID: previous.account,
+      LAPORPAK_REQUIRE_RUNTIME_ACCOUNT: previous.required,
+    })) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test("two-village mode ignores media hooks without a trusted account", async () => {
   const previous = {
     account: process.env.LAPORPAK_CHANNEL_ACCOUNT_ID,
