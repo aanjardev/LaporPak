@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     whatsapp_verify_token: str = ""
 
     openclaw_api_url: str = ""
+    openclaw_gateway_token: SecretStr | None = None
+    cf_access_client_id: str = ""
+    cf_access_client_secret: SecretStr | None = None
     openclaw_api_key: SecretStr | None = None
     openclaw_cli_path: str = "openclaw"
     dashboard_admin_unit_id: UUID | None = None
