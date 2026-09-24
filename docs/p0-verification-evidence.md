@@ -308,3 +308,24 @@ Dashboard REQUEST tests:     4 passed
 These checks confirm the current unit and data-layer baselines. They do not
 replace the shared-environment WhatsApp flow, authorization matrix, two-village
 isolation, approved ASK source review, or real REQUEST integration gates.
+
+
+## Finalisasi demo ? pemeriksaan lokal 24 September 2026
+
+Baseline kontrak `0be203d` (PR #40). Implementasi berurutan: gateway `0689337`, backend `d8bb631`, frontend `a27f2c9`, plugin `df73072`. Environment Windows lokal; plugin/eval juga diuji dengan Node 24.16.0. Belum merupakan bukti deployment release candidate.
+
+| Pemeriksaan | Hasil | Sumber/batas |
+|---|---|---|
+| Backend pytest / Ruff | 231 lulus / lulus | Lokal, dependency eksternal disimulasikan dalam tes |
+| Frontend seluruh tests / lint / TypeScript / build | 35 lulus / lulus / lulus / lulus | Lokal; bukan browser E2E login baru |
+| Plugin OpenClaw | 20 lulus | Lokal, termasuk AI_DISABLED dan konteks akun/sesi |
+| FTS | 35/35 | Fixture deterministik, bukan retrieval Gemini live |
+| Eval REPORT / attack / referral | 29/29, 52/52, 7/7 | Deterministik, bukan percakapan WhatsApp |
+| Next production lokal `/login` | 200, CSP nonce cocok HTML, nosniff, tanpa X-Powered-By | HTTP localhost:3105 |
+| Proxy PDF/logo/foto tanpa sesi | 401 untuk ketiganya | HTTP localhost:3105, UUID sintetis |
+| Railway `/health` | 200, status ok | API nyata `laporpak.up.railway.app` |
+| Railway `/ready` | 404 | Perubahan readiness belum terpasang |
+| Vercel `/login` | 200, CSP/nosniff belum ada | Deployment `laporpak-aptikom.vercel.app`, bukan build lokal baru |
+| Status WhatsApp desa dari pengaturan admin | Gagal memuat, layanan bermasalah | UI deployment nyata dengan sesi admin; tidak membuktikan perangkat logout atau host mati |
+
+Tidak ada mutasi laporan, keputusan warga, perubahan kill switch deployment, pairing/logout WhatsApp, upload sumber ASK, atau embedding live dalam pemeriksaan ini. Secret Railway dinyatakan sudah terpasang oleh pengguna, tetapi tidak tersedia dalam environment lokal. Status dua akun WhatsApp/host belum terverifikasi. E2E dua desa, ASK/TRACK live, pengujian CSP browser authenticated, dan review masing-masing role tetap terbuka.

@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.16"
           cache: npm
           cache-dependency-path: apps/dashboard/package-lock.json
       - run: npm ci
@@ -41,9 +41,15 @@ jobs:
         working-directory: apps/dashboard
       - run: npm run test:auth
         working-directory: apps/dashboard
+      - run: npm run test:dashboard
+        working-directory: apps/dashboard
+      - run: npm run test:readiness
+        working-directory: apps/dashboard
       - run: npm run lint
         working-directory: apps/dashboard
       - run: npm run build
+        working-directory: apps/dashboard
+      - run: npx tsc --noEmit
         working-directory: apps/dashboard
 
   openclaw-plugin:
@@ -52,6 +58,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "24.16"
       - run: npm test
         working-directory: integrations/openclaw/plugins/laporpak-tools
+      - run: node fts-recall.js
+        working-directory: integrations/openclaw/evals
+      - run: node runner.js --file report-p0.json
+        working-directory: integrations/openclaw/evals
+      - run: node runner.js --file error-attack-p0.json
+        working-directory: integrations/openclaw/evals
+      - run: node runner.js --file referral-m2.json
+        working-directory: integrations/openclaw/evals
