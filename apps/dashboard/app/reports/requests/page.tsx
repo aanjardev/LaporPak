@@ -41,7 +41,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Sea
         <p className="text-sm text-muted">Data simulasi — prototipe layanan demo, SOP resmi belum ditetapkan.</p>
       </header>
 
-      <section aria-label="Antrean pengajuan" className="overflow-hidden ui-panel">
+      <section data-guide="request-list" aria-label="Antrean pengajuan" className="overflow-hidden ui-panel">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
           <h2 className="font-semibold">Surat Keterangan Domisili</h2>
           <span className="text-sm text-muted-foreground">{result.total} pengajuan</span>

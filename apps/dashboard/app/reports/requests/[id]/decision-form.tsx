@@ -108,7 +108,7 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
 
   return (
     <div className="space-y-6">
-      <section className="ui-panel p-5 sm:p-6">
+      <section data-guide="request-data" className="ui-panel p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-muted-foreground">Nomor pengajuan</p>
@@ -136,7 +136,7 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
         </dl>
       </section>
 
-      <section className="ui-panel p-5 sm:p-6">
+      <section data-guide="request-history" className="ui-panel p-5 sm:p-6">
         <h2 className="text-lg font-semibold">Riwayat keputusan</h2>
         {request.status_history.length === 0 ? (
           <p className="mt-2 text-sm leading-6 text-muted-foreground">Belum ada riwayat keputusan.</p>
@@ -156,7 +156,7 @@ export function RequestDetailView({ initialRequest }: { initialRequest: ServiceR
       </section>
 
       {decisions.length > 0 && (
-        <section className="ui-panel p-5 sm:p-6">
+        <section data-guide="request-decision" className="ui-panel p-5 sm:p-6">
           <h2 className="text-lg font-semibold">Keputusan petugas</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Keputusan akan disimpan sebagai status resmi beserta alasan petugas.

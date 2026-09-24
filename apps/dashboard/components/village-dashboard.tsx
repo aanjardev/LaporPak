@@ -20,7 +20,7 @@ export function VillageDashboardView({ data, isMock }: { data: VillageDashboard;
     { label: "Sumber ASK siap", value: kpis.ask_ready, note: "Aktif, disetujui, dan siap digunakan", icon: BookOpenCheck },
   ];
   return <>
-    <section aria-label="Ringkasan layanan" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section data-guide="dashboard-kpis" aria-label="Ringkasan layanan" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {metrics.map(({ label, value, note, icon: Icon }) => <div key={label} className="ui-panel p-5">
         <div className="flex items-start justify-between gap-3"><h2 className="text-sm font-medium text-muted-foreground">{label}</h2><Icon aria-hidden="true" size={19} className="shrink-0 text-secondary" /></div>
         <p className="mt-4 text-3xl font-bold tabular-nums tracking-tight text-brand">{number.format(value)}</p>
@@ -36,7 +36,7 @@ export function VillageDashboardView({ data, isMock }: { data: VillageDashboard;
           <div className="mt-2 max-h-72 overflow-y-auto rounded-md border border-border"><table className="w-full text-left text-xs tabular-nums"><caption className="sr-only">Jumlah REPORT dan REQUEST setiap hari dalam WIB</caption><thead className="sticky top-0 bg-muted"><tr><th scope="col" className="p-3">Tanggal</th><th scope="col" className="p-3 text-right">REPORT</th><th scope="col" className="p-3 text-right">REQUEST</th></tr></thead><tbody>{data.daily.map((d) => <tr key={d.date} className="border-t border-border"><th scope="row" className="p-3 font-normal">{date(`${d.date}T00:00:00+07:00`)}</th><td className="p-3 text-right">{d.reports}</td><td className="p-3 text-right">{d.requests}</td></tr>)}</tbody></table></div>
         </details>
       </section>
-      <section className="ui-panel min-w-0 overflow-hidden" aria-labelledby="attention-title">
+      <section data-guide="dashboard-attention" className="ui-panel min-w-0 overflow-hidden" aria-labelledby="attention-title">
         <div className="border-b border-border px-5 py-4"><h2 id="attention-title" className="font-semibold">Butuh tindakan <span className="ml-2 text-sm font-normal text-muted-foreground">{number.format(kpis.needs_attention)}</span></h2><p className="mt-1 text-xs text-muted-foreground">Terbaru dari seluruh periode</p></div>
         {isMock && <p className="border-b border-border bg-accent px-5 py-3 text-xs leading-5">Antrean contoh. Detail simulasi tidak tersedia.</p>}
         {data.attention.length ? <ul className="divide-y divide-border">{data.attention.map((item) => {
@@ -46,7 +46,7 @@ export function VillageDashboardView({ data, isMock }: { data: VillageDashboard;
         {kpis.needs_attention > 8 && <p className="border-t border-border px-5 py-3 text-xs text-muted-foreground">Menampilkan 8 terbaru. Buka halaman layanan untuk seluruh antrean.</p>}
       </section>
     </div>
-    <section aria-labelledby="status-title"><div className="mb-4"><h2 id="status-title" className="text-lg font-semibold">Kondisi layanan saat ini</h2><p className="mt-1 text-xs text-muted-foreground">Seluruh periode · tidak mengikuti filter grafik</p></div>
+    <section data-guide="dashboard-status" aria-labelledby="status-title"><div className="mb-4"><h2 id="status-title" className="text-lg font-semibold">Kondisi layanan saat ini</h2><p className="mt-1 text-xs text-muted-foreground">Seluruh periode · tidak mengikuti filter grafik</p></div>
       <div className="grid gap-4 lg:grid-cols-3">
         <StatusPanel title="Laporan warga" href="/reports" rows={reportStatuses.map((status) => [statusLabels[status], data.report_status_counts[status]])} />
         <StatusPanel title="Pengajuan layanan" href="/reports/requests" rows={requestStatuses.map((status) => [requestStatusLabels[status], data.request_status_counts[status]])} />

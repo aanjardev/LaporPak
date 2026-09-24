@@ -144,7 +144,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
       </header>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_290px]">
         <div className="min-w-0 space-y-6">
-          <section aria-labelledby="informasi-laporan" className="ui-panel p-5 sm:p-6">
+          <section data-guide="report-info" aria-labelledby="informasi-laporan" className="ui-panel p-5 sm:p-6">
             <h2 id="informasi-laporan" className="text-lg font-semibold">Informasi laporan</h2>
             <div className="mt-6 space-y-5">
               <div><h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Deskripsi warga</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-foreground">{report.description}</p></div>
@@ -159,7 +159,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
               </dl>
             </div>
           </section>
-          <section aria-labelledby="foto-laporan" className="ui-panel p-5 sm:p-6">
+          <section data-guide="report-photos" aria-labelledby="foto-laporan" className="ui-panel p-5 sm:p-6">
             <h2 id="foto-laporan" className="text-lg font-semibold">Foto laporan</h2>
             {report.attachments.length === 0 ? (
               <p className="mt-4 text-sm text-muted-foreground">Belum ada foto pada laporan ini.</p>
@@ -171,9 +171,9 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
               </ul>
             )}
           </section>
-          <LazyPanel label="Memuat dokumen laporan"><ReportDocumentsPanel reportId={report.id} disabled={isMock} /></LazyPanel>
-          <LazyPanel label="Memuat progres rujukan"><ReportReferralPanel reportId={report.id} reportStatus={report.status} disabled={isMock} /></LazyPanel>
-          <section aria-labelledby="riwayat-status" className="defer-render ui-panel p-5 sm:p-6">
+          <div data-guide="report-documents"><LazyPanel label="Memuat dokumen laporan"><ReportDocumentsPanel reportId={report.id} disabled={isMock} /></LazyPanel></div>
+          <div data-guide="report-referrals"><LazyPanel label="Memuat progres rujukan"><ReportReferralPanel reportId={report.id} reportStatus={report.status} disabled={isMock} /></LazyPanel></div>
+          <section data-guide="report-history" aria-labelledby="riwayat-status" className="defer-render ui-panel p-5 sm:p-6">
             <h2 id="riwayat-status" className="text-lg font-semibold">Riwayat status</h2>
             {report.status_history.length === 0 ? <p className="mt-4 text-sm text-muted-foreground">Belum ada riwayat status.</p> : (
               <ol className="mt-6 space-y-5 border-l-2 border-border pl-5">
@@ -200,7 +200,7 @@ export function ReportDetailView({ initialReport, actionsEnabled, isMock }: { in
             </dl>
           </section>
           {actionsEnabled && availableActions.length > 0 && state !== "saved_unavailable" && state !== "conflict" && (
-            <section aria-labelledby="keputusan-petugas" className="scroll-mt-4 ui-panel p-5">
+            <section data-guide="report-decision" aria-labelledby="keputusan-petugas" className="scroll-mt-4 ui-panel p-5">
               <h2 id="keputusan-petugas" className="text-base font-semibold">Aksi petugas</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">Periksa laporan dan pilih langkah penanganan berikutnya.</p>
               <form ref={decisionForm} onSubmit={handleSubmit} className="mt-5 space-y-4" aria-busy={state === "saving"}>
