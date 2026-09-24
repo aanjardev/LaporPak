@@ -1,3 +1,4 @@
+import { reportsDataSource } from "./reports-data-source.ts";
 import { reportStatuses, type ReportStatus } from "./reports.ts";
 import { requestStatuses, type ServiceRequestStatus } from "./service-request-types.ts";
 
@@ -129,8 +130,9 @@ export function mockDashboard(village: { id: string; name: string }, days: Dashb
 }
 
 export async function getVillageDashboard(village: { id: string; name: string }, days: DashboardDays, token: string, scenario?: string): Promise<VillageDashboard> {
-  if (process.env.REPORTS_DATA_SOURCE !== "api") {
-    if (process.env.NODE_ENV === "production") throw new DashboardApiError(503);
+  let source: "api" | "mock";
+  try { source = reportsDataSource(); } catch { throw new DashboardApiError(503); }
+  if (source === "mock") {
     if (scenario === "error") throw new DashboardApiError(503);
     if (scenario === "slow") await new Promise((resolve) => setTimeout(resolve, 1500));
     return mockDashboard(village, days, new Date(), scenario === "empty");

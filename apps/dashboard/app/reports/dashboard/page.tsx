@@ -1,3 +1,4 @@
+import { reportsDataSource } from "@/lib/reports-data-source";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { RefreshCw } from "lucide-react";
@@ -19,7 +20,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const village = admin.villages.find((item) => item.is_active && item.activation_status === "approved") ?? admin.villages[0];
   if (!village) redirect("/onboarding");
   if (!village.is_active || village.activation_status !== "approved") return <div className="ui-panel mx-auto max-w-2xl p-6"><h1 className="text-2xl font-bold">Desa belum aktif</h1><p className="mt-3 text-sm leading-6 text-muted-foreground">Lengkapi pengaturan dan periksa status aktivasi untuk membuka ringkasan layanan desa.</p><Link href="/reports/settings" className="ui-primary mt-5">Buka pengaturan</Link></div>;
-  const isMock = process.env.REPORTS_DATA_SOURCE !== "api";
+  const isMock = reportsDataSource() === "mock";
   let data;
   try {
     data = await getVillageDashboard(village, days, await getAdminAccessToken(), typeof params.scenario === "string" ? params.scenario : undefined);

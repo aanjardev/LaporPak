@@ -1,3 +1,4 @@
+import { reportsDataSource } from "./reports-data-source.ts";
 import { reportStatusActions } from "./report-status-actions.ts";
 
 export const reportStatuses = [
@@ -301,7 +302,7 @@ export async function getReports(
   query: ReportQuery,
   accessToken?: string,
 ): Promise<ReportListResponse> {
-  if (process.env.REPORTS_DATA_SOURCE === "api") {
+  if (reportsDataSource() === "api") {
     const params = new URLSearchParams({
       page: String(query.page),
       page_size: String(query.page_size),
@@ -344,7 +345,7 @@ export async function getReportById(
   id: string,
   accessToken?: string,
 ): Promise<ReportDetail | null> {
-  if (process.env.REPORTS_DATA_SOURCE === "api") {
+  if (reportsDataSource() === "api") {
     try {
       const report = await apiRequest<ReportDetail>(
         `/api/v1/reports/${encodeURIComponent(id)}`,
@@ -378,7 +379,7 @@ export async function getReportAttachment(
   attachmentId: string,
   accessToken: string,
 ): Promise<Response> {
-  if (process.env.REPORTS_DATA_SOURCE === "api") {
+  if (reportsDataSource() === "api") {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
     if (!baseUrl) throw new Error("NEXT_PUBLIC_API_URL is not configured");
     return fetch(new URL(
@@ -408,7 +409,7 @@ export async function updateReportStatus(
   accessToken?: string,
   mockCurrentStatus?: ReportStatus,
 ): Promise<UpdateReportStatusResponse> {
-  if (process.env.REPORTS_DATA_SOURCE === "api") {
+  if (reportsDataSource() === "api") {
     return apiRequest(
       `/api/v1/reports/${encodeURIComponent(id)}/status`,
       { method: "PATCH", body: JSON.stringify(request) },

@@ -4,6 +4,8 @@ import test from "node:test";
 import { getReportAttachment, getReportById, getReports, ReportApiError, updateReportStatus } from "../lib/reports.ts";
 import { reportStatusActions } from "../lib/report-status-actions.ts";
 
+process.env.REPORTS_DATA_SOURCE = "mock";
+
 test("mock daftar dan detail mengikuti alur laporan", async () => {
   const firstPage = await getReports({ page: 1, page_size: 20 });
   const secondPage = await getReports({ page: 2, page_size: 20 });

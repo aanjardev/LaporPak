@@ -1,3 +1,4 @@
+import { reportsDataSource } from "@/lib/reports-data-source";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { BookOpen, Plus } from "lucide-react";
@@ -12,10 +13,10 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const categoryLabels: Record<string, string> = { village_profile: "Profil desa", sop: "SOP", governance: "Pemerintahan", custom: "Lainnya" };
 const processingLabels: Record<string, string> = { pending: "Menunggu pemrosesan", processing: "Sedang diproses", ready: "Siap digunakan", failed: "Pemrosesan gagal" };
-const reviewLabels = { draft: "Draf", demo: "Data uji", approved: "Disetujui", rejected: "Ditolak" } as const;
+const reviewLabels = { draft: "Draf", demo: "Data simulasi", approved: "Disetujui", rejected: "Ditolak" } as const;
 
 export default async function KnowledgeSettingsPage({ searchParams }: { searchParams: SearchParams }) {
-  if (process.env.REPORTS_DATA_SOURCE !== "api") redirect("/reports/settings");
+  if (reportsDataSource() === "mock") redirect("/reports/settings");
   await requireSignedIn(knowledgeSettingsPath);
   const params = await searchParams;
   let documents;
