@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { availableSteps, introSteps, pageGuide, tourStorageKey } from "../lib/guided-tour.ts";
+import { availableSteps, introSteps, pageGuide, pageGuideScope, pageTourStorageKey, tourStorageKey } from "../lib/guided-tour.ts";
 
 test("tur awal khusus Admin Desa menyesuaikan layar dan status aktivasi", () => {
   const desktop = introSteps(true, false);
@@ -21,4 +21,17 @@ test("panduan mengikuti halaman dan melewati target yang tidak tersedia", () => 
   assert.equal(pageGuide("/reports/settings/knowledge/contoh", true, true).title, "Detail Sumber ASK");
   assert.equal(pageGuide("/reports/settings", false, false).steps.at(-1).title, "Aktivasi desa");
   assert.equal(pageGuide("/reports/dashboard", false, false).steps[0].target, '[data-guide="dashboard-inactive"]');
+});
+
+test("panduan otomatis disimpan per akun dan jenis halaman, bukan per tiket", () => {
+  const reportA = pageGuideScope("/reports/tiket-a", true, true);
+  const reportB = pageGuideScope("/reports/tiket-b", true, true);
+  assert.equal(reportA?.id, "report-detail");
+  assert.equal(reportB?.id, reportA.id);
+  assert.equal(reportA.readyTarget, '[data-guide="report-info"]');
+  assert.equal(pageGuideScope("/reports/dashboard", false, true)?.id, "dashboard-inactive");
+  assert.equal(pageGuideScope("/reports/dashboard", true, true)?.id, "dashboard-active");
+  assert.equal(pageGuideScope("/reports/settings/knowledge", true, false), null);
+  assert.notEqual(pageTourStorageKey("akun-a", "report-detail"), pageTourStorageKey("akun-a", "request-detail"));
+  assert.notEqual(pageTourStorageKey("akun-a", "report-detail"), pageTourStorageKey("akun-b", "report-detail"));
 });
