@@ -106,13 +106,13 @@ async function trustedAttachments(context, env = process.env) {
     mediaCacheKey(
       channelAccountId,
       context.requesterSenderId,
-      context.sessionId ?? null,
+      context.sessionKey ?? context.sessionId ?? null,
     ),
   ) ?? [];
   const freshMedia = media.filter(
     (item) =>
       Date.now() - item.receivedAt <= MEDIA_TTL_MS &&
-      (!item.sessionId || !context.sessionId || item.sessionId === context.sessionId),
+      (!item.sessionId || item.sessionId === (context.sessionKey ?? context.sessionId ?? null)),
   );
   const attachments = [];
   for (const [index, item] of freshMedia.slice(0, 3).entries()) {
@@ -156,6 +156,23 @@ function backendConfig(env) {
   return { apiUrl, apiKey, channelAccountId };
 }
 
+export function channelEnvironment(context, env = process.env) {
+  const account = context.agentAccountId ?? context.deliveryContext?.accountId;
+  if (account !== undefined && (typeof account !== "string" || !account.trim())) {
+    throw new Error("Trusted channel account is invalid");
+  }
+  return account === undefined ? env : { ...env, LAPORPAK_CHANNEL_ACCOUNT_ID: account.trim() };
+}
+
+function backendFailure(status, result) {
+  if (status === 503 && result?.error?.code === "AI_DISABLED") {
+    return new Error("AI_DISABLED: Layanan otomatis sedang nonaktif. Silakan hubungi petugas desa. Jangan mengklaim tindakan berhasil atau mengulang otomatis sebelum layanan diaktifkan.");
+  }
+  // Do not expose upstream detail or arbitrary response text to the model.
+  const code = /^[A-Z][A-Z0-9_]{0,63}$/.test(result?.error?.code ?? "") ? result.error.code : "REQUEST_FAILED";
+  return new Error(`LaporPak API rejected the request (${status} ${code})`);
+}
+
 async function callBackend(fetchImpl, env, path, body) {
   const { apiUrl, apiKey, channelAccountId } = backendConfig(env);
   const response = await fetchImpl(apiEndpoint(apiUrl, path), {
@@ -170,8 +187,7 @@ async function callBackend(fetchImpl, env, path, body) {
   });
   const result = await responseJson(response);
   if (!response.ok) {
-    const code = result?.error?.code ?? "REQUEST_FAILED";
-    throw new Error(`LaporPak API rejected the request (${response.status} ${code})`);
+    throw backendFailure(response.status, result);
   }
   return { response, result };
 }
@@ -212,8 +228,7 @@ async function callOperatorBackend(
   });
   const result = await responseJson(response);
   if (!response.ok) {
-    const code = result?.error?.code ?? "REQUEST_FAILED";
-    throw new Error(`LaporPak API rejected the request (${response.status} ${code})`);
+    throw backendFailure(response.status, result);
   }
   return result;
 }
@@ -336,8 +351,7 @@ export function buildCreateReportTool(
       });
       const result = await responseJson(response);
       if (!response.ok) {
-        const code = result?.error?.code ?? "REQUEST_FAILED";
-        throw new Error(`LaporPak API rejected the report (${response.status} ${code})`);
+        throw backendFailure(response.status, result);
       }
 
       for (const attachment of attachments) {
@@ -526,10 +540,7 @@ export function buildServiceRequestTool(
       );
       const result = await responseJson(response);
       if (!response.ok) {
-        const code = result?.error?.code ?? "REQUEST_FAILED";
-        throw new Error(
-          `LaporPak API rejected the service request (${response.status} ${code})`,
-        );
+        throw backendFailure(response.status, result);
       }
       const details = { ...result, replayed: response.status === 200 };
       return {
@@ -860,14 +871,15 @@ export default {
   name: "LaporPak Tools",
   description: "Citizen tools plus opt-in operator referral tools through the FastAPI boundary.",
   register(api) {
-    api.on("message_received", (event) => {
+    api.on("message_received", (event, hookContext = {}) => {
       pruneMediaCache();
-      const channelAccountId = process.env.LAPORPAK_CHANNEL_ACCOUNT_ID?.trim();
+      const channelAccountId = hookContext.accountId?.trim() || process.env.LAPORPAK_CHANNEL_ACCOUNT_ID?.trim();
+      const session = hookContext.sessionKey ?? event.sessionKey ?? event.sessionId ?? null;
       const key = channelAccountId
         ? mediaCacheKey(
             channelAccountId,
             event.senderId ?? event.from,
-            event.sessionId ?? null,
+            session,
           )
         : "";
       const media = (event.media ?? [])
@@ -880,42 +892,42 @@ export default {
           mimeType: item.contentType,
           messageId: item.messageId ?? event.messageId,
           receivedAt: Date.now(),
-          sessionId: event.sessionId ?? null,
+          sessionId: session,
           consumedBy: null,
         }));
       if (key && media.length > 0) {
         recentMediaBySender.set(key, media);
       }
     });
-    api.registerTool((context) => buildCreateReportTool(context), {
+    api.registerTool((context) => buildCreateReportTool(context, globalThis.fetch, channelEnvironment(context)), {
       name: "laporpak_create_report",
       optional: true,
     });
-    api.registerTool((context) => buildAskTool(context), {
+    api.registerTool((context) => buildAskTool(context, globalThis.fetch, channelEnvironment(context)), {
       name: "laporpak_ask",
       optional: true,
     });
-    api.registerTool((context) => buildTrackTool(context), {
+    api.registerTool((context) => buildTrackTool(context, globalThis.fetch, channelEnvironment(context)), {
       name: "laporpak_track_report",
       optional: true,
     });
-    api.registerTool((context) => buildReportDocumentTool(context), {
+    api.registerTool((context) => buildReportDocumentTool(context, globalThis.fetch, channelEnvironment(context)), {
       name: "laporpak_get_report_document",
       optional: true,
     });
-    api.registerTool((context) => buildServiceRequestTool(context), {
+    api.registerTool((context) => buildServiceRequestTool(context, globalThis.fetch, channelEnvironment(context)), {
       name: "laporpak_create_service_request",
       optional: true,
     });
-    api.registerTool((context) => buildDetectEmergencyTool(context), {
+    api.registerTool((context) => buildDetectEmergencyTool(context, globalThis.fetch, channelEnvironment(context)), {
       name: "laporpak_detect_emergency",
       optional: true,
     });
-    api.registerTool((context) => buildSimilarReportsTool(context), {
+    api.registerTool((context) => buildSimilarReportsTool(context, globalThis.fetch, channelEnvironment(context)), {
       name: "laporpak_check_similar",
       optional: true,
     });
-    api.registerTool((context) => buildConfirmResolutionTool(context), {
+    api.registerTool((context) => buildConfirmResolutionTool(context, globalThis.fetch, channelEnvironment(context)), {
       name: "laporpak_confirm_resolution",
       optional: true,
     });
