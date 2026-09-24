@@ -639,6 +639,38 @@ test("trusted runtime account overrides single-account fallback", () => {
   assert.equal(channelEnvironment({ deliveryContext: { accountId: "village-a" } }, testEnv).LAPORPAK_CHANNEL_ACCOUNT_ID, "village-a");
   assert.throws(() => channelEnvironment({ agentAccountId: "" }, testEnv), /invalid/);
   assert.equal(testEnv.LAPORPAK_CHANNEL_ACCOUNT_ID, "whatsapp-demo");
+  const twoVillages = { ...testEnv, LAPORPAK_REQUIRE_RUNTIME_ACCOUNT: "true" };
+  assert.throws(() => channelEnvironment({}, twoVillages), /required/);
+  assert.equal(channelEnvironment({ agentAccountId: "village-b" }, twoVillages).LAPORPAK_CHANNEL_ACCOUNT_ID, "village-b");
+});
+
+test("two-village mode ignores media hooks without a trusted account", async () => {
+  const previous = {
+    account: process.env.LAPORPAK_CHANNEL_ACCOUNT_ID,
+    required: process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT,
+  };
+  process.env.LAPORPAK_CHANNEL_ACCOUNT_ID = "village-a";
+  process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT = "true";
+  try {
+    let inbound;
+    plugin.register({ on(_event, handler) { inbound = handler; }, registerTool() {} });
+    inbound({
+      senderId: "6281000000001",
+      sessionKey: "two-village-untrusted-media",
+      media: [{ path: "missing-test-photo.jpg", contentType: "image/jpeg" }],
+    }, {});
+    const tool = buildCreateReportTool(
+      { messageChannel: "whatsapp", requesterSenderId: "6281000000001", sessionKey: "two-village-untrusted-media" },
+      async () => { throw new Error("Backend must not be called"); },
+      testEnv,
+    );
+    await assert.rejects(tool.execute("untrusted-media", input), /No trusted WhatsApp photo/);
+  } finally {
+    if (previous.account === undefined) delete process.env.LAPORPAK_CHANNEL_ACCOUNT_ID;
+    else process.env.LAPORPAK_CHANNEL_ACCOUNT_ID = previous.account;
+    if (previous.required === undefined) delete process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT;
+    else process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT = previous.required;
+  }
 });
 
 test("disabled citizen tools never return success or retry", async () => {

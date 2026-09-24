@@ -79,13 +79,18 @@ operator token through the host secret mechanism and keep it out of Git.
 ```env
 LAPORPAK_API_URL=http://localhost:8000
 LAPORPAK_API_KEY=<internal-key>
-LAPORPAK_CHANNEL_ACCOUNT_ID=<authenticated-whatsapp-account-id>
+LAPORPAK_CHANNEL_ACCOUNT_ID=
+LAPORPAK_REQUIRE_RUNTIME_ACCOUNT=true
 LAPORPAK_REFERRAL_TOOLS_ENABLED=false
 LAPORPAK_OPERATOR_ACCESS_TOKEN=
 ```
 
 The plugin does not read Supabase or Gemini credentials and never accepts
 an API URL, API key, or citizen phone number from model-generated tool input.
+On a two-village host, set `LAPORPAK_REQUIRE_RUNTIME_ACCOUNT=true` and leave
+`LAPORPAK_CHANNEL_ACCOUNT_ID` blank. Tools require `agentAccountId` or trusted
+delivery account metadata; inbound media requires the hook account ID. A host
+serving one account may retain `LAPORPAK_CHANNEL_ACCOUNT_ID` as fallback.
 
 ## Tuning Guide
 

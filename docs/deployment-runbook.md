@@ -57,7 +57,7 @@ Tambahkan nama ke `.env.example` bersamaan dengan implementasi, tanpa secret.
 | Railway -> Supabase | Konfigurasi database/Auth/Storage backend yang sudah digunakan |
 | OpenClaw -> Railway | `LAPORPAK_API_URL`, `LAPORPAK_API_KEY` sesuai `OPENCLAW_API_KEY` FastAPI |
 | OpenClaw -> Gemini | `GEMINI_API_KEY` hanya pada host AI |
-| Kanal | `LAPORPAK_CHANNEL_ACCOUNT_ID` per runtime terisolasi, atau metadata akun terautentikasi yang didukung plugin |
+| Kanal | Untuk host dua desa, `LAPORPAK_REQUIRE_RUNTIME_ACCOUNT=true`; akun diambil dari metadata kanal terautentikasi. `LAPORPAK_CHANNEL_ACCOUNT_ID` hanya fallback host satu akun. |
 | Vercel | `REPORTS_DATA_SOURCE=api`, URL FastAPI dan konfigurasi Supabase Auth publik yang sudah digunakan |
 
 Flag demo adalah pengecualian eksplisit pada data sintetis; jangan mengubah
@@ -99,4 +99,4 @@ SOP layanan, provisioning otomatis dan operasi produksi tetap pekerjaan terpisah
 
 ### Identitas kanal runtime multi-desa
 
-Plugin mengambil akun dari konteks tepercaya OpenClaw (`agentAccountId` pada tool, `accountId` pada hook), bukan argumen model. Cache foto dibatasi akun, pengirim, dan session key. `LAPORPAK_CHANNEL_ACCOUNT_ID` hanya fallback host satu akun versi lama; jangan mengandalkannya untuk host dua desa. Verifikasi versi host menyediakan konteks tersebut sebelum E2E.
+Plugin mengambil akun dari konteks tepercaya OpenClaw (`agentAccountId` pada tool, `accountId` pada hook), bukan argumen model. Cache foto dibatasi akun, pengirim, dan session key. Set `LAPORPAK_REQUIRE_RUNTIME_ACCOUNT=true` pada host dua desa: tool menolak panggilan tanpa identitas akun runtime, dan hook mengabaikan foto tanpa akun runtime. `LAPORPAK_CHANNEL_ACCOUNT_ID` hanya fallback host satu akun versi lama. Verifikasi versi host menyediakan konteks tersebut sebelum E2E.

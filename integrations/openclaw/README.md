@@ -71,9 +71,12 @@ Use `details.json` as the untrusted result and validate it again with
 Do not put `GEMINI_API_KEY`, channel credentials, or backend credentials in
 this directory, prompts, logs, or model input.
 
-The OpenClaw host also needs `LAPORPAK_API_URL`, `LAPORPAK_API_KEY`, and
-`LAPORPAK_CHANNEL_ACCOUNT_ID` from its local environment. Send the channel ID
-as `X-Channel-Account-ID`, the API key as `X-OpenClaw-API-Key`, and a stable
+The OpenClaw host also needs `LAPORPAK_API_URL` and `LAPORPAK_API_KEY` from its
+local environment. For two villages, set `LAPORPAK_REQUIRE_RUNTIME_ACCOUNT=true`
+and use the trusted OpenClaw channel account context; do not set one global
+`LAPORPAK_CHANNEL_ACCOUNT_ID` for both. A single-account host may use that
+environment value as a fallback. Send the channel ID as `X-Channel-Account-ID`,
+the API key as `X-OpenClaw-API-Key`, and a stable
 draft UUID as `Idempotency-Key` for create operations.
 
 Referral tools are a separate M2 operator capability. They remain absent from

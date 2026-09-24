@@ -52,8 +52,9 @@ berbeda dari API key arah OpenClaw ke FastAPI.
 
 Plugin mengambil akun dari konteks kanal tepercaya saat host menyediakan
 `agentAccountId`/`accountId`. `LAPORPAK_CHANNEL_ACCOUNT_ID` menjadi fallback
-untuk runtime satu akun. Farel wajib membuktikan bahwa dua akun host tidak memakai
-satu nilai global untuk keduanya. Verifikasi konteks kanal pada versi host yang
+untuk runtime satu akun. Pada host dua desa, set
+`LAPORPAK_REQUIRE_RUNTIME_ACCOUNT=true` agar panggilan tanpa konteks akun ditolak.
+Farel wajib membuktikan kedua akun dan konteks kanal pada versi host yang
 terpasang sebelum dua desa diaktifkan.
 Nama desa dari pesan/model tidak boleh menjadi sumber scope.
 
