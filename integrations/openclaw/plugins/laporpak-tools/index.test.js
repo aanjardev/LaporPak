@@ -6,6 +6,7 @@ import test from "node:test";
 
 import plugin from "./index.js";
 import {
+  channelEnvironment,
   buildAskTool,
   buildCaseContextTool,
   buildConfirmResolutionTool,
@@ -370,10 +371,10 @@ test("trusted media is isolated by session and cannot move to another draft", as
   });
   inbound({
     senderId: "628199999999",
-    sessionId: "session-a",
+    sessionKey: "session-key-a",
     messageId: "media-message",
     media: [{ path: photo, contentType: "image/jpeg" }],
-  });
+  }, { accountId: "whatsapp-demo", sessionKey: "session-key-a" });
   const fetchImpl = async () => Response.json({
     id: "72af1a52-7016-48c7-aacc-6c35417be819",
     ticket_number: "LP-2026-0001",
@@ -389,7 +390,7 @@ test("trusted media is isolated by session and cannot move to another draft", as
     await assert.rejects(otherSession.execute("other", input), /No trusted WhatsApp photo/);
 
     const tool = buildCreateReportTool(
-      { messageChannel: "whatsapp", requesterSenderId: "628199999999", sessionId: "session-a" },
+      { messageChannel: "whatsapp", requesterSenderId: "628199999999", sessionKey: "session-key-a", sessionId: "runtime-session-id" },
       fetchImpl,
       testEnv,
     );
@@ -630,4 +631,24 @@ test("referral tools are disabled for citizen WhatsApp and opt-in runtimes", asy
     disabledTool.execute("disabled", { report_id: referralIds.report }),
     /disabled for this OpenClaw runtime/,
   );
+});
+
+
+test("trusted runtime account overrides single-account fallback", () => {
+  assert.equal(channelEnvironment({ agentAccountId: "village-b" }, testEnv).LAPORPAK_CHANNEL_ACCOUNT_ID, "village-b");
+  assert.equal(channelEnvironment({ deliveryContext: { accountId: "village-a" } }, testEnv).LAPORPAK_CHANNEL_ACCOUNT_ID, "village-a");
+  assert.throws(() => channelEnvironment({ agentAccountId: "" }, testEnv), /invalid/);
+  assert.equal(testEnv.LAPORPAK_CHANNEL_ACCOUNT_ID, "whatsapp-demo");
+});
+
+test("disabled citizen tools never return success or retry", async () => {
+  let calls = 0;
+  const fetchImpl = async () => { calls++; return Response.json({ error: { code: "AI_DISABLED" } }, { status: 503 }); };
+  const context = { messageChannel: "whatsapp", requesterSenderId: "6281234567890" };
+  const tool = buildTrackTool(context, fetchImpl, testEnv);
+  await assert.rejects(tool.execute("disabled", { ticket_number: "LP-2026-0001" }), /AI_DISABLED.*hubungi petugas desa/);
+  assert.equal(calls, 1);
+  const report = buildCreateReportTool(context, fetchImpl, testEnv, testAttachments);
+  await assert.rejects(report.execute("disabled-report", input), /AI_DISABLED/);
+  assert.equal(calls, 2);
 });

@@ -96,3 +96,7 @@ backup lokal bila diperlukan dan ulangi probe dua akun.
 
 MVP demo ready baru dicatat setelah matriks lengkap lulus. Sumber ASK resmi,
 SOP layanan, provisioning otomatis dan operasi produksi tetap pekerjaan terpisah.
+
+### Identitas kanal runtime multi-desa
+
+Plugin mengambil akun dari konteks tepercaya OpenClaw (`agentAccountId` pada tool, `accountId` pada hook), bukan argumen model. Cache foto dibatasi akun, pengirim, dan session key. `LAPORPAK_CHANNEL_ACCOUNT_ID` hanya fallback host satu akun versi lama; jangan mengandalkannya untuk host dua desa. Verifikasi versi host menyediakan konteks tersebut sebelum E2E.
