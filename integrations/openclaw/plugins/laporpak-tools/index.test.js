@@ -389,6 +389,13 @@ test("trusted media is isolated by session and cannot move to another draft", as
     );
     await assert.rejects(otherSession.execute("other", input), /No trusted WhatsApp photo/);
 
+    const otherVillage = buildCreateReportTool(
+      { messageChannel: "whatsapp", requesterSenderId: "628199999999", sessionKey: "session-key-a" },
+      fetchImpl,
+      { ...testEnv, LAPORPAK_CHANNEL_ACCOUNT_ID: "whatsapp-other-village" },
+    );
+    await assert.rejects(otherVillage.execute("other-village", input), /No trusted WhatsApp photo/);
+
     const tool = buildCreateReportTool(
       { messageChannel: "whatsapp", requesterSenderId: "628199999999", sessionKey: "session-key-a", sessionId: "runtime-session-id" },
       fetchImpl,
