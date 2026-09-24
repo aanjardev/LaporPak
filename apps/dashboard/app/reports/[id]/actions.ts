@@ -1,4 +1,6 @@
 "use server";
+import { reportsDataSource } from "@/lib/reports-data-source";
+
 
 import { getReportById, ReportApiError, updateReportStatus, type ReportStatus, type UpdateReportStatusRequest } from "@/lib/reports";
 import { requireSignedIn } from "@/lib/auth";
@@ -16,7 +18,7 @@ export async function saveReportDecision(id: string, request: UpdateReportStatus
   try {
     revalidatePath("/reports");
     revalidatePath(`/reports/${id}`);
-    if (process.env.REPORTS_DATA_SOURCE !== "api") {
+    if (reportsDataSource() === "mock") {
       return { ok: true as const, data, report: null };
     }
     return { ok: true as const, data, report: await getReportById(id) };

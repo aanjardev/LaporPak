@@ -1,3 +1,4 @@
+import { reportsDataSource } from "@/lib/reports-data-source";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getAdminAccessToken, requireSignedIn } from "@/lib/auth";
@@ -8,10 +9,10 @@ import { KnowledgeForm, KnowledgeReviewForm } from "@/app/reports/knowledge/know
 import { KnowledgeUnavailable } from "@/app/reports/knowledge/knowledge-unavailable";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-const reviewLabels = { draft: "Draf", demo: "Data uji", approved: "Disetujui", rejected: "Ditolak" } as const;
+const reviewLabels = { draft: "Draf", demo: "Data simulasi", approved: "Disetujui", rejected: "Ditolak" } as const;
 
 export default async function KnowledgeSettingsDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: SearchParams }) {
-  if (process.env.REPORTS_DATA_SOURCE !== "api") redirect("/reports/settings");
+  if (reportsDataSource() === "mock") redirect("/reports/settings");
   const { id } = await params;
   const returnPath = knowledgeDetailPath(id);
   await requireSignedIn(returnPath);

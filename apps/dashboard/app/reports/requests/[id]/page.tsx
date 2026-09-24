@@ -30,6 +30,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       <header className="ui-page-header">
         <p className="text-sm font-semibold text-brand">Layanan warga / REQUEST</p>
         <h1 className="text-3xl font-bold tracking-tight sm:text-3xl">Detail pengajuan</h1>
+        <p className="text-sm text-muted">Data simulasi — prototipe layanan demo, SOP resmi belum ditetapkan.</p>
       </header>
       <RequestDetailView key={`${request.id}:${request.updated_at}`} initialRequest={request} />
     </div>

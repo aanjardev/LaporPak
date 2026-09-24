@@ -1,3 +1,4 @@
+import { reportsDataSource } from "@/lib/reports-data-source";
 import { notFound, redirect } from "next/navigation";
 import { ReportDetailView } from "@/components/report-detail";
 import { getReportById, ReportApiError } from "@/lib/reports";
@@ -25,6 +26,6 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
     key={report.id}
     initialReport={report}
     actionsEnabled
-    isMock={process.env.REPORTS_DATA_SOURCE !== "api"}
+    isMock={reportsDataSource() === "mock"}
   />;
 }

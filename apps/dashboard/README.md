@@ -28,9 +28,9 @@ Untuk menguji login, buat satu akun uji dengan email, kata sandi, dan email terk
 5. Petugas menekan **Terima undangan**, lalu mengatur kata sandi di `/set-password`. Penerimaan undangan dilakukan setelah tombol ditekan agar pembaca pratinjau email tidak menghabiskan tautan sekali pakai.
 6. Muat ulang `/reports`, keluar, lalu masuk lagi memakai kata sandi baru. Jika tautan kedaluwarsa atau gagal, pengelola mengirim undangan baru.
 
-Pengiriman undangan dilakukan dari Supabase Dashboard oleh pengelola. Frontend tidak menyimpan service role key dan tidak mempunyai formulir pendaftaran publik. Mode default `mock` hanya menampilkan laporan sintetis. Saat `REPORTS_DATA_SOURCE=api`, FastAPI memeriksa token Supabase serta akun admin, peran, dan cakupan desa. Pembatasan tersebut tetap perlu dibuktikan lewat uji integrasi nyata sebelum deployment publik.
+Pengiriman undangan dilakukan dari Supabase Dashboard oleh pengelola. Frontend tidak menyimpan service role key dan tidak mempunyai formulir pendaftaran publik. Mode `mock` wajib diaktifkan eksplisit dan hanya tersedia pada local/preview. Saat `REPORTS_DATA_SOURCE=api`, FastAPI memeriksa token Supabase serta akun admin, peran, dan cakupan desa. Pembatasan tersebut tetap perlu dibuktikan lewat uji integrasi nyata sebelum deployment publik.
 
-Buka `http://localhost:3000/login`. Tanpa sesi, `/reports` dan detailnya mengarah ke login. Setelah login, sesi bertahan saat halaman dimuat ulang; tombol **Keluar** mengakhiri sesi. Secara default, `REPORTS_DATA_SOURCE=mock` memakai laporan sintetis. Pencarian, filter status/urgensi/kategori, dan pagination disimpan pada URL.
+Buka `http://localhost:3000/login`. Tanpa sesi, `/reports` dan detailnya mengarah ke login. Setelah login, sesi bertahan saat halaman dimuat ulang; tombol **Keluar** mengakhiri sesi. `REPORTS_DATA_SOURCE=mock` memakai laporan sintetis hanya pada local/preview. Production wajib memakai `api`; nilai kosong/invalid ditolak. Pencarian, filter status/urgensi/kategori, dan pagination disimpan pada URL.
 
 Untuk memeriksa state kosong, error, atau loading pada mode development, set `REPORTS_MOCK_SCENARIO` menjadi `empty`, `error`, atau `slow` di `.env.local`, lalu mulai ulang server. Nilai default adalah `normal`. Skenario tersebut diabaikan pada build production.
 
@@ -126,3 +126,7 @@ tidak perlu diganti ke mock untuk integrasi API.
 
 Jalankan `npm run test:dashboard` untuk kontrak, periode WIB, nol, pemetaan
 tautan, status HTTP, jaringan gagal, dan isolasi mode data.
+
+## Hardening demo
+
+Production Vercel wajib `REPORTS_DATA_SOURCE=api`. Mock tidak menjadi fallback ketika konfigurasi atau API gagal. CSP memakai nonce per respons; rendering dinamis mempertahankan hydration Next.js. Inline style tetap diizinkan untuk posisi Base UI/grafik; inline script tanpa nonce ditolak. Proxy aset privat memakai `private, no-store`, `nosniff`, dan CORP same-origin. Verifikasi login, server action, QR, foto dan unduhan PDF pada deployment sebelum menutup release gate.

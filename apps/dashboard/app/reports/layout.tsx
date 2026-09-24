@@ -1,3 +1,4 @@
+import { reportsDataSource } from "@/lib/reports-data-source";
 import Link from "next/link";
 import { LogOut, Settings } from "lucide-react";
 import { redirect } from "next/navigation";
@@ -16,7 +17,7 @@ export default async function ReportsLayout({ children }: { children: React.Reac
   if (admin.role === "system_admin") redirect("/admin");
   const village = admin.villages.find((item) => item.is_active && item.activation_status === "approved") ?? admin.villages[0];
   if (!village) redirect("/onboarding");
-  const isMock = process.env.REPORTS_DATA_SOURCE !== "api";
+  const isMock = reportsDataSource() === "mock";
   return (
     <div className="min-h-screen bg-background text-foreground">
       <NavigationFeedback />
