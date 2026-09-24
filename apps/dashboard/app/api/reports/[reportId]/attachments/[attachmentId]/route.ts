@@ -6,6 +6,7 @@ const imageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const privateHeaders = {
   "Cache-Control": "private, no-store",
   "X-Content-Type-Options": "nosniff",
+  "Cross-Origin-Resource-Policy": "same-origin",
 };
 
 export async function GET(
@@ -39,7 +40,7 @@ export async function GET(
     }
 
     return new Response(upstream.body, {
-      headers: { ...privateHeaders, "Content-Type": contentType, "Cross-Origin-Resource-Policy": "same-origin" },
+      headers: { ...privateHeaders, "Content-Type": contentType },
     });
   } catch {
     return new Response(null, { status: 503, headers: privateHeaders });

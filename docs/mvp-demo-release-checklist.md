@@ -50,10 +50,11 @@ berbeda dari API key arah OpenClaw ke FastAPI.
 - [ ] Timeout, payload invalid, token salah dan gateway down ditangani tanpa secret.
 - [ ] Restart host mempertahankan sesi/config; probe GET tidak me-restart semua akun.
 
-Plugin saat ini membaca `LAPORPAK_CHANNEL_ACCOUNT_ID` dari environment proses.
-Farel wajib membuktikan pemetaan dua akun tidak memakai satu nilai global untuk
-keduanya. Gunakan konteks kanal terautentikasi yang didukung versi host atau
-runtime terisolasi per akun; keputusan runtime dicatat sebelum dua desa diaktifkan.
+Plugin mengambil akun dari konteks kanal tepercaya saat host menyediakan
+`agentAccountId`/`accountId`. `LAPORPAK_CHANNEL_ACCOUNT_ID` menjadi fallback
+untuk runtime satu akun. Farel wajib membuktikan bahwa dua akun host tidak memakai
+satu nilai global untuk keduanya. Verifikasi konteks kanal pada versi host yang
+terpasang sebelum dua desa diaktifkan.
 Nama desa dari pesan/model tidak boleh menjadi sumber scope.
 
 ## Pekerjaan Anjar

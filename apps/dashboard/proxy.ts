@@ -7,6 +7,7 @@ export async function proxy(request: NextRequest) {
   const policy = contentSecurityPolicy(nonce);
   request.headers.set("x-nonce", nonce);
   request.headers.set("Content-Security-Policy", policy);
+  request.headers.set("x-laporpak-return-path", request.nextUrl.pathname + request.nextUrl.search);
   const response = await updateSession(request);
   response.headers.set("Content-Security-Policy", policy);
   response.headers.set("Cache-Control", "private, no-store");
