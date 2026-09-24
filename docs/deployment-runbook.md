@@ -1,7 +1,8 @@
 # Deployment demo: Vercel, Railway dan OpenClaw VPS Linux
 
 Status 2026-09-25: prosedur target untuk implementasi/review. VPS dan domain
-belum tersedia; koneksi ke akun Cloudflare pemilik LaporPak belum berfungsi.
+belum tersedia. Akun Cloudflare Farel sudah dapat diakses, tetapi belum memiliki
+zone/domain atau Tunnel, dan Cloudflare Access belum diaktifkan.
 Jangan mengaktifkan konfigurasi yang belum didukung release terpasang.
 Catat SHA FE/BE/plugin serta versi OpenClaw dalam evidence sebelum menjalankan uji. Acceptance ada pada
 [release gate](mvp-demo-release-checklist.md).
@@ -31,7 +32,10 @@ sebelum perubahan; jangan menyalin folder auth/session ke repository.
    mapping desa/account di konfigurasi tepercaya. Nilai channel tidak boleh
    dipilih oleh model.
 3. Pada akun Cloudflare pemilik domain, tentukan hostname khusus
-   `openclaw.<domain-tim>`. Buat Access application untuk **seluruh hostname**
+   `openclaw.<domain-tim>`. Jika Access belum aktif, pemilik akun menyelesaikan
+   [onboarding Zero Trust](https://developers.cloudflare.com/cloudflare-one/setup/)
+   di dashboard (nama tim dan paket) terlebih dahulu.
+   Buat Access application untuk **seluruh hostname**
    dengan kebijakan Service Auth yang hanya menerima service token khusus Railway;
    jangan menambah Allow atau Bypass lain. Setelah kebijakan aktif, buat Tunnel
    yang menuju `http://127.0.0.1:<port-gateway>` dan terbitkan hostname itu.
