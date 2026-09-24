@@ -1,8 +1,8 @@
 # Release gate MVP demo LaporPak
 
 Tanggal keputusan: 2026-09-23. Baseline kode: `85587a9`.
-Status: kontrak penutupan untuk review tim; implementasi dan deployment di bawah
-belum diverifikasi. Dokumen ini bukan bukti bahwa MVP sudah selesai.
+Status: keputusan kontrak telah disepakati tim dan PR #40 telah digabung.
+Implementasi lokal telah diuji; deployment dan E2E di bawah belum ditutup. Dokumen ini bukan bukti bahwa MVP sudah selesai.
 
 ## Target dan batas demo
 
@@ -145,3 +145,7 @@ meninjau bukti. **Production ready** masih terbuka: sumber dan SOP resmi,
 operasi/backup/incident response, uji beban, pengamanan lampiran lanjutan,
 provisioning desa otomatis dan transport PDF WhatsApp. Tidak ada klaim antivirus
 hanya berdasarkan decode/re-encode gambar.
+
+## Progres implementasi 24 September 2026
+
+Adapter remote, backend readiness, frontend hardening, dan plugin kill switch telah dibuat pada branch terpisah yang saling bergantung. Bukti lokal dan pemeriksaan deployment dicatat di `p0-verification-evidence.md`. Sumber sintetis A/B tersedia di `data/knowledge-base/demo/`, belum diunggah atau di-embedding. Semua checkbox deployment tetap terbuka sampai release candidate yang sama terpasang di Vercel, Railway, dan host OpenClaw.
