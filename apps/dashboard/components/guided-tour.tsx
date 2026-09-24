@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
 import { HelpCircle, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { availableSteps, introSteps, pageGuide, tourStorageKey, type TourStep } from "@/lib/guided-tour";
+import { availableSteps, introSteps, pageGuide, pageGuideScope, pageTourStorageKey, tourStorageKey, type TourStep } from "@/lib/guided-tour";
 
 type TourMode = "intro" | "page" | null;
 type Spot = { left: number; top: number; right: number; bottom: number };
@@ -22,8 +22,11 @@ export function GuidedTour({ accountId, villageActive, knowledgeAvailable }: { a
   const menu = useRef<HTMLDetailsElement>(null);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const previousPath = useRef(pathname);
-  const autoChecked = useRef<string | null>(null);
+  const autoIntroSeen = useRef<string | null>(null);
+  const autoPagesSeen = useRef(new Set<string>());
   const [mode, setMode] = useState<TourMode>(null);
+  const [activePageId, setActivePageId] = useState<string | null>(null);
+  const [closedCount, setClosedCount] = useState(0);
   const [title, setTitle] = useState("");
   const [steps, setSteps] = useState<TourStep[]>([]);
   const [index, setIndex] = useState(0);
@@ -38,6 +41,7 @@ export function GuidedTour({ accountId, villageActive, knowledgeAvailable }: { a
       ? { title: "Kenali LaporPak", steps: introSteps(villageActive, mobile) }
       : pageGuide(pathname, villageActive, knowledgeAvailable);
     const shown = availableSteps(guide.steps, visible);
+    setActivePageId(kind === "page" && shown.length ? pageGuideScope(pathname, villageActive, knowledgeAvailable)?.id ?? null : null);
     setTitle(guide.title);
     setSteps(shown.length ? shown : [{ title: guide.title, body: "Panduan untuk bagian ini belum tersedia pada tampilan saat ini. Coba muat ulang halaman setelah data siap." }]);
     setIndex(0);
@@ -47,11 +51,17 @@ export function GuidedTour({ accountId, villageActive, knowledgeAvailable }: { a
 
   const close = useCallback(() => {
     if (mode === "intro") {
+      autoIntroSeen.current = accountId;
       try { localStorage.setItem(tourStorageKey(accountId), "done"); } catch { /* Storage may be unavailable in private mode. */ }
+    } else if (mode === "page" && activePageId) {
+      const key = pageTourStorageKey(accountId, activePageId);
+      autoPagesSeen.current.add(key);
+      try { localStorage.setItem(key, "done"); } catch { /* Keep completion for this session. */ }
     }
     setMode(null);
     setSpot(null);
-  }, [accountId, mode]);
+    setClosedCount((count) => count + 1);
+  }, [accountId, activePageId, mode]);
 
   useEffect(() => {
     if (previousPath.current !== pathname) {
@@ -62,16 +72,33 @@ export function GuidedTour({ accountId, villageActive, knowledgeAvailable }: { a
   }, [pathname]);
 
   useEffect(() => {
-    if (autoChecked.current === accountId) return;
-    let completed = false;
-    try { completed = localStorage.getItem(tourStorageKey(accountId)) === "done"; } catch { /* Keep the tour available. */ }
-    if (completed) { autoChecked.current = accountId; return; }
-    const timer = window.setTimeout(() => {
-      autoChecked.current = accountId;
-      if (!document.querySelector('[role="dialog"][aria-modal="true"]')) start("intro");
-    }, 450);
-    return () => window.clearTimeout(timer);
-  }, [accountId, start]);
+    const scope = pageGuideScope(pathname, villageActive, knowledgeAvailable);
+    let introDone = autoIntroSeen.current === accountId;
+    try { introDone ||= localStorage.getItem(tourStorageKey(accountId)) === "done"; } catch { /* Storage may be unavailable. */ }
+    let pageDone = !scope;
+    if (scope) {
+      const key = pageTourStorageKey(accountId, scope.id);
+      pageDone = autoPagesSeen.current.has(key);
+      try { pageDone ||= localStorage.getItem(key) === "done"; } catch { /* Use session memory. */ }
+    }
+    const kind = !introDone ? "intro" : !pageDone ? "page" : null;
+    if (!kind) return;
+
+    const startedAt = Date.now();
+    const check = () => {
+      if (Date.now() - startedAt > 30_000) { window.clearInterval(interval); window.clearTimeout(timer); return; }
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      if (kind === "page" && (!scope || !visible(scope.readyTarget))) return;
+      window.clearInterval(interval);
+      window.clearTimeout(timer);
+      if (kind === "intro") autoIntroSeen.current = accountId;
+      else if (scope) autoPagesSeen.current.add(pageTourStorageKey(accountId, scope.id));
+      start(kind);
+    };
+    const timer = window.setTimeout(check, 450);
+    const interval = window.setInterval(check, 250);
+    return () => { window.clearTimeout(timer); window.clearInterval(interval); };
+  }, [accountId, closedCount, knowledgeAvailable, pathname, start, villageActive]);
 
   useEffect(() => {
     if (!mode || !step) return;

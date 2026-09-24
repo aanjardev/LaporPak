@@ -1,8 +1,23 @@
 export type TourStep = { title: string; body: string; target?: string };
 export type PageGuide = { title: string; steps: TourStep[] };
 
-export const TOUR_VERSION = 1;
+export const TOUR_VERSION = 2;
 export const tourStorageKey = (accountId: string) => `laporpak:admin-tour:v${TOUR_VERSION}:${accountId}`;
+export const pageTourStorageKey = (accountId: string, pageId: string) => `laporpak:page-tour:v${TOUR_VERSION}:${accountId}:${pageId}`;
+
+export function pageGuideScope(pathname: string, active: boolean, knowledgeAvailable: boolean): { id: string; readyTarget: string } | null {
+  if (pathname.startsWith("/reports/settings/knowledge/") && knowledgeAvailable) return { id: "knowledge-detail", readyTarget: '[data-guide="knowledge-detail"]' };
+  if (pathname === "/reports/settings/knowledge" && knowledgeAvailable) return { id: "knowledge-list", readyTarget: '[data-guide="knowledge-add"]' };
+  if (pathname === "/reports/settings") return { id: "settings", readyTarget: '[data-guide="settings-account"]' };
+  if (/^\/reports\/requests\/[^/]+$/.test(pathname)) return { id: "request-detail", readyTarget: '[data-guide="request-data"]' };
+  if (pathname === "/reports/requests") return { id: "request-list", readyTarget: '[data-guide="request-list"]' };
+  if (pathname === "/reports/dashboard") return active
+    ? { id: "dashboard-active", readyTarget: '[data-guide="dashboard-kpis"]' }
+    : { id: "dashboard-inactive", readyTarget: '[data-guide="dashboard-inactive"]' };
+  if (/^\/reports\/[^/]+$/.test(pathname)) return { id: "report-detail", readyTarget: '[data-guide="report-info"]' };
+  if (pathname === "/reports") return { id: "report-list", readyTarget: '[data-guide="reports-filter"]' };
+  return null;
+}
 
 export function introSteps(active: boolean, mobile: boolean): TourStep[] {
   const steps: TourStep[] = [{
