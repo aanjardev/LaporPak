@@ -100,3 +100,5 @@ SOP layanan, provisioning otomatis dan operasi produksi tetap pekerjaan terpisah
 ### Identitas kanal runtime multi-desa
 
 Plugin mengambil akun dari konteks tepercaya OpenClaw (`agentAccountId` pada tool, `accountId` pada hook), bukan argumen model. Cache foto dibatasi akun, pengirim, dan session key. `LAPORPAK_CHANNEL_ACCOUNT_ID` hanya fallback host satu akun versi lama; jangan mengandalkannya untuk host dua desa. Verifikasi versi host menyediakan konteks tersebut sebelum E2E.
+
+Pada host Gateway, aktifkan `channels.whatsapp.accounts["<account-id>"].pluginHooks.messageReceived=true` **untuk setiap akun desa**. Uji foto masuk ke tool sebelum mengklaim REPORT berhasil; tanpa opt-in ini OpenClaw tidak mengirim hook foto ke plugin. Jika tool gagal, bot harus menyatakan laporan belum tersimpan dan tidak boleh memakai nomor tiket lama.

@@ -118,6 +118,19 @@ def test_whatsapp_accounts_are_provisioned_open_without_groups():
     assert any('groupPolicy "disabled" --strict-json' in call for call in calls)
 
 
+def test_pairing_enables_photo_hook_before_requesting_qr():
+    gateway = RecordingGateway()
+    gateway.start_pairing("laporpak-test")
+    assert gateway.calls[0] == (
+        "config",
+        "set",
+        'channels.whatsapp.accounts["laporpak-test"].pluginHooks.messageReceived',
+        "true",
+        "--strict-json",
+    )
+    assert gateway.calls[1][:4] == ("gateway", "call", "web.login.start", "--json")
+
+
 def test_restart_accepts_windows_shim_timeout_when_gateway_is_healthy(monkeypatch):
     gateway = RecordingGateway()
     monkeypatch.setattr(gateway_module, "_gateway_restarted_at", 0.0)

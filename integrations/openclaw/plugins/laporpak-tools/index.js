@@ -299,7 +299,7 @@ export function buildCreateReportTool(
 
       const attachments = await attachmentProvider(context, env);
       if (attachments.length === 0) {
-        throw new Error("No trusted WhatsApp photo is available; ask the citizen to send it again");
+        throw new Error("REPORT_NOT_CREATED: No trusted WhatsApp photo is available. Do not claim a ticket; ask the citizen to send the photo again");
       }
       const reportDraftId = uuidFromFingerprint(stableJson({
         channelAccountId,

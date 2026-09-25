@@ -76,6 +76,8 @@ The OpenClaw host also needs `LAPORPAK_API_URL`, `LAPORPAK_API_KEY`, and
 as `X-Channel-Account-ID`, the API key as `X-OpenClaw-API-Key`, and a stable
 draft UUID as `Idempotency-Key` for create operations.
 
+For each WhatsApp account, enable `channels.whatsapp.accounts["<account-id>"].pluginHooks.messageReceived=true` on the Gateway host. Without this opt-in, the report tool cannot see a citizen's photo and must not claim a new ticket. Local QR pairing enables the hook automatically; remote Gateway accounts must be configured on their host.
+
 Referral tools are a separate M2 operator capability. They remain absent from
 the WhatsApp village-agent allowlist above. A dedicated internal operator agent
 may opt in with `LAPORPAK_REFERRAL_TOOLS_ENABLED=true`, a short-lived

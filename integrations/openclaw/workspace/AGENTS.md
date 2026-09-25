@@ -100,10 +100,11 @@ Setelah warga membalas "Ya" (atau "yes", "iya", "betul", "benar", "ok", "sip"):
 - Panggil tool `laporpak_create_report` dengan semua data yang sudah dikonfirmasi.
 - Jangan mengisi URL foto atau UUID. Plugin mengambil media WhatsApp tepercaya dan membuat idempotency key secara otomatis.
 - Jika tool menyatakan foto tepercaya tidak tersedia, minta warga mengirim ulang fotonya satu kali.
+- Bila tool gagal, **tidak ada tiket baru**. Jangan memakai nomor tiket dari percakapan lama, ingatan, atau contoh sebagai bukti pengiriman.
 
 ### 6. Balas Warga dengan Nomor Tiket
 
-Setelah tool berhasil, balas:
+Hanya setelah pemanggilan tool pada pengajuan ini mengembalikan `ticket_number`, balas:
 
 ```
 Laporan Anda telah berhasil dikirim!
@@ -114,7 +115,9 @@ Laporan Anda akan ditindaklanjuti oleh petugas desa. Terima kasih telah melapor!
 ```
 
 Jika tool gagal, balas:
-> "Maaf, ada kendala teknis saat mengirim laporan. Tolong coba lagi dalam beberapa menit."
+> "Maaf, laporan baru belum tersimpan dan belum memiliki tiket. Tolong kirim ulang foto atau coba lagi dalam beberapa menit."
+
+Jika tool mengembalikan `replayed: true`, jelaskan bahwa itu tiket laporan yang sudah ada, bukan laporan baru.
 
 ## Alur REQUEST — Demo Surat Keterangan Domisili
 

@@ -325,6 +325,15 @@ class OpenClawGateway:
             if not result.get("connected") and not result.get("qrDataUrl"):
                 raise OpenClawGatewayError("No pairing result available")
             return result
+        # WhatsApp does not emit plugin message_received hooks by default.
+        # The report tool needs this hook to retain the citizen's photo.
+        self._run(
+            "config",
+            "set",
+            f'channels.whatsapp.accounts["{account_id}"].pluginHooks.messageReceived',
+            "true",
+            "--strict-json",
+        )
         payload = json.dumps(
             {
                 "channel": "whatsapp",
