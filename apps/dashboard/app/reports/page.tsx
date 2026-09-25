@@ -77,7 +77,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
         <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-3xl">Laporan warga</h1>
       </header>
 
-      <section aria-label="Pencarian dan filter laporan" className="ui-panel p-4 sm:p-5">
+      <section data-guide="reports-filter" aria-label="Pencarian dan filter laporan" className="ui-panel p-4 sm:p-5">
         <form action="/reports" method="get" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_155px_155px_170px_auto] xl:items-end">
           <div className="space-y-1.5">
             <label htmlFor="search" className="text-sm font-medium text-foreground">Cari laporan</label>
@@ -116,7 +116,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
         )}
       </section>
 
-      <section aria-labelledby="hasil-laporan" className="overflow-hidden ui-panel">
+      <section data-guide="reports-list" aria-labelledby="hasil-laporan" className="overflow-hidden ui-panel">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-4 sm:px-6">
           <h2 id="hasil-laporan" className="text-lg font-semibold text-foreground">Daftar laporan</h2>
           <p className="text-sm text-muted-foreground">{result.total} laporan</p>
@@ -185,7 +185,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-4 text-sm sm:px-6">
           <p className="text-muted-foreground">Menampilkan {start}–{end} dari {result.total}</p>
-          <nav aria-label="Halaman laporan" className="flex items-center gap-2">
+          <nav data-guide="reports-pagination" aria-label="Halaman laporan" className="flex items-center gap-2">
             {result.page > 1 ? (
               <Link href={pageHref(query, result.page - 1)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-input px-3 font-medium text-foreground hover:bg-background focus-visible:outline-2 focus-visible:outline-ring"><ChevronLeft aria-hidden="true" size={16} /> Sebelumnya</Link>
             ) : null}

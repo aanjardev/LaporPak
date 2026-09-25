@@ -11,7 +11,7 @@ export function MobileNavigation({ accountName, villageName }: { accountName: st
   const [open, setOpen] = useState(false);
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger aria-label="Buka navigasi" className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-border text-brand lg:hidden"><Menu size={21} /></Dialog.Trigger>
+      <Dialog.Trigger data-guide="mobile-menu" aria-label="Buka navigasi" className="inline-flex size-11 shrink-0 items-center justify-center rounded-md border border-border text-brand lg:hidden"><Menu size={21} /></Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-brand/50" />
         <Dialog.Popup className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[calc(100vw-3rem)] flex-col overflow-y-auto bg-brand p-5 text-white shadow-lg">

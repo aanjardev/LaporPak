@@ -1340,3 +1340,18 @@ Tenggat standar adalah 15 detik untuk pembacaan, 30 detik untuk mutasi, 60
 detik untuk upload/download, dan 90 detik untuk QR. Polling berjalan satu
 request pada satu waktu, dijeda saat tab tersembunyi, lalu berhenti setelah dua
 menit dan menyediakan pemeriksaan manual.
+
+## Panduan interaktif Admin Desa
+
+Tur awal tampil otomatis sekali per akun pada browser setelah portal Admin Desa
+tersedia. Panduan tiap jenis halaman terbuka otomatis pada kunjungan pertamanya
+setelah konten utama muncul; detail tiket lain tidak mengulang panduan yang sama.
+Tombol **Bantuan halaman** dapat mengulang panduan konteks atau tur awal. Gunakan maskot
+transparan hanya di dialog panduan; panel administrasi rutin tetap mengikuti gaya
+institusional. Sorot target dengan batas kuning dan redupkan area lain, tetapi
+sebutkan nama target dalam teks agar panduan tidak bergantung pada warna.
+
+Panduan hanya menjelaskan, tidak menjalankan aksi petugas. Langkah kondisional
+yang tidak terlihat dilewati. Dialog menjaga fokus, menyediakan Kembali,
+Selanjutnya, dan Lewati, serta menghormati reduced motion. Status selesai
+disimpan per ID akun dan jenis halaman di browser ini, tanpa sinkronisasi antarperangkat.

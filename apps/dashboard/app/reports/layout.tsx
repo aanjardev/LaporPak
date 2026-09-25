@@ -8,6 +8,7 @@ import { logoutAction } from "@/app/auth-actions";
 import { BrandLogo } from "@/components/brand-logo";
 import { MobileNavigation } from "@/components/mobile-navigation";
 import { NavigationFeedback } from "@/components/navigation-feedback";
+import { GuidedTour } from "@/components/guided-tour";
 import { ReportsNav } from "@/components/reports-nav";
 import { getCurrentAdmin, requireSignedIn } from "@/lib/auth";
 
@@ -38,6 +39,7 @@ export default async function ReportsLayout({ children }: { children: React.Reac
           </div>
           <div className="flex shrink-0 items-center gap-2 sm:gap-5">
             {isMock && <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">Data simulasi</span>}
+            <GuidedTour accountId={admin.auth_user_id} villageActive={village.is_active && village.activation_status === "approved"} knowledgeAvailable={!isMock} />
             <form action={logoutAction}><button type="submit" className="inline-flex min-h-11 items-center gap-2 rounded-md px-3 text-sm font-semibold text-brand hover:bg-muted"><LogOut aria-hidden="true" size={17} /><span>Keluar</span></button></form>
           </div>
         </header>
