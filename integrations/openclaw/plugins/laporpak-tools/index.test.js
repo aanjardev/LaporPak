@@ -389,6 +389,13 @@ test("trusted media is isolated by session and cannot move to another draft", as
     );
     await assert.rejects(otherSession.execute("other", input), /No trusted WhatsApp photo/);
 
+    const otherVillage = buildCreateReportTool(
+      { messageChannel: "whatsapp", requesterSenderId: "628199999999", sessionKey: "session-key-a" },
+      fetchImpl,
+      { ...testEnv, LAPORPAK_CHANNEL_ACCOUNT_ID: "whatsapp-other-village" },
+    );
+    await assert.rejects(otherVillage.execute("other-village", input), /No trusted WhatsApp photo/);
+
     const tool = buildCreateReportTool(
       { messageChannel: "whatsapp", requesterSenderId: "628199999999", sessionKey: "session-key-a", sessionId: "runtime-session-id" },
       fetchImpl,
@@ -639,6 +646,80 @@ test("trusted runtime account overrides single-account fallback", () => {
   assert.equal(channelEnvironment({ deliveryContext: { accountId: "village-a" } }, testEnv).LAPORPAK_CHANNEL_ACCOUNT_ID, "village-a");
   assert.throws(() => channelEnvironment({ agentAccountId: "" }, testEnv), /invalid/);
   assert.equal(testEnv.LAPORPAK_CHANNEL_ACCOUNT_ID, "whatsapp-demo");
+  const twoVillages = { ...testEnv, LAPORPAK_REQUIRE_RUNTIME_ACCOUNT: "true" };
+  assert.throws(() => channelEnvironment({}, twoVillages), /required/);
+  assert.equal(channelEnvironment({ agentAccountId: "village-b" }, twoVillages).LAPORPAK_CHANNEL_ACCOUNT_ID, "village-b");
+});
+
+test("registered citizen tool sends the runtime account for each village", async () => {
+  const previous = {
+    url: process.env.LAPORPAK_API_URL,
+    key: process.env.LAPORPAK_API_KEY,
+    account: process.env.LAPORPAK_CHANNEL_ACCOUNT_ID,
+    required: process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT,
+    fetch: globalThis.fetch,
+  };
+  Object.assign(process.env, {
+    LAPORPAK_API_URL: testEnv.LAPORPAK_API_URL,
+    LAPORPAK_API_KEY: testEnv.LAPORPAK_API_KEY,
+    LAPORPAK_CHANNEL_ACCOUNT_ID: "village-a",
+    LAPORPAK_REQUIRE_RUNTIME_ACCOUNT: "true",
+  });
+  const factories = new Map();
+  plugin.register({ on() {}, registerTool(factory, { name }) { factories.set(name, factory); } });
+  const accountHeaders = [];
+  globalThis.fetch = async (_url, options) => {
+    accountHeaders.push(options.headers["X-Channel-Account-ID"]);
+    return Response.json({ items: [] });
+  };
+  try {
+    const factory = factories.get("laporpak_track_report");
+    const sender = { messageChannel: "whatsapp", requesterSenderId: "6281000000001" };
+    await factory({ ...sender, agentAccountId: "village-a" }).execute("track-a", {});
+    await factory({ ...sender, agentAccountId: "village-b" }).execute("track-b", {});
+    assert.deepEqual(accountHeaders, ["village-a", "village-b"]);
+    assert.throws(() => factory(sender), /Trusted channel account is required/);
+  } finally {
+    globalThis.fetch = previous.fetch;
+    for (const [key, value] of Object.entries({
+      LAPORPAK_API_URL: previous.url,
+      LAPORPAK_API_KEY: previous.key,
+      LAPORPAK_CHANNEL_ACCOUNT_ID: previous.account,
+      LAPORPAK_REQUIRE_RUNTIME_ACCOUNT: previous.required,
+    })) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test("two-village mode ignores media hooks without a trusted account", async () => {
+  const previous = {
+    account: process.env.LAPORPAK_CHANNEL_ACCOUNT_ID,
+    required: process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT,
+  };
+  process.env.LAPORPAK_CHANNEL_ACCOUNT_ID = "village-a";
+  process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT = "true";
+  try {
+    let inbound;
+    plugin.register({ on(_event, handler) { inbound = handler; }, registerTool() {} });
+    inbound({
+      senderId: "6281000000001",
+      sessionKey: "two-village-untrusted-media",
+      media: [{ path: "missing-test-photo.jpg", contentType: "image/jpeg" }],
+    }, {});
+    const tool = buildCreateReportTool(
+      { messageChannel: "whatsapp", requesterSenderId: "6281000000001", sessionKey: "two-village-untrusted-media" },
+      async () => { throw new Error("Backend must not be called"); },
+      testEnv,
+    );
+    await assert.rejects(tool.execute("untrusted-media", input), /No trusted WhatsApp photo/);
+  } finally {
+    if (previous.account === undefined) delete process.env.LAPORPAK_CHANNEL_ACCOUNT_ID;
+    else process.env.LAPORPAK_CHANNEL_ACCOUNT_ID = previous.account;
+    if (previous.required === undefined) delete process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT;
+    else process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT = previous.required;
+  }
 });
 
 test("disabled citizen tools never return success or retry", async () => {

@@ -8,14 +8,14 @@ FastAPI does not call Gemini.
 
 1. Configure Google AI Studio authentication outside this repository:
 
-   ```powershell
+   ```bash
    openclaw onboard --auth-choice gemini-api-key
    openclaw models list --provider google
    ```
 
    `GEMINI_API_KEY` belongs in the OpenClaw host environment (for example,
-   `%USERPROFILE%\.openclaw\.env` on Windows). Use `.env.example` in this
-   directory only as a key-name template; never add a real value to Git.
+   `~/.openclaw/.env` for the dedicated Linux service user). Use `.env.example`
+   in this directory only as a key-name template; never add a real value to Git.
 
 2. Enable `llm-task` and `laporpak-tools`, pin the evaluated model, and limit
    the agent to the approved LaporPak tools. Merge these entries
@@ -71,10 +71,19 @@ Use `details.json` as the untrusted result and validate it again with
 Do not put `GEMINI_API_KEY`, channel credentials, or backend credentials in
 this directory, prompts, logs, or model input.
 
-The OpenClaw host also needs `LAPORPAK_API_URL`, `LAPORPAK_API_KEY`, and
-`LAPORPAK_CHANNEL_ACCOUNT_ID` from its local environment. Send the channel ID
-as `X-Channel-Account-ID`, the API key as `X-OpenClaw-API-Key`, and a stable
+The OpenClaw host also needs `LAPORPAK_API_URL` and `LAPORPAK_API_KEY` from its
+local environment. For two villages, set `LAPORPAK_REQUIRE_RUNTIME_ACCOUNT=true`
+and use the trusted OpenClaw channel account context; do not set one global
+`LAPORPAK_CHANNEL_ACCOUNT_ID` for both. A single-account host may use that
+environment value as a fallback. Send the channel ID as `X-Channel-Account-ID`,
+the API key as `X-OpenClaw-API-Key`, and a stable
 draft UUID as `Idempotency-Key` for create operations.
+
+For each WhatsApp account on the two-village host, enable
+`channels.whatsapp.accounts.<id>.pluginHooks.messageReceived=true`; otherwise
+the plugin cannot receive inbound report photos on OpenClaw versions that
+require opt-in. Verify the installed runtime supplies `agentAccountId` to
+tools and `accountId` to the media hook before merging the two-village guard.
 
 Referral tools are a separate M2 operator capability. They remain absent from
 the WhatsApp village-agent allowlist above. A dedicated internal operator agent
@@ -105,7 +114,7 @@ Knowledge embeddings are generated only on this host. Configure
 `GEMINI_API_KEY` and optionally `GEMINI_EMBEDDING_MODEL` (default
 `gemini-embedding-001`), then drain all approved/development-demo jobs with:
 
-```powershell
+```bash
 cd integrations/openclaw/plugins/laporpak-tools
 npm run embeddings:drain
 ```
@@ -115,7 +124,7 @@ failed job to FastAPI before exiting. ASK creates a matching
 `RETRIEVAL_QUERY` vector. If ASK returns `trust_level=demo`, the tool includes a
 simulation notice which must remain visible in the citizen response.
 
-See `../../docs/whatsapp-setup.md` for Windows setup, QR pairing, access
+See `../../docs/whatsapp-setup.md` for local Windows setup, QR pairing, access
 policy, verification, and troubleshooting.
 
 The current baseline is `google/gemini-3.1-flash-lite`. On 2026-09-17 it

@@ -161,6 +161,9 @@ export function channelEnvironment(context, env = process.env) {
   if (account !== undefined && (typeof account !== "string" || !account.trim())) {
     throw new Error("Trusted channel account is invalid");
   }
+  if (account === undefined && env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT === "true") {
+    throw new Error("Trusted channel account is required");
+  }
   return account === undefined ? env : { ...env, LAPORPAK_CHANNEL_ACCOUNT_ID: account.trim() };
 }
 
@@ -873,7 +876,8 @@ export default {
   register(api) {
     api.on("message_received", (event, hookContext = {}) => {
       pruneMediaCache();
-      const channelAccountId = hookContext.accountId?.trim() || process.env.LAPORPAK_CHANNEL_ACCOUNT_ID?.trim();
+      const runtimeAccountId = typeof hookContext.accountId === "string" ? hookContext.accountId.trim() : "";
+      const channelAccountId = runtimeAccountId || (process.env.LAPORPAK_REQUIRE_RUNTIME_ACCOUNT === "true" ? "" : process.env.LAPORPAK_CHANNEL_ACCOUNT_ID?.trim());
       const session = hookContext.sessionKey ?? event.sessionKey ?? event.sessionId ?? null;
       const key = channelAccountId
         ? mediaCacheKey(

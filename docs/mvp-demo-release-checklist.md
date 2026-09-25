@@ -37,13 +37,16 @@ implementasi digabung; baseline di atas bukan SHA hasil pengujian berikutnya.
 ## Kontrak backend dan gateway
 
 Detail API berada di [api-contract.md](api-contract.md#kontrak-penutupan-demo-2026-09-23).
-Railway memanggil host Windows melalui Cloudflare Tunnel + Access, lalu Admin
+Railway memanggil VPS Linux OpenClaw melalui Cloudflare Tunnel + Access, lalu Admin
 HTTP RPC OpenClaw. Gateway tetap loopback. Token arah Railway ke Gateway harus
 berbeda dari API key arah OpenClaw ke FastAPI.
 
 - [ ] Anjar/Farel membuktikan HTTPS, Access service token, Gateway bearer token,
   dan versi OpenClaw host mendukung RPC yang dibutuhkan.
-- [ ] Dua agent/workspace/account/binding dipra-konfigurasi pada host persisten.
+- [ ] VPS Linux memiliki Gateway loopback bertoken, service auto-start, dan
+  dua agent/workspace/account/binding yang persisten setelah reboot.
+- [ ] Hook `message_received` diaktifkan untuk kedua akun WhatsApp; tanpa
+  opt-in ini foto tidak sampai ke plugin pada runtime OpenClaw terkait.
 - [ ] Status, pairing/wait, start/stop dan logout hanya menyentuh akun yang diminta.
 - [ ] Akun belum diprovisioning menghasilkan `409 OPENCLAW_PROVISIONING_REQUIRED`.
 - [ ] Adapter remote tidak menulis workspace Railway atau fallback ke CLI lokal.
@@ -52,8 +55,9 @@ berbeda dari API key arah OpenClaw ke FastAPI.
 
 Plugin mengambil akun dari konteks kanal tepercaya saat host menyediakan
 `agentAccountId`/`accountId`. `LAPORPAK_CHANNEL_ACCOUNT_ID` menjadi fallback
-untuk runtime satu akun. Farel wajib membuktikan bahwa dua akun host tidak memakai
-satu nilai global untuk keduanya. Verifikasi konteks kanal pada versi host yang
+untuk runtime satu akun. Pada host dua desa, set
+`LAPORPAK_REQUIRE_RUNTIME_ACCOUNT=true` agar panggilan tanpa konteks akun ditolak.
+Farel wajib membuktikan kedua akun dan konteks kanal pada versi host yang
 terpasang sebelum dua desa diaktifkan.
 Nama desa dari pesan/model tidak boleh menjadi sumber scope.
 
